@@ -2,26 +2,28 @@
 
 ## Why
 
-Software project teams need a shared way to assign work, report progress, review completed work, and understand project activity without piecing updates together across conversations and GitHub. This change defines the product's initial task-management and AI-assisted progress workflow so implementation can proceed against reviewed requirements.
+Small software teams lose time to status reporting: product managers chase developers for updates, and developers write updates that repeat what their commits already show. This change defines a lightweight task board where developers attach their GitHub commits to tasks, AI checks those commits against each task's acceptance criteria, and AI turns project activity into progress reports, so the product manager can see where the project stands without asking.
 
 ## What Changes
 
-- Introduce projects with one product manager and members who may participate in multiple projects.
-- Let product managers create and assign tasks, including acceptance criteria, and let developers submit progress and work for review.
-- Require product-manager approval before a developer-submitted task is completed; rejection includes feedback and returns the task to In Progress.
-- Let developers provide GitHub evidence for a task and let the application retrieve related commit activity.
-- Add AI assessment of how well submitted work appears to meet task acceptance criteria.
-- Provide product managers a daily summary of developer-submitted task updates and GitHub activity for 8:00am–6:00pm Singapore Time (SGT, UTC+08:00).
-- Keep the supported GitHub reference types (pull requests, branch links, or both) open for product confirmation.
+- Introduce projects with exactly one product manager and any number of developers. A person may belong to several projects, with one role in each.
+- People sign in with GitHub, so each developer's GitHub identity is verified.
+- Product managers create, edit, reassign, and delete tasks with acceptance criteria. Tasks move through To Do, In Progress, In Review, and Done, and only the product manager can approve a task or request changes.
+- The product manager links one GitHub repository to the project. Developers pick their own commits from it with a commit picker instead of pasting links.
+- **Developer AI feature: Acceptance Criteria Check.** For each criterion, the AI reports addressed, not addressed, or unclear, with evidence quoted from the diff, plus possible gaps. There is no numeric score. The latest result is attached to the submission for the product manager.
+- **Product manager AI feature: Progress Report.** An on-demand summary for a date range (default: today, SGT) built from structured activity, with every statement citing task IDs.
+- AI safeguards for both features: untrusted-input handling, secret redaction, output validation, per-person quotas, and usage logging.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `task-management`: Project membership, the single product-manager role per project, task assignment, progress updates, and approval/rejection lifecycle.
-- `github-evidence`: Developer-supplied GitHub references and retrieval of associated commit activity. Supported reference types remain to be confirmed.
-- `completion-assessment`: AI assessment of submitted work against task acceptance criteria, presented as decision support for the product manager.
-- `daily-progress-report`: Daily project summaries combining developer task updates and GitHub activity within the shared SGT reporting window.
+- `task-management`: Project membership and roles, task management, the task lifecycle, progress updates, and the review and approval flow.
+- `identity-and-access`: GitHub sign-in, verified GitHub identity, and server-side enforcement of project roles.
+- `github-evidence`: Repository linking, the developer commit picker, attaching commits to tasks, and reporting unavailable evidence.
+- `completion-assessment`: The developer's Acceptance Criteria Check and how its result is shown to the product manager.
+- `daily-progress-report`: The product manager's Progress Report for a date range.
+- `ai-safeguards`: Protections and resource limits shared by every LLM call.
 
 ### Modified Capabilities
 
@@ -29,7 +31,8 @@ None.
 
 ## Impact
 
-- Product requirements and later implementation for project membership, tasks, review workflow, GitHub integration, AI assessment, and daily reports.
-- GitHub authorization and data access requirements, which must be specified before implementation.
-- AI input/output and reporting contracts, which must avoid treating generated assessments as approval actions.
+- Requirements for the whole initial product, including authentication, GitHub integration, both AI features, and AI security.
+- A read-only GitHub credential per project, stored encrypted on the server.
+- SoC LLM usage, limited by per-person quotas and the school's own limits.
+- Separate development and production environments (database, deployment, credentials).
 - No existing OpenSpec capability specs are present to modify.
