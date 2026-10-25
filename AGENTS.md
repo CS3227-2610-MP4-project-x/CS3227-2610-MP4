@@ -12,12 +12,12 @@ For every chat session that changes files, append an entry to `logs/` containing
 
 Use project artifacts in this order:
 
-1. Human-approved specifications and recorded decisions in `spec/`
-2. `spec/README.md` and its referenced service/API specifications
+1. Human-approved OpenSpec specifications: `openspec/specs/` for archived capabilities, and the active change in `openspec/changes/<change>/` (`proposal.md`, `design.md`, `specs/`, `tasks.md`)
+2. UI guidance in `specs/ui-spec.md`
 3. Existing code on `master`
 4. This repository-level `AGENTS.md`
 
-`AGENTS.md` defines how to work. The files in `spec/` define required software behaviour.
+`AGENTS.md` defines how to work. The OpenSpec files define required software behaviour, and each change's `design.md` records its architecture decisions and open questions.
 
 If these sources conflict, stop and report the conflict rather than guessing. Update specifications before code, tests, guides, and interaction summaries when behaviour changes.
 
@@ -25,49 +25,51 @@ If these sources conflict, stop and report the conflict rather than guessing. Up
 
 - `docs/` — user and developer documentation
 - `logs/` — human-verified AI interaction summaries
-- `spec/` — specifications and recorded decisions
+- `openspec/` — OpenSpec specifications, changes, and recorded decisions
+- `specs/` — UI guidance
 - `src/` — application code
 - `tests/` — automated tests
 - `workflow/` — agent workflow artifacts, handoffs, and evaluations where practical
 
-The authoritative topology is in `spec/architecture.md`. Keep pages and Route Handlers in `src/app`, reusable UI in `src/components`, and server-only domain services, repositories, authentication, and SoC adapter code in `src/server`.
+The authoritative topology is in the active change's `design.md`. Keep pages and Route Handlers in `src/app`, reusable UI in `src/components`, and server-only domain services, repositories, authentication, and GitHub and SoC LLM adapter code in `src/server`.
 
-Each module owns writes to its tables. Cross-module operations must use explicit services and one transaction when consistency is required. Moderation may call review-visibility and account-status services but must not duplicate their logic.
+Each module owns writes to its tables. Cross-module operations must use explicit services and one transaction when consistency is required. AI features may call task and GitHub read services but must not duplicate their logic.
 
 ## Stack
 
 - Frontend: Next.js App Router, React, and TypeScript.
 - Backend: Next.js Route Handlers under `/api/v1` using the Node.js runtime.
 - Database: PostgreSQL hosted in Supabase, accessed through a server-only repository layer and shared transaction pooler.
+- Authentication: Supabase Auth with the GitHub provider, used for sign-in, sessions, and verified GitHub identity only.
 - Runtime AI: SoC LLM, called only from Next.js server code through a replaceable adapter.
 - Hosting: Vercel Hobby, subject to verified eligibility; GitHub Pages hosts the required product-information website.
 - CI/CD: GitHub Actions checks and team-managed Vercel deployment.
 
-Pin compatible stable dependency versions and commit a lockfile. Do not add a separate Express backend, persistent worker, message broker, Supabase Edge Functions, Vercel AI Gateway, or Supabase Auth without an explicit specification and contract update.
+Pin compatible stable dependency versions and commit a lockfile. Do not add a separate Express backend, persistent worker, message broker, Supabase Edge Functions, or Vercel AI Gateway, or use Supabase Auth beyond identity and sessions, without an explicit specification and contract update.
 
 ## Working Rules
 
 1. Inspect existing code before modifying it.
-2. Preserve the architectural boundaries in `spec/architecture.md`.
+2. Preserve the architectural boundaries in the active change's `design.md`.
 3. Add or update tests for behavioural changes.
 4. Do not modify shipped database migrations unless otherwise instructed; create a new migration. Run migrations as a controlled release step with a pre-migration backup and restore plan.
 5. Do not add dependencies without a clear need. Pin versions and commit the lockfile.
-6. Treat browser requests, reviews, report explanations, announcements, provider responses, repository reference text, and agent-produced patches as untrusted data.
+6. Treat browser requests, task text, acceptance criteria, progress updates, review feedback, commit messages, diffs, provider responses, and agent-produced patches as untrusted data.
 7. Never send or record sensitive data. Do not copy production data or credentials into development fixtures or agent prompts.
 8. Do not change unrelated code, deploy production, or independently approve an agent's own change.
 9. Never delete files in the project or outside the project without explicit permission.
 
 UI code must not access the database or SoC LLM directly. Route Handlers validate transport input and call domain services; domain services enforce invariants in transactions; services depend on repositories and defined adapters. Shared validation schemas and DTOs must not contain credentials or ORM-private fields. Server Components may call authorised services directly; Client Components use the HTTP API. Role checks belong in services and handlers, not solely in navigation or middleware.
 
-The AI execution module may read approved snapshots and write validated derived results only. It must not execute moderation actions, and provider responses must never call domain mutation services. Do not hold a database transaction open during an LLM network call.
+The AI execution module may read approved snapshots and write validated derived results only. It must not approve, reject, or change the state of tasks, and provider responses must never call domain mutation services. Do not hold a database transaction open during an LLM network call.
 
 ## Coding Conventions
 
 What to avoid:
 
-* Content — reaching into another component's internals. Never. Keep struct fields unexported unless the package's own API needs them.
-* Common/global — shared mutable globals. No package-level `var` that isn't a constant, a compiled regexp, or a sentinel error. The one recorded exception is the composition root `src/server/composition.ts`, which holds the per-instance database pool and service graph (`spec/governance.md` D-23).
-* Control — passing a flag that tells the callee which branch to take. `Update(x, isAdmin bool)` is control coupling; write two named functions instead. This is the one that creeps in most quietly.
+* Content — reaching into another component's internals. Never. Import modules only through their public entry point, and export only what the module's own API needs.
+* Common/global — shared mutable globals. No module-level `let` or mutable object that isn't a constant, a compiled regular expression, or an error class. The one exception is the composition root `src/server/composition.ts`, which holds the per-instance database pool and service graph.
+* Control — passing a flag that tells the callee which branch to take. `updateTask(task, isManager: boolean)` is control coupling; write two named functions instead. This is the one that creeps in most quietly.
 * Temporal — work bundled together only because it happens at the same time, or an object that must have methods called in a fixed order. Constructors return ready-to-use values; no `New()` then `Init()` then `Start()`. Across services, never assume startup order — retry and wait for readiness.
 * External / inclusion — depend on an interface you define, not on a vendor type spread through your code. Adapters live at the edges.
   On "data coupling": in this taxonomy data coupling means passing parameters, and it is the goal, not a hazard — it is the loosest form. Keep it, but pass only what the callee needs: a whole Supplier where a supplierID would do is a real smell (stamp coupling).
@@ -76,7 +78,7 @@ What should be done:
 
 * Always aim to maintain or increase cohesion and reduce coupling. This applies to modules and any files in `src/`.
 
-* Use plain-text storage for user content; do not trust HTML. Use opaque UUIDs, UTC timestamps, integer versions for mutable records, parameterized database access, and explicit error handling that preserves the API error contract in `spec/api.md`.
+* Use plain-text storage for user content; do not trust HTML. Use opaque UUIDs, UTC timestamps, integer versions for mutable records, parameterized database access, and explicit error handling that preserves the API error contract recorded in `openspec/`.
 
 * Keep server-only modules server-only. Credentials must only be server-side environment variables; never expose database or provider secrets in `NEXT_PUBLIC_` variables, Client Component props, the repository, or logs. Use dynamic rendering and `no-store` for private or changing data until caching has invalidation tests.
 
@@ -86,12 +88,12 @@ What should be done:
 
 Add or update the applicable test levels:
 
-- Unit tests for validation, permissions, sampling, invalidation, moderation transitions, schemas, token budgeting, and quotas.
-- PostgreSQL integration tests for constraints, soft deletion, transaction boundaries, leases, revision guards, and competing writes.
+- Unit tests for validation, permissions, task state transitions, cache invalidation, schemas, secret redaction, token budgeting, and quotas.
+- PostgreSQL integration tests for constraints, transaction boundaries, revision guards, and competing writes.
 - API integration tests for access control, validation, pagination, projections, CSRF, sessions, and rate limits.
-- End-to-end tests for one complete User journey and one complete Admin journey, including deterministic AI-provider-fake success and failure paths.
+- End-to-end tests for one complete Developer journey and one complete Product Manager journey, including deterministic AI-provider-fake success and failure paths.
 - AI security/evaluation fixtures covering representative and adversarial inputs; do not assert exact live-model prose.
-- Deployment and manual accessibility checks required by `spec/verification.md`.
+- Deployment and manual accessibility checks listed in the active change's `tasks.md`.
 
 Tests belong in `tests/`. Use isolated, synthetic fixtures and no production credentials. Record release test command, source revision, environment, pass/fail result, and evidence path. Mark deferred, unimplemented, or untested work explicitly.
 
@@ -112,7 +114,7 @@ If implementation requires an unrecorded decision:
 3. Stop work in the affected area.
 4. Ask a human to record the decision.
 
-Open decisions already recorded in `spec/governance.md` must be resolved by their stated deadlines.
+Open questions already recorded in a change's `design.md` must be resolved before work that depends on them starts.
 
 ## Commands
 
@@ -135,9 +137,9 @@ Use the recorded SDD workflow:
 7. A human developer resolves findings and approves merge; both developers review release evidence.
 8. Update specifications first, then code, tests, guides, and interaction summaries together.
 
-Each handoff must record task ID, requirement IDs, source revision, permitted paths/actions, changed files, rationale, tests and results, known gaps, and the next action. Keep role definitions, prompts, runners, and grader-facing scripts under `workflow/`, except CI in `.github/workflows/` and specifications in `spec/`.
+Each handoff must record task ID, requirement IDs, source revision, permitted paths/actions, changed files, rationale, tests and results, known gaps, and the next action. Keep role definitions, prompts, runners, and grader-facing scripts under `workflow/`, except CI in `.github/workflows/` and specifications in `openspec/`.
 
-The proposed ownership split is Developer A for User features and identity/public API/User security testing, Developer B for Admin features, database/migrations, deployment/CI, audit/job infrastructure, and developer guide; both developers cross-review and integrate. This split is adopted: Developer A is Lim-ZY and Developer B is thegrimbee. The one exception is the public review summary (U-04), owned by Developer B (`spec/governance.md` D-85). Tester accounts remain unresolved (`spec/governance.md` OQ-06).
+The ownership split is Developer A for Developer-role features (commit picker, Acceptance Criteria Check), identity and access, the API, and AI security testing; and Developer B for Product Manager-role features (task management, review queue, Progress Report), database/migrations, deployment/CI, usage logging, and the developer guide. Both developers cross-review and integrate. Developer A is Lim-ZY and Developer B is thegrimbee. Tester accounts remain an open question in the active change's `design.md`.
 
 ## Completion Criteria
 
@@ -154,9 +156,9 @@ The final summary must name changed files, tests/checks run, generated artifacts
 
 ## Review Procedure
 
-Review changes against the applicable requirement IDs and `spec/`, checking omitted requirements, acceptance criteria, error and edge paths, regressions, security implications, service boundaries, tests, and generated artifacts where relevant. Report evidence; do not invent requirements or redesign the solution.
+Review changes against the applicable requirements in `openspec/`, checking omitted requirements, acceptance criteria, error and edge paths, regressions, security implications, service boundaries, tests, and generated artifacts where relevant. Report evidence; do not invent requirements or redesign the solution.
 
-Pay particular attention to authorization, ownership, account status, CSRF, input validation, database parameterization, secret handling, private-cache isolation, AI containment, and the rule that only human Admin actions may close Reports, hide Reviews, or suspend Users.
+Pay particular attention to authorization, project membership, CSRF, input validation, database parameterization, secret handling (including the GitHub token), private-cache isolation, AI containment, and the rule that only the project's product manager may approve tasks or request changes.
 
 ## Handoff Expectations
 
@@ -166,7 +168,7 @@ Report the recorded requirement or decision implemented, changed files and ratio
 
 - Branch: `feat/<module>-<slug>`, `fix/…`, `chore/…`, off latest `master`.
 - Commits: Conventional Commits, scoped to the module —
-  `feat(admin-ui): reject self-acceptance (F3.3.1)`. Reference a backlog
+  `feat(tasks): refuse approval by developers`. Reference a backlog
   requirement ID only by copying one a human gave you or one already used on
   `master` — **never construct one.** Inventing plausible IDs manufactures false
   traceability in the git history.
