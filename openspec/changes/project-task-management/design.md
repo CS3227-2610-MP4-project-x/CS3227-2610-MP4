@@ -43,19 +43,41 @@ The change introduces six capabilities described in the delta specs. The reposit
 
 - **Separate environments.** Development and production each have their own Supabase project, Vercel environment (`dev` branch preview and `master` production), GitHub OAuth app (different callback URLs), SoC LLM credentials, and quota settings.
 
+## SoC LLM Facts
+
+The SoC LLM is SoCLaaS. These facts come from the SoC DocHub SoCLaaS guides (access, API, quickstart, usage-limits, and models pages, last modified between 29 August and 7 October 2026), saved and checked in the CS3227-2610-MP3 project on 16 October 2026. Facts marked *(MP3 key)* were observed with that project's API key and must be re-checked with this project's key.
+
+- **API format.** An OpenAI-compatible gateway at `https://soclaas-api.comp.nus.edu.sg`. Endpoints are `GET /v1/models`, `POST /v1/chat/completions`, `POST /v1/responses` (a compatibility shim with non-durable state), `POST /v1/embeddings`, and `POST /v1/audio/transcriptions`. `POST /v1/chat/completions` is the primary endpoint and executes no tools in the gateway. `model` is required. Streaming uses server-sent events. The quickstart sends `"reasoning_effort": "none"` with Qwen and Gemma models.
+- **Authentication.** `Authorization: Bearer <key>`. Keys have the form `clsk_<prefix>_<secret>`, are issued per SoC account through `https://soclaas-portal.comp.nus.edu.sg`, and rotating a key disables the old one at once. Keys must stay server-side.
+- **Errors.** Bodies have the shape `{"error": "<message>"}`. 400 is an invalid request, 401 a missing, invalid, or revoked key, 403 a model or feature the key may not use, 429 a rate *or* budget limit, and 5xx a temporary gateway or backend fault. The guides recommend retry with backoff for 429 and 5xx and client-side timeouts. They do not document a `Retry-After` header.
+- **Models.** Model names are operator-managed aliases, and `GET /v1/models` is the authoritative list for a key. A key that may not use a model does not see it there. The models page lists `llama3.1:8b` (65,536-token context), `qwen3.5:9b` (65,536), `gemma4:26b` (131,072), `qwen3-coder-next` (196,608), `qwen3.6:35b` (262,144), `qwen3.8:27b` (262,144), `qwen3-vl:32b` (80,000), and `ornith:35b` (262,144), plus trial models such as `x-test-1`. New or test models may appear before the page is updated. *(MP3 key)* On 16 October 2026 the list also had a `default` alias pointing to `qwen3.6:35b`, and operators can repoint it without notice.
+- **Context window.** Per model, as above, reported by `GET /v1/models` in `context_length` (also `context_window`, `max_context_tokens`, and `max_model_len`).
+- **Prices.** Prices are in microdollars per million tokens and are used only for rate control. No real money is charged. The authoritative source is `GET /v1/models` (`soclaas.input_microdollars_per_million_tokens` and `soclaas.output_microdollars_per_million_tokens`), because the models page was found to list outdated prices. *(MP3 key)* On 16 October 2026 `default` cost 411,810 per million input tokens and 1,456,571 per million output tokens.
+- **Rate and budget limits.** Limits apply per API key. The current defaults are 90 requests per minute, 80,000,000 microdollars (USD 80) per day, and 800,000,000 microdollars (USD 800) per month. Lifetime credits and model access policy may also apply, and SoC may adjust any of these. The daily budget resets at 00:00 UTC (08:00 SGT), and the monthly budget at 00:00 UTC on the 1st. A key's actual limits can be read from `GET https://soclaas-portal.comp.nus.edu.sg/api-key/budget`. Requests over a limit are rejected with 429.
+- **Token limits.** No tokens-per-minute or tokens-per-day limit is documented. Spending is limited by cost, which is computed from tokens and the model's prices.
+- **Data retention.** The guides say only that SoCLaaS records API usage and request metadata against the key for reporting, quotas, and auditing. They say nothing about prompt or response retention, or about which data may be sent.
+- **Reachability from Vercel.** A human-run smoke test in the CS3227-2610-MP3 project reached the endpoint and authenticated with an API key from a Vercel Hobby deployment on 11 October 2026. This project has not repeated the check.
+
 ## Risks / Trade-offs
 
 - **The GitHub token gives access to the whole repository.** It is limited to read-only access for one repository, encrypted, and never exposed. The product manager can replace or remove it.
 - **Developers commit with an email that is not linked to their GitHub account.** Those commits won't match the author filter. The commit picker explains this when no commits are found.
 - **The model may judge criteria wrongly.** Results are advisory, evidence is verified against the diff, and only the product manager can approve.
 - **Prompt injection through commits or task text.** This is mitigated by separating untrusted content, validating against the schema and evidence rules, and giving AI no ability to change state. Adversarial fixtures check it.
-- **The school's LLM limits may be low.** This is mitigated by caching, input budgets, per-person quotas, and usage records.
+- **The school's LLM limits may be low.** The defaults are 90 requests per minute and USD 80 per day per API key, and 429 does not say whether the rate or the budget limit was hit. This is mitigated by caching, input budgets, per-person quotas, and usage records.
+- **The model alias can change.** Operators can repoint a model alias or change its prices without notice. Results and usage records should store the model name used.
+- **SoCLaaS does not document prompt retention.** Prompts carry task text and diffs, so secret redaction and small, task-focused prompts matter even more.
 - **Large diffs exceed the input budget.** The check assesses what fits and lists the files it skipped, instead of silently truncating.
 
 ## Open Questions
 
-- SoC LLM details: API format, available models, context window, rate and token limits, data-retention policy, and whether it can be reached from Vercel.
-- Values for the input budget, per-person quotas, and the maximum report range.
+- SoC LLM decisions that remain after recording the facts above:
+  - Which model to use (a named model or the `default` alias), confirmed with `GET /v1/models` using this project's key.
+  - How development and production get separate SoC LLM credentials, given that keys are issued one per SoC account. Each environment needs its own account's key, or the environments share one key and its limits.
+  - How the per-key limits (90 requests per minute and USD 80 per day by default) are split between environments if they share a key.
+  - Whether undocumented prompt retention is acceptable for task text and diffs, or must be confirmed with course staff first.
+  - Whether to repeat the Vercel reachability check for this project.
+- Values for the input budget, per-person quotas, and the maximum report range. The per-person daily token quota also needs a reset time. SoCLaaS resets its daily budget at 08:00 SGT, and this project uses SGT days.
 - Tester accounts for the deployed environments.
 
 ## Migration Plan

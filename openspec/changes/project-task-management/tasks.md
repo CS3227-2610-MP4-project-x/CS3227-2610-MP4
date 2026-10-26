@@ -4,7 +4,7 @@ Tasks marked **[P]** can be worked on at the same time as the other **[P]** task
 
 ## 1. Resolve Open Decisions
 
-- [ ] 1.1 **[P]** Confirm SoC LLM details (API format, models, context window, limits, data retention, reachability from Vercel) and record them in the design.
+- [ ] 1.1 **[P]** Confirm SoC LLM details (API format, models, context window, limits, data retention, reachability from Vercel) and record them in the design. Facts from the SoCLaaS guides are recorded under "SoC LLM Facts". The remaining SoC LLM decisions are listed under Open Questions.
 - [ ] 1.2 **[P]** Choose values for the check input budget, per-person quotas, and maximum report range; record them in the design.
 
 ## 2. Foundations
