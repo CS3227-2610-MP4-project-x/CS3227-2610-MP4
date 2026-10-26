@@ -4,9 +4,13 @@
 - Human-verified decision: Developer A (Lim-ZY) and Developer B (thegrimbee) are people who own different product scopes; they are not agent roles. AI workers are assigned inside the relevant human owner's scope.
 - Follow-up request: require the reviewer to assess code quality (cohesion, coupling, abstractions, reuse) and each assigned acceptance criterion; require the implementer to use `present-changes-visually` when available in the active Codex/Claude environment.
 - Follow-up request: set the Codex implementer to `gpt-6-luna` with medium reasoning effort, and the Codex reviewer and test-writer to `gpt-6-sol` with medium reasoning effort.
+- Follow-up request: add a final commit/PR role that inventories all branch changes, groups related changes into scoped commits, and drafts a PR title and description.
+- Follow-up request: mark which handoff fields apply to all agents versus particular roles and instruct agents to omit unrelated fields.
 - Work recorded: added reusable role contracts and platform adapters, a handoff template and workflow guidance; clarified the human ownership split in `AGENTS.md`.
 - Follow-up changes: expanded reviewer and implementer contracts and synchronized the applicable Codex/Claude adapters and repository workflow guidance.
 - Follow-up changes: configured the requested Codex models and reasoning effort for implementer, reviewer, and test-writer.
+- Follow-up changes: added the reusable commit/PR role and Codex/Claude profiles, defined its place at the end of the workflow, and preserved explicit authorization boundaries for commits, pushes, PR creation, and history rewrites.
+- Follow-up changes: made the handoff template role-aware, with required shared fields, role-specific sections, and explicit omission rules.
 - Resource reporting rule: record only metrics surfaced by the platform and label unavailable values; do not estimate or include secrets.
-- Validation: all five Codex TOML definitions parsed successfully. No application tests were run because this change only adds agent configuration and documentation.
-- Visual output: `_temp/visual-diff.html`, refreshed from `HEAD` to the working tree; the generator reported 20 changed files and 36 unchanged files.
+- Validation: six Codex TOML definitions parsed successfully. No application tests were run because this change only adds agent configuration and documentation.
+- Visual output: `_temp/visual-diff.html`, refreshed from `HEAD` to the working tree; the generator reported 8 changed files and 51 unchanged files.

@@ -126,15 +126,17 @@ Open questions already recorded in a change's `design.md` must be resolved befor
 
 ## Agent Workflow and Roles
 
-Use the five reusable agent roles defined in `workflow/agents/` and exposed through `.codex/agents/` and `.claude/agents/`. The canonical role contracts in `workflow/agents/` define responsibilities and file boundaries; platform files only configure and point to those contracts.
+Use the six reusable agent roles defined in `workflow/agents/` and exposed through `.codex/agents/` and `.claude/agents/`. The canonical role contracts in `workflow/agents/` define responsibilities and file boundaries; platform files only configure and point to those contracts.
 
 1. The analyst prepares scoped requirements and acceptance examples in OpenSpec. A human reviews and approves requirements before implementation.
 2. The orchestrator assigns non-overlapping tasks, records dependencies and ownership, manages worktree boundaries, and writes the handoff record. It does not implement product code or requirements.
 3. The test-writer writes tests for the assigned approved requirements. AI security evaluation cases remain reserved to Developer A, who supplies and owns those cases; the general test-writer does not edit them.
 4. The implementer changes only the assigned implementation paths against approved requirements. The implementer does not edit tests or specifications and uses the `present-changes-visually` skill for a visual diff when it is available in the active Codex or Claude environment.
 5. The reviewer independently checks every acceptance criterion for the implementer's assigned task and reviews code quality, including cohesion, coupling, suitable abstractions, and reuse. The reviewer reports evidence-based findings, is read-only, and cannot approve its own work or merge.
-6. A human resolves findings, approves integration, and both human developers review release evidence.
-7. Update specifications first, then code, tests, guides, and interaction summaries together.
+6. A human resolves findings and authorizes any commit work.
+7. At the end of the sequence, the commit/PR agent inventories the complete branch delta, groups eligible uncommitted changes into scoped commits only when explicitly authorized on the named branch, and drafts a PR title and description. It must not push or create a PR; those actions need separate explicit authorization and remain with the human. Rewriting existing commits also requires separate explicit authorization.
+8. A human reviews the commits and PR draft, then separately authorizes any push or PR creation. Both human developers review release evidence.
+9. Update specifications first, then code, tests, guides, and interaction summaries together.
 
 Every worker session records resource usage using `workflow/agent-handoff-template.md`. Record only metrics surfaced by the platform; write `not available` rather than estimate. The orchestrator consolidates session data into one handoff per task. Do not include secrets or personal data.
 
@@ -176,14 +178,15 @@ Report the recorded requirement or decision implemented, changed files and ratio
 - **Never** commit `.env`, credentials, or real secrets. Any new env var must
   be added to `.env.example` with a placeholder.
 
-**You never write to git history or to GitHub on your own initiative.** Leave
-your work in the working tree and say what you changed; the human runs the
-command. Each of the following needs its own explicit instruction, and consent
-to one is never consent to the next:
+Agents never write to git history or GitHub on their own initiative. Only the
+commit/PR agent may create commits, and only after an explicit human instruction
+authorizes commits on a named branch. Other agents leave changes in the working
+tree. Each of the following needs its own explicit instruction, and consent to
+one is never consent to the next:
 
 | Action                                     | Rule                                                                                               |
 |--------------------------------------------|----------------------------------------------------------------------------------------------------|
-| `git commit`                               | Only when asked. Never as the last step of a task "to be helpful"                                  |
+| `git commit`                               | Only when asked; the commit/PR agent may commit approved scoped changes on the named branch        |
 | `git push`                                 | Only when asked, and never to `master`                                                             |
 | `gh pr create` / merge                     | Only when asked. Opening a PR puts work in front of the team — that is the owner's call, not yours |
 | `git rebase` / `reset --hard` / force-push | Only when asked, and only on a branch the human named                                              |

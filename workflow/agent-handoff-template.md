@@ -1,8 +1,16 @@
 # Agent task handoff
 
-Use one consolidated handoff per task at `workflow/handoffs/<task-id>.md`. The orchestrator owns the consolidated file. Each worker supplies its own session record; do not overwrite another worker's report.
+Use one consolidated handoff per task at `workflow/handoffs/<task-id>.md`. The orchestrator owns that file and consolidates the assigned workers' session reports.
 
-## Task
+## How to fill this template
+
+- `[ALL]` means every agent contributing a session report must provide the field.
+- A role tag means only that role provides the field: `[ORCH]` orchestrator, `[ANALYST]` analyst, `[TEST-WRITER]` test-writer, `[IMPLEMENTER]` implementer, `[REVIEWER]` reviewer, `[COMMIT-PR]` commit/PR agent.
+- Include only fields tagged `[ALL]` or with your role. Omit unrelated role fields and whole sections that do not apply; do not fill them with `N/A`.
+- Required fields must be present. For required resource metrics the platform does not expose, write `not available`; never estimate usage. For a required results/findings field with no results/findings, write `none`.
+- Keep source documents linked by repository path rather than copying them. Never include secrets, credentials, personal data, or production data.
+
+## Task record `[ORCH]`
 
 - Task ID:
 - Summary:
@@ -11,7 +19,7 @@ Use one consolidated handoff per task at `workflow/handoffs/<task-id>.md`. The o
 - Status:
 - Next human action:
 
-## Source and scope
+## Source and scope `[ORCH]`
 
 - Repository / branch / worktree:
 - Source revision:
@@ -19,37 +27,78 @@ Use one consolidated handoff per task at `workflow/handoffs/<task-id>.md`. The o
 - Prohibited paths and actions:
 - Dependencies and parallel work:
 
-## Context references
+## Context references `[ALL, when relevant]`
 
-Link to relevant OpenSpec, design, code, tests, or prior handoffs by repository path. Summarize only the context needed to continue; do not duplicate source documents or include secrets, credentials, personal data, or production data.
+List only the OpenSpec, design, code, tests, or prior handoff paths needed for this agent's task. Omit this section if no references apply.
 
-## Current state and decisions
+## Decisions and open questions `[ORCH, ANALYST]`
 
 - Current state:
 - Human-approved decisions:
-- Assumptions (mark unapproved assumptions clearly):
+- Assumptions (identify unapproved assumptions):
 - Open questions / conflicts:
 
 ## Worker session reports
 
-Repeat this section for each worker session.
+Repeat one session block for each assigned agent session. Include the shared fields and only the fields for that session's role.
 
-### Session: `<role> / <session-id>`
+### Session `<role> / <session-id>`
+
+#### Shared fields `[ALL]`
 
 - Platform and model (if surfaced):
 - Role:
-- Human owner and task scope:
-- Started / ended / elapsed (if surfaced):
-- Resource usage (provider-reported only): tokens in / out / total; cache read / write; cost; tool calls or other relevant usage:
-- Unavailable metrics:
-- Findings / work completed:
-- Files changed:
-- Checks run and exact results:
-- Gaps / blockers:
+- Human owner and assigned task scope:
+- Source revision:
+- Started / ended / elapsed `[ALL, optional when surfaced]`:
+- Resource usage (provider-reported): tokens in / out / total; cache read / write; cost; tool calls or other surfaced metrics:
+- Unavailable resource metrics:
+- Work completed / findings:
+- Files changed (use `none` if read-only):
+- Checks run and exact results (use `none` if none were run):
+- Gaps / blockers (use `none` if none):
 
-Use `not available` for metrics the platform does not expose. Never estimate token usage, cost, elapsed time, or tool counts.
+#### Analyst fields `[ANALYST]`
 
-## Consolidated outcome
+- Requirement IDs and acceptance examples:
+- Open product/design decisions:
+- OpenSpec files changed:
+
+#### Test-writer fields `[TEST-WRITER]`
+
+- Test files changed:
+- Scenarios and requirement IDs covered:
+- Coverage gaps:
+
+#### Implementer fields `[IMPLEMENTER]`
+
+- Implementation files and rationale:
+- Visual diff path, or reason skill was unavailable:
+- Other generated artifacts / dependencies:
+
+#### Reviewer fields `[REVIEWER]`
+
+- Acceptance-criteria status (met / unmet / unverified, with evidence):
+- Code-quality findings (cohesion, coupling, abstractions, reuse):
+- Other findings by severity and evidence:
+- Review limits:
+
+#### Commit/PR fields `[COMMIT-PR]`
+
+- Base branch and comparison used:
+- Complete branch-change inventory:
+- Existing commits and proposed scoped commit groups:
+- Commit hashes, or why commits were not authorized/safe:
+- Draft PR title:
+- Draft PR description:
+- Push / PR creation status:
+
+#### Orchestrator fields `[ORCH]`
+
+- Assignments, dependencies, and handoff decisions:
+- Consolidation notes:
+
+## Consolidated outcome `[ORCH]`
 
 - Changed files and rationale:
 - Tests/checks and results:
@@ -57,10 +106,11 @@ Use `not available` for metrics the platform does not expose. Never estimate tok
 - Dependencies added:
 - Known gaps and unverified items:
 - Reviewer findings:
-- Suggested skills / references for the next worker:
+- Branch inventory, scoped commits, and PR draft (include only when commit/PR agent was assigned):
+- Suggested skills / references for the next worker `[ORCH, when applicable]`:
 - Next action and responsible human:
 
-## Change log
+## Change log `[ORCH]`
 
 | Date/time (SGT) | Role/session | Update |
 |---|---|---|
