@@ -126,20 +126,19 @@ Open questions already recorded in a change's `design.md` must be resolved befor
 
 ## Agent Workflow and Roles
 
-Use the recorded SDD workflow:
+Use the five reusable agent roles defined in `workflow/agents/` and exposed through `.codex/agents/` and `.claude/agents/`. The canonical role contracts in `workflow/agents/` define responsibilities and file boundaries; platform files only configure and point to those contracts.
 
-1. An analyst proposes scoped requirement changes with IDs, assumptions, and acceptance examples.
-2. An architect reviews boundaries, contracts, and threats, recording decisions and unresolved risks.
-3. A human developer reviews the specification before implementation.
-4. An implementation agent works only in its assigned scope using approved specifications and isolated test data.
-5. A Code Quality and Test case generation agent ensures all code are "readable" and tested to ensure tests are robust.
-6. A separate reviewer/tester agent checks intent, negative cases, security, and the diff without copying implementation assumptions.
-7. A human developer resolves findings and approves merge; both developers review release evidence.
-8. Update specifications first, then code, tests, guides, and interaction summaries together.
+1. The analyst prepares scoped requirements and acceptance examples in OpenSpec. A human reviews and approves requirements before implementation.
+2. The orchestrator assigns non-overlapping tasks, records dependencies and ownership, manages worktree boundaries, and writes the handoff record. It does not implement product code or requirements.
+3. The test-writer writes tests for the assigned approved requirements. AI security evaluation cases remain reserved to Developer A, who supplies and owns those cases; the general test-writer does not edit them.
+4. The implementer changes only the assigned implementation paths against approved requirements. The implementer does not edit tests or specifications and uses the `present-changes-visually` skill for a visual diff when it is available in the active Codex or Claude environment.
+5. The reviewer independently checks every acceptance criterion for the implementer's assigned task and reviews code quality, including cohesion, coupling, suitable abstractions, and reuse. The reviewer reports evidence-based findings, is read-only, and cannot approve its own work or merge.
+6. A human resolves findings, approves integration, and both human developers review release evidence.
+7. Update specifications first, then code, tests, guides, and interaction summaries together.
 
-Each handoff must record task ID, requirement IDs, source revision, permitted paths/actions, changed files, rationale, tests and results, known gaps, and the next action. Keep role definitions, prompts, runners, and grader-facing scripts under `workflow/`, except CI in `.github/workflows/` and specifications in `openspec/`.
+Every worker session records resource usage using `workflow/agent-handoff-template.md`. Record only metrics surfaced by the platform; write `not available` rather than estimate. The orchestrator consolidates session data into one handoff per task. Do not include secrets or personal data.
 
-The ownership split is Developer A for Developer-role features (commit picker, Acceptance Criteria Check), identity and access, the API, and AI security testing; and Developer B for Product Manager-role features (task management, review queue, Progress Report), database/migrations, deployment/CI, usage logging, and the developer guide. Both developers cross-review and integrate. Developer A is Lim-ZY and Developer B is thegrimbee. Tester accounts remain an open question in the active change's `design.md`.
+Developer A and Developer B are human developers, not agent roles. Developer A is Lim-ZY and owns Developer-role features (commit picker, Acceptance Criteria Check), identity and access, the API, AI security testing, and the user guide. Developer B is thegrimbee and owns Product Manager-role features (task management, review queue, Progress Report), database/migrations, deployment/CI, usage logging, and the developer guide. Both humans cross-review and integrate. Agents are assigned within the responsible human's ownership scope; the role names never imply Developer A or B. Tester accounts remain an open question in the active change's `design.md`.
 
 ## Completion Criteria
 

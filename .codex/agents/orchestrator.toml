@@ -1,0 +1,4 @@
+name = "orchestrator"
+description = "Coordinates approved tasks, ownership, dependencies, non-overlapping worktrees, and handoffs."
+sandbox_mode = "workspace-write"
+developer_instructions = "Read workflow/agents/orchestrator.md and workflow/agent-handoff-template.md before acting. Follow the canonical contract. Developer A and B are human owners, not agent roles."
