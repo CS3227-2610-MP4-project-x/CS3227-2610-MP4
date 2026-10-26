@@ -4,8 +4,8 @@ Tasks marked **[P]** can be worked on at the same time as the other **[P]** task
 
 ## 1. Resolve Open Decisions
 
-- [ ] 1.1 **[P]** Confirm SoC LLM details (API format, models, context window, limits, data retention, reachability from Vercel) and record them in the design. Facts from the SoCLaaS guides are recorded under "SoC LLM Facts". The remaining SoC LLM decisions are listed under Open Questions.
-- [ ] 1.2 **[P]** Choose values for the check input budget, per-person quotas, and maximum report range; record them in the design.
+- [x] 1.1 **[P]** Confirm SoC LLM details (API format, models, context window, limits, data retention, reachability from Vercel) and record them in the design.
+- [x] 1.2 **[P]** Choose values for the check input budget, per-person quotas, and maximum report range; record them in the design.
 
 ## 2. Foundations
 
@@ -46,7 +46,7 @@ Depends on: 2. Can run alongside groups 3–5.
 
 - [ ] 6.1 **[P]** Implement the SoC LLM adapter and a deterministic fake adapter.
 - [ ] 6.2 **[P]** Implement secret redaction; add unit tests for common secret patterns.
-- [ ] 6.3 Implement the gateway: prompt building with untrusted content separated, schema validation with one retry, safe errors, per-person rate limits and quotas, and usage records; add unit tests for each.
+- [ ] 6.3 Implement the gateway: prompt building with untrusted content separated, schema validation with one retry, safe errors, per-person rate limits and quotas (reserved before the call, reset at 00:00 SGT, cached results not counted), and usage records; add unit tests for each.
 
 ## 7. Acceptance Criteria Check
 
@@ -60,7 +60,7 @@ Depends on: 5 and 6.
 
 Depends on: 4 and 6. Can run alongside group 7.
 
-- [ ] 8.1 Implement report input assembly from structured activity for a date range in SGT; add tests for range boundaries (including late-evening activity), excluded diffs, and empty ranges.
+- [ ] 8.1 Implement report input assembly from structured activity for a date range in SGT; add tests for range boundaries (including late-evening activity), excluded diffs, empty ranges, ranges longer than 7 days, and activity over the input budget.
 - [ ] 8.2 Implement report generation with citation checks and caching invalidated by new activity; add fake-adapter tests and product-manager-only access tests.
 - [ ] 8.3 Build the report page and the project AI usage view.
 
@@ -71,5 +71,5 @@ Depends on: all groups above.
 - [ ] 9.1 **[P]** Run the AI security evaluation: prompt-injection and secret-redaction fixtures for both AI features against the live SoC LLM in development; record outcomes without asserting exact model wording.
 - [ ] 9.2 **[P]** Write end-to-end tests for one complete developer journey and one complete product-manager journey, including fake-provider success and failure paths.
 - [ ] 9.3 **[P]** Run accessibility checks on the main pages and record results.
-- [ ] 9.4 Deploy to production, run the release checks, and record commands, revision, environment, results, and evidence paths.
+- [ ] 9.4 Deploy to production, run the release checks (including one real SoC LLM call from each environment, after confirming with `GET /v1/models` that each key can use the pinned model), and record commands, revision, environment, results, and evidence paths.
 - [ ] 9.5 Run OpenSpec validation and all lint, type-check, test, and build checks; resolve findings and record the final results.

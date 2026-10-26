@@ -33,7 +33,7 @@ The change introduces six capabilities described in the delta specs. The reposit
 
 - **Context engineering for the check.** The prompt contains only the acceptance criteria and the filtered diff. Lockfiles, generated files, and binaries are dropped, and a fixed input budget applies. Files left out because of the budget are listed in the result.
 
-- **Context engineering for the report.** Report input is structured activity (state changes, progress updates, submissions, check results, feedback, commit metadata), never diffs. Each item carries its task ID so the model can cite it, and the server checks every citation against the project's tasks.
+- **Context engineering for the report.** Report input is structured activity (state changes, progress updates, submissions, check results, feedback, commit metadata), never diffs. Each item carries its task ID so the model can cite it, and the server checks every citation against the project's tasks. The range is at most 7 days, and the input has its own budget. A range whose activity exceeds the budget is refused, and the product manager is asked to choose a shorter range. Activity is never silently dropped.
 
 - **Caching.** Check results are keyed by the sorted set of commit SHAs plus a hash of the acceptance criteria. Reports are keyed by project and date range, and are invalidated when activity is recorded in that range. An empty range is answered without an LLM call.
 
@@ -41,7 +41,7 @@ The change introduces six capabilities described in the delta specs. The reposit
 
 - **Single timezone.** Dates and default ranges use SGT (UTC+08:00) for every project. Timestamps are stored in UTC.
 
-- **Separate environments.** Development and production each have their own Supabase project, Vercel environment (`dev` branch preview and `master` production), GitHub OAuth app (different callback URLs), SoC LLM credentials, and quota settings.
+- **Separate environments.** Development and production each have their own Supabase project, Vercel environment (`dev` branch preview and `master` production), GitHub OAuth app (different callback URLs), SoC LLM credentials, and quota settings. The SoC LLM keys come from two different SoC accounts (see SoC LLM and Quota Decisions).
 
 ## SoC LLM Facts
 
@@ -58,6 +58,22 @@ The SoC LLM is SoCLaaS. These facts come from the SoC DocHub SoCLaaS guides (acc
 - **Data retention.** The guides say only that SoCLaaS records API usage and request metadata against the key for reporting, quotas, and auditing. They say nothing about prompt or response retention, or about which data may be sent.
 - **Reachability from Vercel.** A human-run smoke test in the CS3227-2610-MP3 project reached the endpoint and authenticated with an API key from a Vercel Hobby deployment on 11 October 2026. This project has not repeated the check.
 
+## SoC LLM and Quota Decisions
+
+Approved by thegrimbee on 26 October 2026. Cost estimates use the `qwen3.6:35b` prices observed on 16 October 2026: one check with a full input budget costs about USD 0.01, so the USD 80 daily key budget allows about 8,000 checks.
+
+- **Model.** Both AI features use `qwen3.6:35b`, pinned by name rather than through the `default` alias, so cache keys and usage records name the model actually used. Before AI is enabled, `GET /v1/models` with this project's key must list the model, and its prices are read from there. If the name is retired, calls fail safe and the model is changed in configuration.
+- **Keys per environment.** Development uses an API key from thegrimbee's SoC account, and production uses one from Lim-ZY's SoC account. Each environment therefore has its own full per-key limits, and replacing one key does not affect the other. The key owner uses the key only for this application, or warns the team before replacing it. Local development uses the fake adapter by default and the development key only when needed.
+- **Limit split.** No split is needed while the environments use separate keys. If they ever share one key, production gets 60 requests per minute and USD 53.33 per day, and development 30 requests per minute and USD 26.67 per day.
+- **Prompt retention.** Undocumented retention is accepted. Secret redaction and minimal prompts are the safeguards. Course staff may be asked in parallel, but this does not block work.
+- **Vercel reachability.** No separate smoke test. After the first deployment with the real adapter, each environment makes one real call, and the result is recorded with the release checks.
+- **Quota reset.** Per-person daily quotas reset at 00:00 SGT, matching the project's day boundary. SoCLaaS's 08:00 SGT reset does not affect them, because per-person quotas are far below the key budget.
+- **Check input budget.** 16,000 tokens for the filtered diff, and 2,000 output tokens. Because no token-counting endpoint exists, input size is estimated at 3 characters per token, so the diff limit is 48,000 characters.
+- **Report input budget.** 24,000 tokens, estimated the same way (72,000 characters), and 2,000 output tokens.
+- **Maximum report range.** 7 days.
+- **Per-person rate limit.** 5 AI requests per minute per person, in each environment. Requests answered from a cached result do not count.
+- **Per-person daily token quota.** 400,000 tokens in production and 1,000,000 in development, where developers run the evaluation fixtures against the real model. Tokens are counted from the usage the provider reports. If a response has no usage, the request's maximum possible tokens are charged. The maximum is reserved before the call and settled afterwards, so concurrent requests cannot exceed the quota.
+
 ## Risks / Trade-offs
 
 - **The GitHub token gives access to the whole repository.** It is limited to read-only access for one repository, encrypted, and never exposed. The product manager can replace or remove it.
@@ -71,13 +87,6 @@ The SoC LLM is SoCLaaS. These facts come from the SoC DocHub SoCLaaS guides (acc
 
 ## Open Questions
 
-- SoC LLM decisions that remain after recording the facts above:
-  - Which model to use (a named model or the `default` alias), confirmed with `GET /v1/models` using this project's key.
-  - How development and production get separate SoC LLM credentials, given that keys are issued one per SoC account. Each environment needs its own account's key, or the environments share one key and its limits.
-  - How the per-key limits (90 requests per minute and USD 80 per day by default) are split between environments if they share a key.
-  - Whether undocumented prompt retention is acceptable for task text and diffs, or must be confirmed with course staff first.
-  - Whether to repeat the Vercel reachability check for this project.
-- Values for the input budget, per-person quotas, and the maximum report range. The per-person daily token quota also needs a reset time. SoCLaaS resets its daily budget at 08:00 SGT, and this project uses SGT days.
 - Tester accounts for the deployed environments.
 
 ## Migration Plan

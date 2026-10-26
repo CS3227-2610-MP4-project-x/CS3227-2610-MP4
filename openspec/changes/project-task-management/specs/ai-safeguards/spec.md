@@ -36,11 +36,23 @@ The system SHALL validate every model response against the feature's output sche
 - **THEN** the user sees a safe error message without raw provider details, and no result is stored
 
 ### Requirement: AI usage is limited per person
-The system SHALL enforce a per-person rate limit and a per-person daily token quota for AI features, with separate limits for each environment.
+The system SHALL enforce a per-person rate limit and a per-person daily token quota for AI features, with separate limits for each environment. The daily quota SHALL reset at 00:00 SGT. Requests answered from a cached result SHALL NOT count toward either limit. Before each LLM call, the system SHALL reserve the request's maximum possible tokens against the quota, and afterwards SHALL charge the tokens the provider reports, or the reserved maximum if it reports none.
 
 #### Scenario: Quota exceeded
 - **WHEN** a person who has used their daily token quota requests an AI feature
-- **THEN** the system refuses the request without calling the LLM and tells them when the quota resets
+- **THEN** the system refuses the request without calling the LLM and tells them the quota resets at 00:00 SGT
+
+#### Scenario: Concurrent requests near the quota
+- **WHEN** a person sends two AI requests at the same time and their remaining quota covers only one request's maximum tokens
+- **THEN** only one request calls the LLM, and the other is refused
+
+#### Scenario: Cached result near the limits
+- **WHEN** a person who has reached their rate limit requests a result that is already cached
+- **THEN** the cached result is returned and nothing is counted against their limits
+
+#### Scenario: Provider reports no usage
+- **WHEN** an LLM response has no token usage
+- **THEN** the person is charged the maximum tokens reserved for the request
 
 ### Requirement: AI usage is recorded
 The system SHALL record, for every LLM call, the feature, project, person, environment, input tokens, output tokens, latency, outcome, and whether a cached result was used instead. The record SHALL NOT contain prompt or response content.

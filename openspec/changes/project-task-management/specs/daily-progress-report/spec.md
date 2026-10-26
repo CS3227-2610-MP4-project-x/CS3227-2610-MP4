@@ -43,6 +43,17 @@ The system SHALL build the report from structured activity only: task state chan
 - **WHEN** there is no activity in the selected range
 - **THEN** the system reports that there was no activity without calling the LLM
 
+### Requirement: Report size is limited
+The system SHALL refuse a report range longer than 7 days. When the activity in a range exceeds the report input budget, the system SHALL refuse to generate the report without calling the LLM and SHALL ask the product manager to choose a shorter range. The system SHALL NOT silently drop activity to fit the budget.
+
+#### Scenario: Range longer than 7 days
+- **WHEN** the product manager requests a report for a range longer than 7 days
+- **THEN** the system refuses the request and states the 7-day limit
+
+#### Scenario: Activity exceeds the input budget
+- **WHEN** the activity in the chosen range is larger than the report input budget
+- **THEN** no LLM call is made and the product manager is asked to choose a shorter range
+
 ### Requirement: Reports are reused until new activity arrives
 The system SHALL reuse a stored report for the same project and date range, without calling the LLM, until new activity in that range is recorded.
 
