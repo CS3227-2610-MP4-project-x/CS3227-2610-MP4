@@ -44,6 +44,15 @@ Repeat one session block for each assigned agent session. Include the shared fie
 
 ### Session `<role> / <session-id>`
 
+For sessions that report usage, include these optional structured attribution
+fields in the session block so local usage can be matched without inference:
+
+- Provider: `codex` or `claude`
+- Provider session ID: exact provider-generated session identifier
+- Work ID: explicit task/work identifier, when available
+- Agent: role or agent label, when available
+- Phase: lifecycle phase, when available
+
 #### Shared fields `[ALL]`
 
 - Platform and model (if surfaced):
