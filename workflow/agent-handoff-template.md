@@ -5,7 +5,7 @@ Use one consolidated handoff per task at `workflow/handoffs/<task-id>.md`. The o
 ## How to fill this template
 
 - `[ALL]` means every agent contributing a session report must provide the field.
-- A role tag means only that role provides the field: `[ORCH]` orchestrator, `[ANALYST]` analyst, `[TEST-WRITER]` test-writer, `[IMPLEMENTER]` implementer, `[REVIEWER]` reviewer, `[COMMIT-PR]` commit/PR agent.
+- A role tag means only that role provides the field: `[ORCH]` orchestrator, `[ANALYST]` analyst, `[TEST-WRITER]` test-writer, `[IMPLEMENTER]` implementer, `[FRONTEND]` frontend agent, `[REVIEWER]` reviewer, `[COMMIT-PR]` commit/PR agent.
 - Include only fields tagged `[ALL]` or with your role. Omit unrelated role fields and whole sections that do not apply; do not fill them with `N/A`.
 - Required fields must be present. For required resource metrics the platform does not expose, write `not available`; never estimate usage. For a required results/findings field with no results/findings, write `none`.
 - Keep source documents linked by repository path rather than copying them. Never include secrets, credentials, personal data, or production data.
@@ -29,9 +29,9 @@ Use one consolidated handoff per task at `workflow/handoffs/<task-id>.md`. The o
 
 ## Context references `[ALL, when relevant]`
 
-List only the OpenSpec, design, code, tests, or prior handoff paths needed for this agent's task. Omit this section if no references apply.
+List only the OpenSpec, design, code, tests, or prior handoff paths needed for this agent's task. Omit this section if no references apply. The analyst should use its role-specific source index below instead of duplicating the same paths here.
 
-## Decisions and open questions `[ORCH, ANALYST]`
+## Decisions and open questions `[ORCH]`
 
 - Current state:
 - Human-approved decisions:
@@ -69,8 +69,13 @@ fields in the session block so local usage can be matched without inference:
 
 #### Analyst fields `[ANALYST]`
 
+- Exploration scope / task question:
+- Compressed repository-context brief (about 300 words maximum; source index excluded):
+- Relevant repository paths inspected and why:
+- Prior human decisions and constraints, each linked to its source path:
+- Candidate files / modules likely to need changes and rationale (candidates only; orchestrator confirms write scope):
+- Dependencies, conflicts, and open product/design decisions:
 - Requirement IDs and acceptance examples:
-- Open product/design decisions:
 - OpenSpec files changed:
 
 #### Test-writer fields `[TEST-WRITER]`
@@ -84,6 +89,15 @@ fields in the session block so local usage can be matched without inference:
 - Implementation files and rationale:
 - Visual diff path, or reason skill was unavailable:
 - Other generated artifacts / dependencies:
+
+#### Frontend fields `[FRONTEND; only for UI changes]`
+
+- UI intent / acceptance criteria / UI-spec sections checked:
+- Routes, user role, browser/runtime, viewport(s), and UI states inspected:
+- Actions exercised and results (or reason runtime inspection was unavailable):
+- Evidence references (screenshot, browser state, or UI source path):
+- UI fit assessment (matches / partly matches / unverified) and limitations:
+- Specific UI update recommendations, each in `location / element: current → desired`, with rationale and severity:
 
 #### Reviewer fields `[REVIEWER]`
 
@@ -115,6 +129,7 @@ fields in the session block so local usage can be matched without inference:
 - Dependencies added:
 - Known gaps and unverified items:
 - Reviewer findings:
+- Frontend UI findings and requested screen/component changes (include only when frontend agent was assigned):
 - Branch inventory, scoped commits, and PR draft (include only when commit/PR agent was assigned):
 - Suggested skills / references for the next worker `[ORCH, when applicable]`:
 - Next action and responsible human:

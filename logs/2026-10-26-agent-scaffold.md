@@ -6,11 +6,17 @@
 - Follow-up request: set the Codex implementer to `gpt-6-luna` with medium reasoning effort, and the Codex reviewer and test-writer to `gpt-6-sol` with medium reasoning effort.
 - Follow-up request: add a final commit/PR role that inventories all branch changes, groups related changes into scoped commits, and drafts a PR title and description.
 - Follow-up request: mark which handoff fields apply to all agents versus particular roles and instruct agents to omit unrelated fields.
+- Follow-up request (2026-10-27 SGT): extend Analyst with repository exploration, prior-decision retrieval, context compression, and a handoff context brief.
+- Follow-up request: add a read-only frontend agent for UI changes, with specific handoff recommendations, and skip it for non-UI tasks.
+- Follow-up clarification: invoke the frontend agent only when the assigned task changes visible UI; skip it for non-UI repository work.
 - Work recorded: added reusable role contracts and platform adapters, a handoff template and workflow guidance; clarified the human ownership split in `AGENTS.md`.
 - Follow-up changes: expanded reviewer and implementer contracts and synchronized the applicable Codex/Claude adapters and repository workflow guidance.
 - Follow-up changes: configured the requested Codex models and reasoning effort for implementer, reviewer, and test-writer.
 - Follow-up changes: added the reusable commit/PR role and Codex/Claude profiles, defined its place at the end of the workflow, and preserved explicit authorization boundaries for commits, pushes, PR creation, and history rewrites.
 - Follow-up changes: made the handoff template role-aware, with required shared fields, role-specific sections, and explicit omission rules.
+- Follow-up changes: added Analyst context exploration and compression to the canonical role, both platform profiles, workflow sequence, and Analyst-specific handoff fields; clarified that the orchestrator confirms final write scopes.
+- Follow-up changes: added the conditional frontend role and platform profiles; non-UI tasks explicitly skip it, while UI-task handoffs require evidence and actionable current-to-desired changes.
+- Follow-up clarification recorded in both workflow guides and `AGENTS.md`; added the frontend-only handoff fields and exact UI recommendation format.
 - Resource reporting rule: record only metrics surfaced by the platform and label unavailable values; do not estimate or include secrets.
-- Validation: six Codex TOML definitions parsed successfully. No application tests were run because this change only adds agent configuration and documentation.
-- Visual output: `_temp/visual-diff.html`, refreshed from `HEAD` to the working tree; the generator reported 8 changed files and 51 unchanged files.
+- Validation: seven Codex TOML definitions parsed successfully. `git diff --check` passed. No application tests were run because this change only adds agent configuration and documentation.
+- Visual output: `_temp/visual-diff.html`, refreshed from `HEAD` to the working tree after frontend-agent changes; the generator reported 12 changed files and 62 unchanged files.

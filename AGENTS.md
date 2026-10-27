@@ -126,19 +126,20 @@ Open questions already recorded in a change's `design.md` must be resolved befor
 
 ## Agent Workflow and Roles
 
-Use the six reusable agent roles defined in `workflow/agents/` and exposed through `.codex/agents/` and `.claude/agents/`. The canonical role contracts in `workflow/agents/` define responsibilities and file boundaries; platform files only configure and point to those contracts.
+Use the seven reusable agent roles defined in `workflow/agents/` and exposed through `.codex/agents/` and `.claude/agents/`. The canonical role contracts in `workflow/agents/` define responsibilities and file boundaries; platform files only configure and point to those contracts.
 
-1. The analyst prepares scoped requirements and acceptance examples in OpenSpec. A human reviews and approves requirements before implementation.
-2. The orchestrator assigns non-overlapping tasks, records dependencies and ownership, manages worktree boundaries, and writes the handoff record. It does not implement product code or requirements.
+1. The analyst explores task-relevant repository context and prior recorded decisions, compresses source-linked findings and candidate edit paths into the handoff, then prepares scoped OpenSpec requirements and acceptance examples. A human reviews and approves requirements before implementation.
+2. The orchestrator assigns non-overlapping tasks, confirms final write paths using the analyst's context brief, records dependencies and ownership, manages worktree boundaries, and writes the handoff record. It does not implement product code or requirements.
 3. The test-writer writes tests for the assigned approved requirements. AI security evaluation cases remain reserved to Developer A, who supplies and owns those cases; the general test-writer does not edit them.
 4. The implementer changes only the assigned implementation paths against approved requirements. The implementer does not edit tests or specifications and uses the `present-changes-visually` skill for a visual diff when it is available in the active Codex or Claude environment.
-5. The reviewer independently checks every acceptance criterion for the implementer's assigned task and reviews code quality, including cohesion, coupling, suitable abstractions, and reuse. The reviewer reports evidence-based findings, is read-only, and cannot approve its own work or merge.
-6. A human resolves findings and authorizes any commit work.
-7. At the end of the sequence, the commit/PR agent inventories the complete branch delta, groups eligible uncommitted changes into scoped commits only when explicitly authorized on the named branch, and drafts a PR title and description. It must not push or create a PR; those actions need separate explicit authorization and remain with the human. Rewriting existing commits also requires separate explicit authorization.
-8. A human reviews the commits and PR draft, then separately authorizes any push or PR creation. Both human developers review release evidence.
-9. Update specifications first, then code, tests, guides, and interaction summaries together.
+5. Only for tasks that change visible UI, the frontend agent reads and safely exercises the rendered UI against approved intent and acceptance criteria. It is read-only and reports specific current-to-desired interface changes with evidence; skip it for non-UI tasks.
+6. The reviewer independently checks every acceptance criterion for the implementer's assigned task and reviews code quality, including cohesion, coupling, suitable abstractions, and reuse. The reviewer reports evidence-based findings, is read-only, and cannot approve its own work or merge.
+7. A human resolves findings and authorizes any commit work.
+8. At the end of the sequence, the commit/PR agent inventories the complete branch delta, groups eligible uncommitted changes into scoped commits only when explicitly authorized on the named branch, and drafts a PR title and description. It must not push or create a PR; those actions need separate explicit authorization and remain with the human. Rewriting existing commits also requires separate explicit authorization.
+9. A human reviews the commits and PR draft, then separately authorizes any push or PR creation. Both human developers review release evidence.
+10. Update specifications first, then code, tests, guides, and interaction summaries together.
 
-Every worker session records resource usage using `workflow/agent-handoff-template.md`. Record only metrics surfaced by the platform; write `not available` rather than estimate. The orchestrator consolidates session data into one handoff per task. Do not include secrets or personal data.
+Every worker session records resource usage using `workflow/agent-handoff-template.md`. Record only metrics surfaced by the platform; write `not available` rather than estimate. The analyst reports a concise, source-linked repository-context brief and candidate edit paths for the orchestrator to include in the task handoff. The orchestrator consolidates session data into one handoff per task. Do not include secrets or personal data.
 
 Developer A and Developer B are human developers, not agent roles. Developer A is Lim-ZY and owns Developer-role features (commit picker, Acceptance Criteria Check), identity and access, the API, AI security testing, and the user guide. Developer B is thegrimbee and owns Product Manager-role features (task management, review queue, Progress Report), database/migrations, deployment/CI, usage logging, and the developer guide. Both humans cross-review and integrate. Agents are assigned within the responsible human's ownership scope; the role names never imply Developer A or B. Tester accounts remain an open question in the active change's `design.md`.
 
