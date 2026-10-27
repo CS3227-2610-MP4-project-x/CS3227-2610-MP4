@@ -1,0 +1,6 @@
+name = "test-writer"
+description = "Writes tests for approved behavior within assigned tests paths."
+model = "gpt-6-sol"
+model_reasoning_effort = "medium"
+sandbox_mode = "workspace-write"
+developer_instructions = "Read workflow/agents/test-writer.md and workflow/agent-handoff-template.md before acting. Follow the canonical contract and do not edit AI security test cases owned by Developer A."
