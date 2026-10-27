@@ -28,6 +28,26 @@ The actual human owner remains the authority for a workstream. Developer A (Lim-
 8. At the end of the sequence, the commit/PR agent inventories the complete branch delta, groups eligible uncommitted work into scoped commits when explicitly authorized, and drafts a PR title and description. It does not push or create a PR.
 9. The human reviews the commits and PR draft, then separately decides whether to push or open a PR.
 
+## Coordination limits
+
+- **Who orchestrates.** Claude Code subagents cannot start other subagents, so in Claude Code the main session plays the orchestrator and dispatches each role directly. Invoke the `orchestrator` subagent only to write plans and consolidated handoffs.
+- **Leaf workers never delegate.** Analyst, test-writer, implementer, frontend, reviewer, and commit/PR agents do their assigned work themselves and must not spawn further agents.
+- **Bounded review loop.** Implementer → reviewer is a generator-verifier loop with at most two fix rounds. If findings remain after the second review, stop and escalate to the human owner.
+- **Match effort to task size.** Small single-file fixes skip the agent sequence. Use the full sequence for one `tasks.md` item or larger.
+
+## Enforcement
+
+Instructions are backed by these checked-in controls; keep them in sync with the role contracts.
+
+| Control | Location | Effect |
+|---|---|---|
+| Ask-before-run git rules | `.claude/settings.json` | `git push`, `gh pr`, `git reset --hard`, `git rebase`, and `git config` always prompt the human |
+| Write-scope hook | `.claude/hooks/guard-write-scope.mjs`, declared in the test-writer and implementer adapters | Test-writer can write only under `tests/`; implementer cannot write `tests/`, `openspec/`, `specs/`, or `workflow/` |
+| Tool restrictions | `.claude/agents/reviewer.md`, `.claude/agents/frontend.md` | Reviewer has read/search tools only; frontend cannot use edit tools but may run the dev server |
+| Sandboxes | `.codex/agents/*.toml` | Codex reviewer and frontend run `read-only` |
+
+The hook covers the Write, Edit, and NotebookEdit tools only; file writes made through shell commands are not blocked.
+
 ## Reuse
 
 Keep these seven role profiles checked in and invoke applicable roles for new work. Invoke the frontend role only for tasks that change visible UI. Continue a suitable existing worker conversation/session when the platform supports it. If a fresh context is necessary, pass the current task handoff to a new invocation of the same role. Create new worktrees for isolation when concurrent write scopes require it, not a new role definition for every task. Do not reuse a session across unrelated human ownership scopes or incompatible permissions.
