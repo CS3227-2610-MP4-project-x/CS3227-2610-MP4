@@ -5,6 +5,7 @@
 - [ ] 1.1 Add standard-library Codex and Claude session readers for documented/default local roots plus explicit path overrides; validate supported records and verify with synthetic fixtures for response usage, malformed lines, partial trailing lines, and missing fields.
 - [ ] 1.2 Add a private local SQLite ledger with provider-scoped response deduplication, session metadata, explicit source provenance, attribution, and coverage diagnostics; verify rescans do not duplicate records and unknown metrics remain null.
 - [ ] 1.3 Parse explicit provider/session/work/agent fields from handoff and log records and extend the handoff session template for future structured records; verify exact matches attribute correctly while unmatched and ambiguous sessions remain visible as unassigned.
+- [x] 1.4 Support the current Codex layout (top-level `token_usage_record`, `turn_context` model, `cache_write_input_tokens`) and Claude `output_tokens_details.thinking_tokens`, keeping the older layouts; never record Codex running totals as responses, and report a diagnostic when only totals exist. Verify with synthetic fixtures for each layout.
 
 ## 2. Dashboard and exports
 

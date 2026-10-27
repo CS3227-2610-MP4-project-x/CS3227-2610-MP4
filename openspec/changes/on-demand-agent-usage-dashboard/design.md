@@ -27,6 +27,12 @@ Both provider skill entries invoke one Python command that discovers configured 
 
 Use separate Codex and Claude readers to map each provider's per-response usage, timestamps, model, session ID, and tool-call observations into a shared record shape. Defaults are `CODEX_HOME/sessions` plus `CODEX_HOME/archived_sessions` for Codex and `~/.claude/projects` for Claude; allow explicit local path overrides. Do not treat transcript layout or fields as stable contracts: each adapter reports unsupported or malformed records, and its fixtures are tied to known source examples. Do not add one provider's usage to another's response identity.
 
+Recognized layouts (2026-10-27):
+
+- **Codex, older:** per-response usage in `event_msg` `token_count` → `info.token_usage_record`; model in `session_meta`.
+- **Codex, current:** per-response usage in top-level `token_usage_record` records (`payload.usage`, `payload.response_id`, `payload.session_id`); model in `turn_context`; cache writes named `cache_write_input_tokens`. In this layout `token_count` events carry only `last_token_usage` and `total_token_usage` running totals. These do not match per-response records one-to-one, so they are never recorded: using them would double-count or misattribute usage. A file chunk with running totals but no per-response records produces a `per_response_usage_unavailable` diagnostic.
+- **Claude:** usage in assistant `message.usage`; reasoning comes from `output_tokens_details.thinking_tokens`, or from the older `reasoning_tokens` field when that is absent.
+
 ### Local SQLite ledger with idempotent response keys
 
 Store normalized session, response, attribution, checkpoint, and diagnostic facts in SQLite under `~/.agent-usage-dashboard/` by default. Deduplicate by provider plus response identity. Scan or resume local JSONL inputs only during skill execution; process complete lines and retry a partial final line on the next run. Preserve previously collected normalized rows if source files move or disappear. Avoid storing raw transcript lines, prompts, assistant text, tool arguments/results, or absolute paths in report data.

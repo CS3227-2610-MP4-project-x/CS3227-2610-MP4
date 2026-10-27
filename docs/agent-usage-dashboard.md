@@ -49,18 +49,47 @@ output path is printed after generation.
 ## Session sources and attribution
 
 The Codex reader looks for JSONL records in `sessions/` and
-`archived_sessions/` under the Codex home. It reads per-response
-`token_usage_record` from `event_msg` token-count records and intentionally
-does not substitute cumulative thread totals. The Claude reader recognizes
-assistant JSONL records with `sessionId`, response/message identity, timestamp,
-model, and `message.usage`. Provider transcript formats may change; unsupported
-or malformed records are surfaced as generic diagnostics.
+`archived_sessions/` under the Codex home. It reads per-response usage from
+either layout:
+
+- current Codex: top-level `token_usage_record` records, with the model taken
+  from `turn_context`;
+- older Codex: `token_usage_record` inside `event_msg` token-count records,
+  with the model taken from `session_meta`.
+
+It never substitutes cumulative or running totals (`total_token_usage`,
+`last_token_usage`). A session file that contains only running totals shows a
+`per_response_usage_unavailable` diagnostic.
+
+The Claude reader recognizes assistant JSONL records with `sessionId`,
+response/message identity, timestamp, model, and `message.usage`. Reasoning
+tokens come from `message.usage.output_tokens_details.thinking_tokens`; older
+transcripts without that field show reasoning as unknown. Provider transcript
+formats may change; unsupported or malformed records are surfaced as generic
+diagnostics. Newer CLIs also write non-usage record types, such as titles,
+attachments, and request metadata. These are skipped and counted under
+`unsupported_record` without affecting usage totals.
 
 Handoff and log Markdown can enrich work attribution only when a session block
 contains explicit `Provider`, `Provider session ID`, and optional `Work ID`,
 `Agent`, or `Phase` fields. A single exact provider/session match is attributed;
 multiple matches show as ambiguous and no match remains unknown. The tool does
 not infer links from filenames, branches, or prose.
+
+## After updating the reader
+
+The ledger keeps collected rows and resumes each file from its saved position,
+so an updated reader does not re-read history it has already scanned. After
+pulling a change to `tools/agent_usage_dashboard.py`, delete the ledger and
+regenerate:
+
+```bash
+rm ~/.agent-usage-dashboard/usage.sqlite3
+python3 -m tools.agent_usage_dashboard generate --repo .
+```
+
+In PowerShell, use `Remove-Item "$HOME\.agent-usage-dashboard\usage.sqlite3"`.
+Rows from session files that have since been deleted are not recovered.
 
 ## Privacy and limitations
 

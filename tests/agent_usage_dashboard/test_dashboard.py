@@ -493,6 +493,85 @@ process.stdout.write(JSON.stringify(tables));
         table = self.rendered_tables(html)["codex"]
         self.assertIn(">140<", table)
 
+    def test_current_codex_layout_reads_top_level_usage_records(self) -> None:
+        """Top-level usage records count once; running totals and model context do not add rows."""
+        usage = {
+            "input_tokens": 200,
+            "cached_input_tokens": 50,
+            "cache_write_input_tokens": 7,
+            "output_tokens": 30,
+            "reasoning_output_tokens": 4,
+            "total_tokens": 230,
+        }
+        write_jsonl(
+            self.codex_root / "sessions" / "synthetic.jsonl",
+            {"timestamp": "2026-05-01T00:00:00Z", "type": "session_meta",
+             "payload": {"id": "current-codex-session", "session_id": "current-codex-session"}},
+            {"timestamp": "2026-05-01T00:00:01Z", "type": "turn_context",
+             "payload": {"model": "synthetic-current-model", "turn_id": "turn-1"}},
+            {"timestamp": "2026-05-01T00:00:02Z", "type": "world_state",
+             "payload": {"content": PRIVATE_TEXT}},
+            {"timestamp": "2026-05-01T00:00:03Z", "type": "token_usage_record",
+             "payload": {"session_id": "current-codex-session", "turn_id": "turn-1",
+                         "response_id": "response-1", "usage": usage,
+                         "thread_token_usage": {"input_tokens": 9999, "output_tokens": 9999}}},
+            {"timestamp": "2026-05-01T00:00:04Z", "type": "event_msg",
+             "payload": {"type": "token_count",
+                         "info": {"last_token_usage": usage, "total_token_usage": usage}}},
+        )
+        html = self.generate()
+        rows = self.ledger_rows()
+        self.assertEqual(len(rows), 1, "running totals were recorded as extra responses")
+        row = rows[0]
+        self.assertEqual(row["session_id"], "current-codex-session")
+        self.assertEqual(row["response_id"], "response-1")
+        self.assertEqual(row["model"], "synthetic-current-model")
+        self.assertEqual(
+            (row["input_tokens"], row["output_tokens"], row["cached_input_tokens"],
+             row["cache_write_tokens"], row["reasoning_tokens"]),
+            (200, 30, 50, 7, 4),
+        )
+        codes = {d["code"] for d in self.diagnostic_rows() if d["provider"] == "codex"}
+        self.assertFalse(
+            codes & {"unsupported_record", "missing_usage", "optional_metric_unavailable",
+                     "per_response_usage_unavailable"},
+            f"current Codex layout produced coverage gaps: {codes}",
+        )
+        self.assertNotIn(PRIVATE_TEXT, html)
+
+    def test_codex_running_totals_alone_are_a_coverage_gap(self) -> None:
+        totals = {"input_tokens": 10, "output_tokens": 5}
+        write_jsonl(
+            self.codex_root / "sessions" / "synthetic.jsonl",
+            {"type": "session_meta", "payload": {"id": "totals-only-session"}},
+            {"timestamp": "2026-05-02T00:00:00Z", "type": "event_msg",
+             "payload": {"type": "token_count",
+                         "info": {"last_token_usage": totals, "total_token_usage": totals}}},
+        )
+        self.generate()
+        self.assertEqual(len(self.ledger_rows()), 0, "running totals were treated as per-response usage")
+        self.assertTrue(
+            any(d["code"] == "per_response_usage_unavailable" for d in self.diagnostic_rows()),
+            "missing per-response Codex usage had no coverage diagnostic",
+        )
+
+    def test_claude_thinking_tokens_are_reported_as_reasoning(self) -> None:
+        record = claude_usage(
+            session="thinking-session",
+            message="thinking-response",
+            timestamp="2026-05-03T00:00:00Z",
+        )
+        record["message"]["usage"]["output_tokens_details"] = {"thinking_tokens": 7}
+        write_jsonl(self.claude_root / "projects" / "synthetic.jsonl", record)
+        self.generate()
+        rows = self.ledger_rows()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["reasoning_tokens"], 7)
+        self.assertFalse(
+            any(d["code"] == "optional_metric_unavailable" for d in self.diagnostic_rows()),
+            "reported thinking tokens were still flagged as unavailable",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

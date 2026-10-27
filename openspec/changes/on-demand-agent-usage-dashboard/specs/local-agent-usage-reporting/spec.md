@@ -28,6 +28,14 @@ The system MUST keep Codex and Claude records separately attributable and retain
 - **WHEN** a metric is absent, invalid, or comes from an unsupported record format
 - **THEN** the system represents it as unknown and exposes a coverage diagnostic rather than treating it as zero
 
+#### Scenario: Provider writes a recognized newer record layout
+- **WHEN** a provider version stores per-response usage, model, or reasoning metrics in a different recognized record layout or field name
+- **THEN** the system normalizes those metrics to the same token categories as the older layout and records each response once
+
+#### Scenario: Only running totals are available
+- **WHEN** a session file reports cumulative or running-total usage without per-response usage records
+- **THEN** the system does not record the totals as responses and exposes a coverage diagnostic
+
 #### Scenario: Providers are compared
 - **WHEN** the dashboard filters or groups records by provider
 - **THEN** Codex and Claude usage remains separately identifiable and is not silently merged

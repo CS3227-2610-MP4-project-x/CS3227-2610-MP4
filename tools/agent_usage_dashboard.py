@@ -225,6 +225,26 @@ def _save_response(connection: sqlite3.Connection, response: dict[str, Any]) -> 
     )
 
 
+def _codex_metrics(connection: sqlite3.Connection, usage: dict[str, Any]) -> dict[str, Any]:
+    # Codex renamed cache_write_tokens to cache_write_input_tokens; accept either.
+    cache_write = usage.get("cache_write_input_tokens", usage.get("cache_write_tokens"))
+    metrics = {
+        "input_tokens": _integer(usage.get("input_tokens")),
+        "output_tokens": _integer(usage.get("output_tokens")),
+        "cached_input_tokens": _integer(usage.get("cached_input_tokens")),
+        "cache_write_tokens": _integer(cache_write),
+        "reasoning_tokens": _integer(usage.get("reasoning_output_tokens")),
+        "tool_calls": None,
+    }
+    _optional_metrics_diagnostic(
+        connection, "codex", metrics,
+        ("cached_input_tokens", "cache_write_tokens", "reasoning_tokens"),
+    )
+    if metrics["input_tokens"] is None or metrics["output_tokens"] is None:
+        _diagnose(connection, "codex", "incomplete_usage", "A Codex response has missing or invalid token metrics.")
+    return metrics
+
+
 def _codex_records(root: Path, connection: sqlite3.Connection) -> None:
     files = list(_jsonl_files(root / "sessions")) + list(_jsonl_files(root / "archived_sessions"))
     if not files:
@@ -235,7 +255,11 @@ def _codex_records(root: Path, connection: sqlite3.Connection) -> None:
             path, "codex", file_key, connection
         )
         recognized = {"session_meta", "event_msg", "response_item", "turn_context",
-                      "compaction", "checkpoint", "config_snapshot", "custom_tool"}
+                      "compaction", "checkpoint", "config_snapshot", "custom_tool",
+                      "world_state"}
+        # Newer Codex writes per-response usage as top-level token_usage_record
+        # records; its token_count events then carry only running totals.
+        usage_records = running_totals = 0
         for record, line_start in records:
             kind = record.get("type")
             payload = record.get("payload")
@@ -246,6 +270,26 @@ def _codex_records(root: Path, connection: sqlite3.Connection) -> None:
                 current_session = _string(payload.get("id")) or _string(record.get("session_id"))
                 current_model = _string(payload.get("model"))
                 continue
+            if kind == "turn_context":
+                current_model = _string(payload.get("model")) or current_model
+                continue
+            if kind == "token_usage_record":
+                usage_records += 1
+                usage = payload.get("usage")
+                if not isinstance(usage, dict):
+                    _diagnose(connection, "codex", "missing_usage", "Per-response token usage is unavailable.")
+                    usage = {}
+                session_id = _string(payload.get("session_id")) or current_session
+                if session_id is None:
+                    _diagnose(connection, "codex", "missing_session", "Token usage record has no session identity.")
+                    continue
+                _save_response(connection, _response(
+                    "codex", session_id,
+                    _string(payload.get("response_id")) or _string(payload.get("turn_id")),
+                    record.get("timestamp"), current_model, _codex_metrics(connection, usage),
+                    "Codex top-level token_usage_record", str(line_start),
+                ))
+                continue
             if kind != "event_msg" or payload.get("type") != "token_count":
                 if kind not in recognized:
                     _diagnose(connection, "codex", "unsupported_record", "Record type is not supported by the Codex usage reader.")
@@ -255,6 +299,10 @@ def _codex_records(root: Path, connection: sqlite3.Connection) -> None:
                 _diagnose(connection, "codex", "missing_usage", "Token-count event has no usage object.")
                 info = {}
             usage = info.get("token_usage_record")
+            if not isinstance(usage, dict) and ("last_token_usage" in info or "total_token_usage" in info):
+                # Running totals are not per-response usage; never record them.
+                running_totals += 1
+                continue
             if not isinstance(usage, dict):
                 _diagnose(connection, "codex", "missing_usage", "Per-response token usage is unavailable.")
                 usage = {}
@@ -262,29 +310,18 @@ def _codex_records(root: Path, connection: sqlite3.Connection) -> None:
             if session_id is None:
                 _diagnose(connection, "codex", "missing_session", "Token-count event has no session identity.")
                 continue
-            metrics = {
-                "input_tokens": _integer(usage.get("input_tokens")),
-                "output_tokens": _integer(usage.get("output_tokens")),
-                "cached_input_tokens": _integer(usage.get("cached_input_tokens")),
-                "cache_write_tokens": _integer(usage.get("cache_write_tokens")),
-                "reasoning_tokens": _integer(usage.get("reasoning_output_tokens")),
-                "tool_calls": None,
-            }
-            _optional_metrics_diagnostic(
-                connection, "codex", usage,
-                ("cached_input_tokens", "cache_write_tokens", "reasoning_output_tokens"),
-            )
-            if metrics["input_tokens"] is None or metrics["output_tokens"] is None:
-                _diagnose(connection, "codex", "incomplete_usage", "A Codex response has missing or invalid token metrics.")
             response = _response(
                 "codex", session_id,
                 _string(info.get("response_id")) or _string(info.get("turn_id")),
                 record.get("timestamp") or payload.get("timestamp"),
                 _string(info.get("model")) or current_model,
-                metrics, "Codex token_usage_record per-response event",
+                _codex_metrics(connection, usage), "Codex token_usage_record per-response event",
                 str(line_start),
             )
             _save_response(connection, response)
+        if running_totals and not usage_records:
+            _diagnose(connection, "codex", "per_response_usage_unavailable",
+                      "Codex running totals were found without per-response usage records.")
         if readable:
             _save_checkpoint(path, "codex", file_key, offset, current_session, current_model, connection)
 
@@ -320,17 +357,22 @@ def _claude_records(root: Path, connection: sqlite3.Connection) -> None:
             content = message.get("content")
             if isinstance(content, list):
                 tool_calls = sum(1 for item in content if isinstance(item, dict) and item.get("type") == "tool_use")
+            # Current transcripts report thinking under output_tokens_details.
+            details = usage.get("output_tokens_details")
+            reasoning = (details["thinking_tokens"]
+                         if isinstance(details, dict) and "thinking_tokens" in details
+                         else usage.get("reasoning_tokens"))
             metrics = {
                 "input_tokens": _integer(usage.get("input_tokens")),
                 "output_tokens": _integer(usage.get("output_tokens")),
                 "cached_input_tokens": _integer(usage.get("cache_read_input_tokens")),
                 "cache_write_tokens": _integer(usage.get("cache_creation_input_tokens")),
-                "reasoning_tokens": _integer(usage.get("reasoning_tokens")),
+                "reasoning_tokens": _integer(reasoning),
                 "tool_calls": tool_calls,
             }
             _optional_metrics_diagnostic(
-                connection, "claude", usage,
-                ("cache_read_input_tokens", "cache_creation_input_tokens", "reasoning_tokens"),
+                connection, "claude", metrics,
+                ("cached_input_tokens", "cache_write_tokens", "reasoning_tokens"),
             )
             if metrics["input_tokens"] is None or metrics["output_tokens"] is None:
                 _diagnose(connection, "claude", "incomplete_usage", "A Claude response has missing or invalid token metrics.")
