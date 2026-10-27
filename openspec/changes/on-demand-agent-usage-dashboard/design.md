@@ -54,4 +54,3 @@ Provide a shared skill contract with Codex and Claude discoverable skill files. 
 ## Migration Plan
 
 No application migration is needed. Existing handoffs remain readable; new structured provider/session metadata applies prospectively. The tool initializes a private local ledger on first invocation. The skill reports its output path and coverage summary; users can remove local state through a documented explicit cleanup command.
-
