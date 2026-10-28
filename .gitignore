@@ -1,2 +1,9 @@
 # Python cache files
 **/__pycache__/
+node_modules/
+.next/
+*.tsbuildinfo
+coverage/
+playwright-report/
+test-results/
+.vitest/
