@@ -11,7 +11,7 @@ Tasks marked **[P]** can be worked on at the same time as the other **[P]** task
 
 Depends on: none.
 
-- [ ] 2.1 Scaffold the Next.js App Router project with TypeScript, linting, Vitest, and Playwright; commit the lockfile.
+- [x] 2.1 Scaffold the Next.js App Router project with TypeScript, linting, Vitest, and Playwright; commit the lockfile.
 - [ ] 2.2 **[P]** Set up GitHub Actions: lint, type-check, unit tests, build, secret scanning, and dependency audit.
 - [ ] 2.3 **[P]** Create the development and production Supabase projects, Vercel environments (`dev` and `master`), and GitHub OAuth apps; document every environment variable in `.env.example`.
 - [ ] 2.4 **[P]** Create the database schema and migrations for people, projects, memberships, tasks, acceptance criteria, task events, progress updates, attached commits, check results, reports, and usage records.
