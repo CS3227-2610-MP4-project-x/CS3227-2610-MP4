@@ -24,6 +24,7 @@ Small software teams lose time to status reporting: product managers chase devel
 - `completion-assessment`: The developer's Acceptance Criteria Check and how its result is shown to the product manager.
 - `daily-progress-report`: The product manager's Progress Report for a date range.
 - `ai-safeguards`: Protections and resource limits shared by every LLM call.
+- `continuous-integration`: GitHub Actions checks (lint, type-check, unit tests, build, secret scanning, and dependency audit) that gate changes to `master`.
 
 ### Modified Capabilities
 
@@ -35,4 +36,5 @@ None.
 - A read-only GitHub credential per project, stored encrypted on the server.
 - SoC LLM usage, limited by per-person quotas and the school's own limits.
 - Separate development and production environments (database, deployment, credentials).
+- A GitHub Actions workflow that runs without repository secrets, plus branch protection on `master` configured by a human.
 - No existing OpenSpec capability specs are present to modify.

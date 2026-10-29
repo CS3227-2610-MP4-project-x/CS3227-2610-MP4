@@ -2,7 +2,7 @@
 
 ## Context
 
-The change introduces six capabilities described in the delta specs. The repository has OpenSpec configuration, agent guidance (`AGENTS.md`), and UI guidance (`specs/ui-spec.md`), but no application code yet. `AGENTS.md` sets the stack: Next.js App Router with TypeScript, Route Handlers under `/api/v1`, PostgreSQL on Supabase behind a server-only repository layer, the SoC LLM behind a replaceable adapter, and Vercel hosting.
+The change introduces seven capabilities described in the delta specs. The repository has OpenSpec configuration, agent guidance (`AGENTS.md`), and UI guidance (`specs/ui-spec.md`), but no application code yet. `AGENTS.md` sets the stack: Next.js App Router with TypeScript, Route Handlers under `/api/v1`, PostgreSQL on Supabase behind a server-only repository layer, the SoC LLM behind a replaceable adapter, and Vercel hosting.
 
 ## Goals / Non-Goals
 
@@ -73,6 +73,27 @@ Approved by thegrimbee on 26 October 2026. Cost estimates use the `qwen3.6:35b` 
 - **Maximum report range.** 7 days.
 - **Per-person rate limit.** 5 AI requests per minute per person, in each environment. Requests answered from a cached result do not count.
 - **Per-person daily token quota.** 400,000 tokens in production and 1,000,000 in development, where developers run the evaluation fixtures against the real model. Tokens are counted from the usage the provider reports. If a response has no usage, the request's maximum possible tokens are charged. The maximum is reserved before the call and settled afterwards, so concurrent requests cannot exceed the quota.
+
+## CI Decisions
+
+Approved by thegrimbee on 29 October 2026 for task 2.2. The human approved the `continuous-integration` spec delta and asked the agent to resolve these decisions as it recommended. The numbering follows the task 2.2 analyst brief.
+
+- **D1 Spec home.** CI behaviour is the `continuous-integration` capability in this change.
+- **D2 Node version.** Node.js 24 (LTS), pinned in a root `.nvmrc` and read by the workflow through `node-version-file`, so local and CI versions match.
+- **D3 Triggers.** Pull requests to any branch, pushes to `master` and `dev`, and manual runs (`workflow_dispatch`). Fork pull requests run with the read-only token and no secrets.
+- **D4 Secret scanning.** The gitleaks CLI at a pinned release, downloaded and checksum-verified in the workflow. The gitleaks GitHub Action is not used because it needs a paid licence for organisation-owned repositories. The scan covers the full git history of the checked-out ref. If the repository plan offers GitHub's own secret scanning and push protection, a human may also enable them; the workflow does not depend on them.
+- **D5 Dependency audit.** `npm audit` over all installed dependencies, including development dependencies, because they run in CI. No new dependency or third-party action is added for the audit.
+- **D6 Audit threshold.** The audit check fails on high or critical vulnerabilities (`--audit-level=high`) and reports lower severities without failing. The workflow also runs the audit weekly on a schedule so that new advisories surface without a code change. Dependabot version updates are not added; dependency changes stay deliberate (`AGENTS.md`).
+- **D7 Required checks.** The jobs are named `lint`, `typecheck`, `unit-tests`, `build`, `secret-scan`, and `dependency-audit`. A human configures branch protection on `master` (and on `dev` once it exists) to require all six and a reviewed pull request. Agents do not change branch protection.
+- **D8 End-to-end tests.** Not part of task 2.2. Task 9.2 adds a Playwright job when the journey tests exist.
+- **D9 Database integration tests.** Deferred until the schema (task 2.4) and the first PostgreSQL integration tests exist. They will then run against a disposable PostgreSQL service container with synthetic data.
+- **D10 Migrations.** CI does not apply or validate migrations, and GitHub holds no migration credentials. Migrations remain a controlled, operator-run release step.
+- **D11 Vercel.** Vercel's Git integration deploys independently of GitHub Actions. Required checks on `master` (D7) keep unchecked code out of production. GitHub holds no Vercel secrets.
+- **D12 Build environment.** The build runs without environment variables. If it later needs any, the workflow sets non-secret placeholder values, never real credentials.
+- **D13 Permissions and pinning.** The workflow token is read-only (`permissions: contents: read`), and the workflow uses no repository secrets. Every action is pinned to a full commit SHA, with its version tag in a comment.
+- **D14 Caching and concurrency.** The npm cache is restored through `actions/setup-node`. A new push to a pull request cancels that pull request's run in progress. Runs on `master` and `dev` are never cancelled.
+- **D15 Other checks.** The Python dashboard test, OpenSpec validation, actionlint, and a format check are not in CI for task 2.2. OpenSpec validation remains a manual step in task 9.5.
+- **D16 `.env.example`.** `.gitignore` ignores `.env.*`, which would hide `.env.example`. Task 2.3 adds a `!.env.example` exception, and its placeholders must not trigger the secret scan.
 
 ## Risks / Trade-offs
 
