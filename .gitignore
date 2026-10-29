@@ -7,3 +7,10 @@ coverage/
 playwright-report/
 test-results/
 .vitest/
+
+# Environment files
+.env
+.env.*
+
+# Local scratch notes (not shared)
+temp/
