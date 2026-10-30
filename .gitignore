@@ -11,6 +11,7 @@ test-results/
 # Environment files
 .env
 .env.*
+!.env.example
 
 # Local scratch notes (not shared)
 temp/
