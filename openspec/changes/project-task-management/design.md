@@ -2,7 +2,7 @@
 
 ## Context
 
-The change introduces eight capabilities described in the delta specs. The repository has OpenSpec configuration, agent guidance (`AGENTS.md`), and UI guidance (`specs/ui-spec.md`), but no application code yet. `AGENTS.md` sets the stack: Next.js App Router with TypeScript, Route Handlers under `/api/v1`, PostgreSQL on Supabase behind a server-only repository layer, the SoC LLM behind a replaceable adapter, and Vercel hosting.
+The change introduces nine capabilities described in the delta specs. The repository has OpenSpec configuration, agent guidance (`AGENTS.md`), and UI guidance (`specs/ui-spec.md`), but no application code yet. `AGENTS.md` sets the stack: Next.js App Router with TypeScript, Route Handlers under `/api/v1`, PostgreSQL on Supabase behind a server-only repository layer, the SoC LLM behind a replaceable adapter, and Vercel hosting.
 
 ## Goals / Non-Goals
 
