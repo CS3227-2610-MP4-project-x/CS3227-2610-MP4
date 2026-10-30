@@ -27,8 +27,8 @@ Depends on: 2.
 
 Depends on: 3.
 
-- [ ] 4.1 **[P]** Implement projects, memberships, and the one-product-manager invariant; add PostgreSQL tests for multiple memberships and manager uniqueness.
-- [ ] 4.2 **[P]** Implement task create, edit, reassign, and delete with acceptance criteria; add tests for missing criteria and assignees outside the project.
+- [ ] 4.1 **[P]** Implement projects with keys, memberships, the one-product-manager invariant, and product-manager transfer; add PostgreSQL tests for multiple memberships, manager uniqueness, and transfer.
+- [ ] 4.2 **[P]** Implement task create, edit, reassign, and soft delete with acceptance criteria and task IDs; add tests for missing criteria, assignees outside the project, and task IDs that are never reused.
 - [ ] 4.3 Implement the To Do → In Progress → In Review → Done lifecycle, request-changes with feedback, and progress updates; add transition, permission, and competing-write tests.
 - [ ] 4.4 Build the board, task detail, and review queue pages following `specs/ui-spec.md`.
 

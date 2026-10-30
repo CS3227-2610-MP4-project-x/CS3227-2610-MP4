@@ -24,6 +24,7 @@ Small software teams lose time to status reporting: product managers chase devel
 - `completion-assessment`: The developer's Acceptance Criteria Check and how its result is shown to the product manager.
 - `daily-progress-report`: The product manager's Progress Report for a date range.
 - `ai-safeguards`: Protections and resource limits shared by every LLM call.
+- `data-persistence`: The PostgreSQL schema, its migrations, and the integrity rules the database enforces.
 - `continuous-integration`: GitHub Actions checks (lint, type-check, unit tests, build, secret scanning, and dependency audit) that gate changes to `master`.
 
 ### Modified Capabilities
