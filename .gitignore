@@ -12,6 +12,7 @@ test-results/
 .env
 .env.*
 !.env.example
+.vercel/
 
 # Supabase CLI working files
 supabase/.temp/
