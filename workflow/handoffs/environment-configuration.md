@@ -9,8 +9,8 @@
   - "Development and production are separate environments"
   - "Every environment variable is documented in .env.example"
   - "Secrets are server-only"
-- Status: implementation complete, pending human review and commit authorization. The human (thegrimbee) approved the spec and decisions E1–E9 on 31 October 2026 (commits `3cef33d`, `78edcf7`). The reviewer found no must-fix issues; fix round 1 addressed S1–S3, N1, and N2. The human provisioning checklist is outstanding and unverified.
-- Next human action: Developer B reviews the working-tree changes and decides on commit authorization; Developer A cross-reviews the guide's sign-in steps; Developer B completes the human provisioning checklist.
+- Status: done. The human (thegrimbee) approved the spec and decisions E1–E9 on 31 October 2026 (commits `3cef33d`, `78edcf7`). The reviewer found no must-fix issues; fix round 1 addressed S1–S3, N1, and N2. The implementation is committed (`18f8d59` to `190adae`). On 31 October 2026 thegrimbee reported the human provisioning for task 2.3 as finished, and `tasks.md` item 2.3 is ticked. No agent verified the provisioning.
+- Next human action: Developer A cross-reviews the guide's sign-in steps. The follow-ups that sit outside task 2.3 are listed under the human provisioning checklist.
 
 ## Source and scope `[ORCH]`
 
@@ -100,9 +100,14 @@
 | AC13 | Callback URL per environment | Human-only; verified by task 9.4 sign-in on each deployed environment. Unverified in this task. |
 | AC14 | D12 and scope limits | `npm run build` still succeeds with no variables; no `src/` change; no dependency added; `.github/` unchanged. Main session and reviewer. |
 
-### Human provisioning checklist (human-only, all unverified)
+### Human provisioning checklist (human-only)
 
-From E2, E8, and "Task 2.3 scope after task 2.4". No agent performs or verifies these.
+From E2, E8, and "Task 2.3 scope after task 2.4". No agent performs or verifies these. On 31 October 2026 thegrimbee reported the task 2.3 provisioning as finished; no agent checked the live Supabase, Vercel, or GitHub settings. These items fall outside task 2.3 and stay open:
+
+- Item 3: the redirect allow-list entry, which is completed when task 3.1 defines the callback path.
+- Item 4: recording the Vercel Hobby result with the release checks (E8).
+- Item 8: branch protection on `dev` (D7).
+- Item 9: belongs to task 9.4.
 
 1. Confirm both Supabase projects (development and production; PostgreSQL 17, Singapore, Data API off) exist and are separate.
 2. Create two GitHub OAuth apps, one per environment, each with authorization callback URL `https://<project-ref>.supabase.co/auth/v1/callback` for its own Supabase project.
@@ -378,7 +383,7 @@ From E2, E8, and "Task 2.3 scope after task 2.4". No agent performs or verifies 
   - The "Variable read by code" scenario has no code to check yet; E5 assigns its test to tasks 3.1, 5.1, or 6.1.
   - "Secrets are server-only" for Client Component props and logs has no code to check yet.
   - The spec's "change is rejected" wording for real environment files relies on `.gitignore`, secret scanning, and review; no other mechanism is recorded.
-  - `tasks.md` item 2.3 stays unchecked until a human decides, after provisioning.
+  - `tasks.md` item 2.3 stayed unchecked until a human decided, after provisioning. It was ticked on 31 October 2026 after thegrimbee reported the provisioning finished.
 - Reviewer findings: no must-fix. S1, S2, S3, N1, and N2 were fixed in fix round 1; N3 and N4 are accepted; N5 is addressed by this update. Details in the reviewer session block.
 - Suggested skills / references for the next worker: `workflow/handoffs/data-persistence-schema.md` (implementer note on avoiding gitleaks `generic-api-key` matches with high-entropy throwaway values). Task 3.1 should read the guide's "Environments and configuration" section and E5 before creating `src/server/config/`.
 - Next action and responsible human: Developer B (thegrimbee) reviews the changes and decides whether to authorize commits on `feat/data-persistence-env-schema`, then completes the human provisioning checklist. Developer A (Lim-ZY) cross-reviews the guide's sign-in steps (E1, E2).
@@ -392,3 +397,4 @@ From E2, E8, and "Task 2.3 scope after task 2.4". No agent performs or verifies 
 | 2026-10-31 | reviewer / not available | No must-fix; S1–S3 and N1–N5 reported. |
 | 2026-10-31 | implementer, test-writer / fix round 1 | S1, S2, N1, N2 fixed in the guide; S3 fixed in the AC2 test. |
 | 2026-10-31 | orchestrator / not available | Consolidated the reviewer findings, main-session checks, and usage. Status: implementation complete, pending human review and commit authorization. |
+| 2026-10-31 | main session / not available | thegrimbee reported the task 2.3 provisioning finished. Ticked `tasks.md` item 2.3 and set the status to done; the out-of-scope follow-ups stay listed. |
