@@ -34,6 +34,17 @@
     - the guide says a human configures `dev` branch protection;
     - the test now requires a `Set in:` line.
   - The frontend agent was skipped because the task has no UI.
+  - The human found the setup steps too thin; for example, the GitHub OAuth app homepage and redirect URLs were not spelled out. At the human's request, the main session rewrote "Setting up the environments" in `docs/developer-guide.md` as an ordered runbook, steps 0 to 12, with:
+    - a worksheet;
+    - the exact Supabase, Vercel and GitHub fields;
+    - Vercel variable tables for each scope;
+    - PowerShell versions of the commands.
+
+    Two things the decisions do not cover are flagged in the guide as needing a team decision, not decided:
+    - Vercel Deployment Protection on the `dev` preview;
+    - whether the Supabase Email provider is turned off.
+
+    The redirect-URL path is still deferred to task 3.1. No second review was run on this rewrite.
 - **Checks (local, Windows):** `npm run lint` and `npx tsc --noEmit` passed, `npm test` passed 29 of 29, and `next build` passed. The regenerated `next-env.d.ts` was reverted.
 - **Not done yet:**
   - human review and commit of the implementation;

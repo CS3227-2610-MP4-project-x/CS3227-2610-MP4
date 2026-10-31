@@ -61,32 +61,70 @@ No application code reads these variables yet. The first of tasks 3.1, 5.1, and 
 
 ### Setting up the environments
 
-These steps are for the human developers. Agents do not perform or verify them. Record what you confirm with the release checks.
+These steps are for the human developers. Agents do not perform or verify them. Do them in the order below, because later steps need values from earlier ones. Do every step once for **development** and once for **production**, unless it says otherwise. Record what you confirm with the release checks.
 
-#### 1. Confirm the Supabase projects
+Dashboard menu names change from time to time. If a label below does not match exactly, look for the nearest equivalent.
 
-Confirm that the development and production Supabase projects both exist and are separate: PostgreSQL 17, Singapore region, Data API turned off. Note each project's reference (`<project-ref>`); it appears in the project URL `https://<project-ref>.supabase.co`. Apply the migrations and enable `app_runtime` in each, as described in [Database migrations](#database-migrations).
+#### Worksheet
 
-#### 2. Create the GitHub OAuth apps
+Keep a private note of these non-secret values as you go. Do not commit it. Secrets (passwords, keys, client secrets) go straight into Supabase, Vercel, or `.env.local`, never into the note.
 
-Create two GitHub OAuth apps, one per environment (GitHub **Settings → Developer settings → OAuth Apps → New OAuth App**). For each:
+| Value | Development | Production | Found in step |
+|---|---|---|---|
+| Supabase project reference `<project-ref>` | | | 1 |
+| `SUPABASE_URL` (`https://<project-ref>.supabase.co`) | | | 1 |
+| Session pooler host (for migrations) | | | 1 |
+| Transaction pooler host (for `DATABASE_URL`) | | | 4 |
+| CA certificate file path | | | 1 |
+| `APP_ORIGIN` | `dev` branch URL | production URL | 6 |
+| GitHub OAuth app client ID (not secret) | | | 7 |
 
-1. Set **Authorization callback URL** to that environment's Supabase callback, `https://<project-ref>.supabase.co/auth/v1/callback`, using that environment's project reference.
-2. Generate a client secret.
-3. Copy the client ID and client secret straight into the matching Supabase project (step 3). Do not put them in `.env.local`, Vercel, the repository, or a chat.
+#### 0. Prerequisites
 
-#### 3. Configure Supabase Auth
+- Node.js 24 and `npm ci` already run in your clone. The Supabase CLI is a pinned development dependency, so `npx supabase` needs no global install.
+- PostgreSQL 17 client tools (`psql`, `pg_dump`) on your `PATH`, for the privilege check and backups.
+  - Windows: run the PostgreSQL 17 installer from postgresql.org and select only **Command Line Tools**. Then add `C:\Program Files\PostgreSQL\17\bin` to `PATH` and open a new terminal. `psql --version` should print 17.x.
+  - macOS: `brew install postgresql@17`.
+- Admin access to both Supabase projects, a Vercel account, and owner access to the GitHub organisation, or someone who has it. Installing the Vercel GitHub app and creating organisation OAuth apps needs an organisation owner.
+- A password manager, for generating and storing passwords.
 
-In each Supabase project:
+#### 1. Supabase project basics
 
-1. Under **Authentication → Sign In / Providers → GitHub**, enable the provider and enter that environment's OAuth client ID and client secret.
-2. Under **Authentication → URL Configuration**, set **Site URL** to that environment's `APP_ORIGIN`.
-3. Set **Redirect URLs** to only the exact sign-in callback URL of that environment's app. The development project also allows the same path on `http://localhost:3000`. The list holds only exact callback URLs, with no wildcards. Task 3.1 defines the callback path, so the entry is added once that task is done.
-4. Under **Project Settings → API Keys**, find the project's publishable key. It becomes `SUPABASE_PUBLISHABLE_KEY`, and the project URL becomes `SUPABASE_URL`. Do not copy the secret or `service_role` keys anywhere.
+In the [Supabase dashboard](https://supabase.com/dashboard), open the project and:
 
-#### 4. Create the `dev` branch
+1. **Project reference.** Open **Project Settings → General**. Copy **Project ID** into the worksheet; this is `<project-ref>`. `SUPABASE_URL` is `https://<project-ref>.supabase.co`.
+2. **Region and version.** On the same page, confirm the region is Singapore (`ap-southeast-1`). Under **Project Settings → Infrastructure**, confirm PostgreSQL 17.
+3. **Data API off.** Open **Project Settings → Data API** (in some dashboards, **Integrations → Data API**). Turn **Enable Data API** off and save (D-J).
+4. **Database password.** This is the `postgres` password used for migrations only. If nobody has it, open **Project Settings → Database → Reset database password**, generate a long password in your password manager, and save it there. Use only letters and digits (turn symbols off), so it never needs percent-encoding in a URL.
+5. **CA certificate.** Open **Project Settings → Database → SSL Configuration → Download certificate**. Save it outside the repository with the environment in its name, for example:
+   - macOS/Linux: `~/.config/mp4/supabase-dev-ca.crt`
+   - Windows: `C:/Users/<you>/.config/mp4/supabase-dev-ca.crt` (use forward slashes; they work in connection strings)
+6. **Session pooler host.** Click **Connect** at the top of the project page. Under **Connection string**, choose type **URI** and method **Session pooler**. The string looks like `postgresql://postgres.<project-ref>:[YOUR-PASSWORD]@<pooler-host>:5432/postgres`. Copy `<pooler-host>` (for example `aws-0-ap-southeast-1.pooler.supabase.com`) into the worksheet.
 
-Create `dev` from the latest `master` and push it:
+#### 2. Apply the migrations
+
+Do development first. Only when everything below works there, repeat for production.
+
+1. Put the session pooler URL into your shell without writing it to history. See [Who applies migrations and how](#who-applies-migrations-and-how) for the Bash and PowerShell commands. The value is:
+
+   ```
+   postgresql://postgres.<project-ref>:<db-password>@<session-pooler-host>:5432/postgres?sslmode=verify-full&sslrootcert=<path-to-ca>
+   ```
+
+2. Preview, then apply:
+
+   ```bash
+   npx supabase migration list --db-url "$SUPABASE_DB_URL"
+   npx supabase db push --db-url "$SUPABASE_DB_URL" --dry-run
+   npx supabase db push --db-url "$SUPABASE_DB_URL"
+   ```
+
+   In PowerShell, write `$env:SUPABASE_DB_URL` instead of `"$SUPABASE_DB_URL"`. The dry run should list `20261030144500_create_app_schema.sql`. The first migration needs no backup; later ones do (see [Backup before a migration](#backup-before-a-migration)).
+3. Run the privilege check in [Check privileges after the first push](#check-privileges-after-the-first-push) and note the result for the release checks.
+
+#### 3. Create the `dev` branch
+
+Do this once. Create `dev` from the latest `master` and push it:
 
 ```bash
 git switch master
@@ -95,38 +133,172 @@ git switch -c dev
 git push -u origin dev
 ```
 
-A human then configures branch protection on `dev`, like `master`: require the CI checks and a reviewed pull request. Agents do not change branch protection (D7).
+A human then configures branch protection on `dev`, like `master`: require the CI checks and a reviewed pull request. Agents do not change branch protection (D7). On GitHub, open **Settings → Branches** (or **Settings → Rules → Rulesets**) for the repository and add a rule for `dev` with the same required checks as `master`.
+
+#### 4. Enable the runtime role and build `DATABASE_URL`
+
+1. Follow [After the first migration: enable the runtime role](#after-the-first-migration-enable-the-runtime-role) to give `app_runtime` a password. Generate it in your password manager, letters and digits only, at least 32 characters, different per environment.
+2. Click **Connect** again and choose method **Transaction pooler**. The string looks like `postgresql://postgres.<project-ref>:[YOUR-PASSWORD]@<pooler-host>:6543/postgres`. Copy the host into the worksheet.
+3. Build `DATABASE_URL` from it: change the user from `postgres.<project-ref>` to `app_runtime.<project-ref>`, put in the `app_runtime` password, keep port `6543`, and add `?sslmode=verify-full`:
+
+   ```
+   postgresql://app_runtime.<project-ref>:<app-runtime-password>@<transaction-pooler-host>:6543/postgres?sslmode=verify-full
+   ```
+
+4. Check it works (it should print `app_runtime`):
+
+   ```bash
+   psql "postgresql://app_runtime.<project-ref>:<app-runtime-password>@<transaction-pooler-host>:6543/postgres?sslmode=verify-full&sslrootcert=<path-to-ca>" -c "select current_user"
+   ```
+
+   This puts the password in your shell history. Afterwards clear it (`history -d <n>` in Bash; in PowerShell, `Clear-History` and delete the line from `(Get-PSReadLineOption).HistorySavePath`), or set the URL with the hidden-prompt method from step 2 first.
+5. Keep `DATABASE_URL` in your password manager until step 9.
 
 #### 5. Create the Vercel project
 
-1. Create **one** Vercel project from this repository, with `master` as the production branch.
-2. Confirm that the Hobby plan can deploy this organisation-owned repository and offers branch-specific Preview variables. Record the result with the release checks (E8). A different setup would need a new recorded decision.
-3. Note the stable URL Vercel gives the `dev` branch. It is development's `APP_ORIGIN` and the development Supabase project's Site URL (step 3).
-4. Under **Settings → Environment Variables**:
-   - **Production**: the production values.
-   - **Preview**, restricted to the `dev` branch: the development values.
-   - **Development**: nothing.
-   - Add no variable for previews of other branches. You may turn off their deployments.
+Do this once; one project serves both environments (E8).
 
-#### 6. Generate the per-environment secrets
+1. In [Vercel](https://vercel.com), click **Add New… → Project**.
+2. Under **Import Git Repository**, choose GitHub. If the organisation's repository is not listed, click **Adjust GitHub App Permissions** (or **Install**), choose the `CS3227-2610-MP4-project-x` organisation, and give the Vercel app access to this repository only. An organisation owner may have to approve this.
+3. **Hobby check (E8).** If Vercel refuses to import an organisation-owned repository on the Hobby plan, stop here and record it: a different setup needs a new recorded decision.
+4. On the configure screen:
+   - **Project Name:** choose a name, for example `mp4-task-board`. It becomes part of every URL.
+   - **Framework Preset:** Next.js (detected automatically).
+   - **Root Directory:** leave as `./`.
+   - **Build and Output Settings:** leave the defaults (`npm run build`).
+   - **Environment Variables:** add none yet. The build needs none (D12).
+5. Click **Deploy**. The first deployment builds the home page only and should succeed.
+6. Open **Settings → Environments → Production** (in older dashboards **Settings → Git**) and check that the production branch (**Branch Tracking**) is `master`.
+
+#### 6. Find the two app URLs (`APP_ORIGIN`)
+
+1. **Production.** Open **Settings → Domains**. The default production domain is `https://<project-name>.vercel.app`; Vercel may add a suffix if the name is taken. Copy the exact value, with `https://` and no trailing slash, into the worksheet as production `APP_ORIGIN`. If you later add a custom domain, `APP_ORIGIN`, the Supabase Site URL, and the GitHub OAuth app's homepage URL must all change to it.
+2. **Development.** Pushing `dev` in step 3 triggers a preview deployment; if it did not, push any commit to `dev`. Open **Deployments**, filter by branch `dev`, and open the latest one. Under **Domains** it lists a branch URL of the form `https://<project-name>-git-dev-<scope>.vercel.app`. This URL stays the same for every `dev` deployment. Copy it into the worksheet as development `APP_ORIGIN`. Do not use the per-deployment URL with a random hash; it changes on every push.
+3. **Deployment Protection.** By default Vercel protects preview URLs, so only people logged in to your Vercel account can open the `dev` URL, and anyone else signing in there is stopped by a Vercel login page. Whether to turn this off for `dev` (**Settings → Deployment Protection**) is not decided yet. Ask the team before changing it, and record the decision.
+
+#### 7. Create the GitHub OAuth apps
+
+Create two OAuth apps, one per environment. Create them under the organisation, so that they do not depend on one person's account: open the organisation's **Settings → Developer settings → OAuth Apps → New OAuth App**. (A personal account's **Settings → Developer settings → OAuth Apps** also works.)
+
+Fill in the form:
+
+| Field | Development app | Production app |
+|---|---|---|
+| Application name | `MP4 Task Board (development)` | `MP4 Task Board` |
+| Homepage URL | development `APP_ORIGIN` (the `dev` branch URL) | production `APP_ORIGIN` |
+| Application description | optional | optional |
+| Authorization callback URL | `https://<dev-project-ref>.supabase.co/auth/v1/callback` | `https://<prod-project-ref>.supabase.co/auth/v1/callback` |
+| Enable Device Flow | leave unticked | leave unticked |
+
+The **Authorization callback URL** is always the Supabase project's own callback, never the app's URL. GitHub sends the user back to Supabase, and Supabase then sends them to the app (E2). You can copy the exact callback URL from the Supabase GitHub provider page in step 8.
+
+Then:
+
+1. Click **Register application**.
+2. Copy the **Client ID** into the worksheet. It is not secret.
+3. Click **Generate a new client secret**. GitHub shows it only once. Paste it straight into the matching Supabase project in step 8. Do not put it in `.env.local`, Vercel, the repository, the worksheet, or a chat.
+
+#### 8. Configure Supabase Auth
+
+In each Supabase project:
+
+1. **GitHub provider.** Open **Authentication → Sign In / Providers → GitHub**.
+   - Check that **Callback URL (for OAuth)** shown there equals the OAuth app's Authorization callback URL from step 7.
+   - Turn **Enable Sign in with GitHub** on.
+   - Paste that environment's **Client ID** and **Client Secret**, then **Save**.
+2. **Site URL.** Open **Authentication → URL Configuration**. Set **Site URL** to that environment's `APP_ORIGIN`: the `dev` branch URL for development, the production URL for production. Do not use `http://localhost:3000` here, even in development.
+3. **Redirect URLs.** These are the app pages that Supabase may send people back to after sign-in. The list holds only exact URLs, with no wildcards. Task 3.1 defines the callback path, so the entries are added once that task is done. They will be:
+   - Development project: `<development APP_ORIGIN><callback path>` and `http://localhost:3000<callback path>`.
+   - Production project: `<production APP_ORIGIN><callback path>` only.
+4. **Other sign-in providers.** The Email provider is on by default in new Supabase projects. The specs only define GitHub sign-in, but whether to turn the others off is not recorded. Ask the team, and record the decision.
+5. **API key.** Open **Project Settings → API Keys**. Under **Publishable key**, copy the key that starts with `sb_publishable_`. If the page has only legacy `anon` and `service_role` keys, create the new keys there first. This is `SUPABASE_PUBLISHABLE_KEY`. Do not copy the secret or `service_role` keys anywhere (E1).
+
+#### 9. Generate the per-environment secrets
 
 Generate each of these separately for development and production, and never reuse a value across them. Local `.env.local` uses the development values.
 
-- **`app_runtime` password.** See [After the first migration: enable the runtime role](#after-the-first-migration-enable-the-runtime-role).
-- **`GITHUB_TOKEN_ENCRYPTION_KEY`.** 32 random bytes, base64-encoded:
+- **`app_runtime` password and `DATABASE_URL`.** From step 4.
+- **`GITHUB_TOKEN_ENCRYPTION_KEY`.** 32 random bytes, base64-encoded. Run this once per environment:
 
   ```bash
   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
   ```
 
-  Paste the output straight into Vercel or `.env.local`; do not save it anywhere else. Replacing the key after GitHub tokens are stored makes them unreadable. Rotation uses the key version in D-H and is implemented by task 5.1.
-- **SoC LLM key.** Issued in the SoCLaaS portal, `https://soclaas-portal.comp.nus.edu.sg`. Development uses a key from thegrimbee's SoC account and production one from Lim-ZY's ("Keys per environment"). The key owner uses the key only for this application, or warns the team before replacing it ("Keys per environment"). Rotating a key disables the old one at once ("SoC LLM Facts"). Before setting `AI_PROVIDER` to `soclaas`, check that `GET /v1/models` with the key lists `qwen3.6:35b`. Locally, keep `AI_PROVIDER=fake` and use the development key only when needed.
+  Paste the output straight into Vercel (step 10) or `.env.local` (step 11); do not save it anywhere else. Replacing the key after GitHub tokens are stored makes them unreadable. Rotation uses the key version in D-H and is implemented by task 5.1.
+- **SoC LLM key.** Issued in the SoCLaaS portal, `https://soclaas-portal.comp.nus.edu.sg`. Development uses a key from thegrimbee's SoC account and production one from Lim-ZY's ("Keys per environment"). The key owner uses the key only for this application, or warns the team before replacing it ("Keys per environment"). Rotating a key disables the old one at once ("SoC LLM Facts"). Before setting `AI_PROVIDER` to `soclaas`, check that the key can use the pinned model. Bash:
 
-#### 7. Verify
+  ```bash
+  read -rs SOCLAAS_API_KEY && export SOCLAAS_API_KEY
+  curl -s -H "Authorization: Bearer $SOCLAAS_API_KEY" https://soclaas-api.comp.nus.edu.sg/v1/models | grep -o '"qwen3.6:35b"'
+  ```
 
-- Compare the two environments' values and confirm that they share no database password, OAuth client secret, SoC LLM key, or encryption key.
-- Task 9.4 signs in on each deployed environment and records the result. CI cannot check this.
-- After the first deployment with the real SoC LLM adapter, each environment makes one real call, recorded with the release checks.
+  PowerShell:
+
+  ```powershell
+  $key = [System.Net.NetworkCredential]::new('', (Read-Host -AsSecureString 'SoCLaaS key')).Password
+  (Invoke-RestMethod -Uri https://soclaas-api.comp.nus.edu.sg/v1/models -Headers @{ Authorization = "Bearer $key" }).data.id -contains 'qwen3.6:35b'
+  ```
+
+  The first prints `"qwen3.6:35b"` and the second prints `True` if the key can use the model. Locally, keep `AI_PROVIDER=fake` and use the development key only when needed.
+
+#### 10. Set the Vercel environment variables
+
+Open the Vercel project's **Settings → Environment Variables**. Add each variable with **Add Environment Variable** (or **Add New**): fill in **Key** and **Value**, tick the environment, and save. Turn on **Sensitive** for every variable marked secret, so that its value cannot be read back from the dashboard.
+
+**Production values**: tick **Production** only.
+
+| Key | Value | Sensitive |
+|---|---|---|
+| `DATABASE_URL` | production `DATABASE_URL` from step 4 | yes |
+| `DATABASE_CA_CERT` | production CA file contents, from `-----BEGIN CERTIFICATE-----` to `-----END CERTIFICATE-----`, pasted as several lines, without quotes | no |
+| `GITHUB_TOKEN_ENCRYPTION_KEY` | a new production key from step 9 | yes |
+| `SUPABASE_URL` | `https://<prod-project-ref>.supabase.co` | no |
+| `SUPABASE_PUBLISHABLE_KEY` | production publishable key | no |
+| `APP_ORIGIN` | production `APP_ORIGIN` | no |
+| `APP_ENV` | `production` | no |
+| `AI_PROVIDER` | `soclaas` | no |
+| `SOCLAAS_API_KEY` | production SoC key (Lim-ZY's account) | yes |
+| `SOCLAAS_MODEL` | `qwen3.6:35b` | no |
+
+**Development values**: tick **Preview** only, then choose **Select a custom Preview branch** (or **Specific branch**) and enter `dev`.
+
+| Key | Value | Sensitive |
+|---|---|---|
+| `DATABASE_URL` | development `DATABASE_URL` from step 4 | yes |
+| `DATABASE_CA_CERT` | development CA file contents, as above | no |
+| `GITHUB_TOKEN_ENCRYPTION_KEY` | a new development key from step 9 | yes |
+| `SUPABASE_URL` | `https://<dev-project-ref>.supabase.co` | no |
+| `SUPABASE_PUBLISHABLE_KEY` | development publishable key | no |
+| `APP_ORIGIN` | development `APP_ORIGIN` (the `dev` branch URL) | no |
+| `APP_ENV` | `development` | no |
+| `AI_PROVIDER` | `fake` until you need the real model, then `soclaas` | no |
+| `SOCLAAS_API_KEY` | development SoC key (thegrimbee's account) | yes |
+| `SOCLAAS_MODEL` | `qwen3.6:35b` | no |
+
+Then:
+
+1. Leave **Development** empty, and add nothing for **Preview** on all branches (E8).
+2. **Hobby check (E8).** If Vercel does not let you restrict Preview variables to the `dev` branch, stop and record it: a different setup needs a new recorded decision.
+3. Check the list. Every key should appear twice (Production, and Preview for `dev`) with different values, except `SOCLAAS_MODEL`. No key starts with `NEXT_PUBLIC_`.
+4. Variable changes only apply to new deployments. Open **Deployments**, and choose **⋯ → Redeploy** on the latest `master` deployment and on the latest `dev` deployment.
+5. Never run `vercel env pull` into this repository. The Development scope is empty, and real values must not land in files.
+
+#### 11. Set up your local `.env.local`
+
+1. Copy the template. Bash: `cp .env.example .env.local`. PowerShell: `Copy-Item .env.example .env.local`.
+2. Fill in the development values, except `APP_ORIGIN=http://localhost:3000` and `AI_PROVIDER=fake`. Keep the quotes around `DATABASE_CA_CERT` so that its line breaks survive. Leave `SUPABASE_DB_URL` commented out and `TEST_DATABASE_URL` as it is.
+3. Use `.env.local`, not `.env`. Both are ignored by git, but this repository's convention is `.env.local`.
+4. Run `git status` and check that `.env.local` is not listed.
+
+#### 12. Verify
+
+- [ ] Both Supabase projects: Singapore, PostgreSQL 17, Data API off, migrations applied, privilege check recorded (steps 1 and 2).
+- [ ] `select current_user` as `app_runtime` returns `app_runtime` through the transaction pooler (step 4).
+- [ ] The `master` and `dev` deployments both succeed after the redeploy (step 10).
+- [ ] The two environments share no database password, OAuth client secret, SoC LLM key, or encryption key. Compare them in your password manager, not in a file.
+- [ ] The Hobby checks (steps 5 and 10) and the Deployment Protection and sign-in-provider decisions (steps 6 and 8) are recorded.
+- [ ] After task 3.1: the Redirect URLs are added (step 8), and task 9.4 signs in on each deployed environment and records the result. CI cannot check this.
+- [ ] After the first deployment with the real SoC LLM adapter, each environment makes one real call, recorded with the release checks.
 
 ## Database migrations
 
@@ -143,12 +315,22 @@ Migrations are a controlled release step. An operator runs them by hand, never C
 
 The session pooler connection string is on the project's **Connect** page in the Supabase dashboard. Use port `5432` and the user `postgres.<project-ref>`. Keep it out of the repository and out of shell history files where you can, for example by pasting it into a variable at a prompt:
 
+Bash:
+
 ```bash
 read -rs SUPABASE_DB_URL   # paste: postgresql://postgres.<project-ref>:<db-password>@<pooler-host>:5432/postgres?sslmode=verify-full&sslrootcert=<path-to-ca>
 export SUPABASE_DB_URL
 ```
 
-The Supabase CLI requires the connection string to be percent-encoded. Encode any special characters in the password.
+PowerShell (the value is typed at a hidden prompt and lives only in this terminal session):
+
+```powershell
+$env:SUPABASE_DB_URL = [System.Net.NetworkCredential]::new('', (Read-Host -AsSecureString 'Paste SUPABASE_DB_URL')).Password
+```
+
+In PowerShell, write `$env:SUPABASE_DB_URL` wherever the commands below say `"$SUPABASE_DB_URL"`, for example `npx supabase db push --db-url $env:SUPABASE_DB_URL --dry-run`. Close the terminal when you are done, so that the value is gone.
+
+The Supabase CLI requires the connection string to be percent-encoded. Encode any special characters in the password, or use a password with only letters and digits so that none need encoding.
 
 Before running any migration, check what it will apply:
 
