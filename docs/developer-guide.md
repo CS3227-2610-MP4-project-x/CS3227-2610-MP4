@@ -292,11 +292,11 @@ Then:
 
 #### 12. Verify
 
-- [ ] Both Supabase projects: Singapore, PostgreSQL 17, Data API off, migrations applied, privilege check recorded (steps 1 and 2).
-- [ ] `select current_user` as `app_runtime` returns `app_runtime` through the transaction pooler (step 4).
-- [ ] The `master` and `dev` deployments both succeed after the redeploy (step 10).
-- [ ] The two environments share no database password, OAuth client secret, SoC LLM key, or encryption key. Compare them in your password manager, not in a file.
-- [ ] The Hobby checks (steps 5 and 10) and the Deployment Protection and sign-in-provider decisions (steps 6 and 8) are recorded.
+- [x] Both Supabase projects: Singapore, PostgreSQL 17, Data API off, migrations applied, privilege check recorded (steps 1 and 2).
+- [x] `select current_user` as `app_runtime` returns `app_runtime` through the transaction pooler (step 4).
+- [x] The `master` and `dev` deployments both succeed after the redeploy (step 10).
+- [x] The two environments share no database password, OAuth client secret, SoC LLM key, or encryption key. Compare them in your password manager, not in a file.
+- [x] The Hobby checks (steps 5 and 10) and the Deployment Protection and sign-in-provider decisions (steps 6 and 8) are recorded.
 - [ ] After task 3.1: the Redirect URLs are added (step 8), and task 9.4 signs in on each deployed environment and records the result. CI cannot check this.
 - [ ] After the first deployment with the real SoC LLM adapter, each environment makes one real call, recorded with the release checks.
 
