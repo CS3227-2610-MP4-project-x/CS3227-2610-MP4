@@ -82,7 +82,7 @@ The system SHALL call the LLM only through an adapter interface defined by the a
 
 #### Scenario: Pinned model is used
 - **WHEN** the SoC adapter makes a call
-- **THEN** it sends the configured model name, never the `default` alias, and returns that model name with the result
+- **THEN** it sends the configured model name, never the `default` alias, and returns with the result the model name the provider reports, or the configured model name if the provider reports none
 
 #### Scenario: Fake adapter is deterministic
 - **WHEN** the same input is sent to the fake adapter in the same configured mode
