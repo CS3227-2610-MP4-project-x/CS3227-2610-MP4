@@ -21,6 +21,32 @@ The system SHALL allow a person to belong to multiple projects with one role per
 - **WHEN** the product manager adds a registered person to the project as a developer
 - **THEN** that person can see the project and can be assigned its tasks
 
+### Requirement: Product manager transfers the role
+The system SHALL allow only the project's current product manager to transfer the product manager role, and only to a developer in the same project. In a single change, the outgoing product manager SHALL become a developer and the incoming developer SHALL become the product manager. The system SHALL refuse the transfer while the incoming developer has assigned tasks that are not Done.
+
+#### Scenario: Product manager transfers the role
+- **WHEN** the product manager transfers the role to a developer in the project who has no open assigned tasks
+- **THEN** that developer becomes the product manager, the previous product manager becomes a developer, and the project still has exactly one product manager
+
+#### Scenario: Incoming product manager has open tasks
+- **WHEN** the product manager tries to transfer the role to a developer who has an assigned task that is not Done
+- **THEN** the system refuses the transfer and asks for the task to be reassigned first
+
+#### Scenario: Developer tries to take the role
+- **WHEN** a developer requests a product manager transfer
+- **THEN** the system refuses the request and the roles are unchanged
+
+### Requirement: Projects and tasks have readable IDs
+Each project SHALL have a key of 2 to 10 uppercase letters and digits, starting with a letter, that is unique and cannot change. Each task SHALL have a task ID made of the project key and a number, such as `WEB-12`, that is unique within the project and never reused, including after the task is deleted. Commit messages and progress reports refer to tasks by this task ID.
+
+#### Scenario: Task receives an ID
+- **WHEN** the product manager creates a task in a project with key `WEB` whose previous task was `WEB-11`
+- **THEN** the new task's ID is `WEB-12`
+
+#### Scenario: Deleted task number is not reused
+- **WHEN** task `WEB-12` is deleted and a new task is created
+- **THEN** the new task's ID is not `WEB-12`
+
 ### Requirement: Product manager manages tasks
 The system SHALL allow a project's product manager to create, edit, reassign, and delete tasks. Each task SHALL have a title, a description, at least one acceptance criterion, an assignee who is a developer in the project, a due date, and an optional branch name.
 
@@ -31,6 +57,10 @@ The system SHALL allow a project's product manager to create, edit, reassign, an
 #### Scenario: Task without acceptance criteria is refused
 - **WHEN** the product manager saves a task with no acceptance criteria
 - **THEN** the system refuses the task and explains that at least one acceptance criterion is required
+
+#### Scenario: Product manager deletes a task
+- **WHEN** the product manager deletes a task
+- **THEN** the task no longer appears on the board, in the review queue, or in new progress reports, and its history is kept
 
 #### Scenario: Assignee must belong to the project
 - **WHEN** the product manager assigns a task to a person who is not a developer in the project
