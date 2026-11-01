@@ -20,7 +20,7 @@ Depends on: none.
 
 Depends on: 2.
 
-- [ ] 3.1 Implement GitHub sign-in and sign-out with Supabase Auth, storing the verified GitHub user ID and username; add tests for first sign-in and sign-out.
+- [x] 3.1 Implement GitHub sign-in and sign-out with Supabase Auth, storing the verified GitHub user ID and username; add tests for first sign-in and sign-out.
 - [ ] 3.2 Implement server-side membership and role checks used by every Route Handler and service; add API tests for non-members, developers calling product-manager actions, and unauthenticated requests.
 
 ## 4. Task Management
