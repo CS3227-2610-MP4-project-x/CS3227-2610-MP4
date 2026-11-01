@@ -13,6 +13,6 @@ From the repository root, run:
 python3 -m tools.agent_usage_dashboard generate --repo .
 ```
 
-The command reads local Codex and Claude JSONL session histories, updates the local normalized ledger, and writes the standalone report to `~/.agent-usage-dashboard/reports/index.html` by default. If the human asks for another location or local history roots, pass `--output PATH`, `--codex-root PATH`, `--claude-root PATH`, or `--state PATH`.
+The command reads local Codex and Claude JSONL session histories and, when present, the local Codex lifecycle metadata log; it updates the normalized ledger and writes the standalone report to `~/.agent-usage-dashboard/reports/index.html` by default. Codex hooks only append identity metadata during agent work; this skill remains the only trigger for history scanning, ledger updates, and report generation. Codex project hooks must be reviewed and trusted before they run. If the human asks for another location or local history roots, pass `--output PATH`, `--codex-root PATH`, `--claude-root PATH`, or `--state PATH`.
 
 Report the exact output path and the coverage or diagnostic summary shown by the report. Do not include transcript content in messages or exports.

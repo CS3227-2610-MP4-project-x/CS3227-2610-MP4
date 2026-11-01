@@ -44,14 +44,19 @@ Repeat one session block for each assigned agent session. Include the shared fie
 
 ### Session `<role> / <session-id>`
 
-For sessions that report usage, include these optional structured attribution
-fields in the session block so local usage can be matched without inference:
+For Codex work, include the following structured attribution fields in the root
+session block so its workflow role and work item can be matched without
+inference. Use the exact provider session ID surfaced by Codex; never use a
+subagent hook's parent `session_id` as a child ID. Codex lifecycle hooks map
+subagents through their exact transcript relationship and provide the surfaced
+agent type/ID. Do not invent missing identifiers. For Claude sessions, include
+these fields when surfaced.
 
-- Provider: `codex` or `claude`
-- Provider session ID: exact provider-generated session identifier
-- Work ID: explicit task/work identifier, when available
-- Agent: role or agent label, when available
-- Phase: lifecycle phase, when available
+- Provider: `codex` or `claude`; required for the root session
+- Provider session ID: exact provider-generated session identifier; required when surfaced
+- Work ID: explicit task/work identifier; required for Codex root sessions
+- Agent: workflow role or agent label; required for Codex root sessions
+- Phase: lifecycle phase; required when recorded by the workflow
 
 #### Shared fields `[ALL]`
 

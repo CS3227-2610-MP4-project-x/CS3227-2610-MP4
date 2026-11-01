@@ -13,15 +13,19 @@ See `proposal.md` for motivation and `specs/local-agent-usage-reporting/spec.md`
 - Make provider, metric provenance, and collection coverage visible in the report.
 
 **Non-Goals:**
-- No provider API calls, telemetry export, account usage/quota polling, background hook installation, or scheduled jobs.
+- No provider API calls, telemetry export, account usage/quota polling, Claude hooks, or scheduled dashboard generation.
 - No application UI, database integration, automatic task-outcome scoring, or transcript text search.
 - No inference of a missing provider metric, cost, or work attribution.
 
 ## Decisions
 
-### Human-invoked, one-shot collection
+### Human-invoked report collection with Codex lifecycle capture
 
-Both provider skill entries invoke one Python command that discovers configured local session roots, updates a local ledger, and writes a fresh HTML snapshot. No hooks or scheduler are installed. A scheduled or hook-driven design was considered because the MP3 tool uses one for catch-up, but rejected here because collection itself is explicitly limited to a human skill invocation.
+Both provider skill entries invoke one Python command that discovers configured local session roots, updates a local ledger, and writes a fresh HTML snapshot. Codex lifecycle hooks append identity metadata only; they never read session histories, update the usage ledger, or generate the dashboard. This preserves human invocation as the only collection/report trigger while letting the dashboard join Codex subagent transcripts to provider usage records.
+
+The Codex hook configuration records `SessionStart` and `SessionEnd` for root sessions, and `SubagentStart` and `SubagentStop` for child sessions. It records only fields Codex surfaces: provider session ID, event name, event observation time, model and working directory when available, and subagent ID/type. At `SubagentStop`, it records a hash of the normalized transcript path as a local join key rather than retaining the path. Hook records are appended to a private file under the local dashboard state directory, outside the repository. Hook failures do not block agent work; unavailable or untrusted hooks produce incomplete attribution.
+
+Codex subagent hook `session_id` identifies the parent session. The dashboard uses the `SubagentStop` transcript path hash to match exactly one scanned Codex JSONL source file, then uses that file's parsed provider session ID to attribute its response rows to the recorded subagent ID/type. No match or multiple matches remain unknown/ambiguous. The root session's workflow role and work ID continue to come from an exact provider-session match in the handoff. Tool-call hooks are not installed for this token/session attribution change; per-response provider usage remains the source of token metrics.
 
 ### Provider adapters over shared normalized records
 
@@ -30,8 +34,39 @@ Use separate Codex and Claude readers to map each provider's per-response usage,
 Recognized layouts (2026-10-27):
 
 - **Codex, older:** per-response usage in `event_msg` `token_count` → `info.token_usage_record`; model in `session_meta`.
-- **Codex, current:** per-response usage in top-level `token_usage_record` records (`payload.usage`, `payload.response_id`, `payload.session_id`); model in `turn_context`; cache writes named `cache_write_input_tokens`. In this layout `token_count` events carry only `last_token_usage` and `total_token_usage` running totals. These do not match per-response records one-to-one, so they are never recorded: using them would double-count or misattribute usage. A file chunk with running totals but no per-response records produces a `per_response_usage_unavailable` diagnostic.
+- **Codex, current:** per-response usage in top-level `token_usage_record` records (`payload.usage`, `payload.response_id`, and explicit `payload.thread_id`, falling back to `payload.session_id` when no thread ID is present); model in `turn_context`; cache writes named `cache_write_input_tokens`. In this layout `token_count` events carry only `last_token_usage` and `total_token_usage` running totals. These do not match per-response records one-to-one, so they are never recorded: using them would double-count or misattribute usage. A file chunk with running totals but no per-response records produces a `per_response_usage_unavailable` diagnostic.
 - **Claude:** usage in assistant `message.usage`; reasoning comes from `output_tokens_details.thinking_tokens`, or from the older `reasoning_tokens` field when that is absent.
+
+### Explicit Codex response thread identity and reader upgrade
+
+Observed child transcripts contain a child `session_meta.id` followed by inherited
+parent metadata. Their top-level per-response records carry the child's exact
+`thread_id` alongside the parent's `session_id`. Prefer the explicit `thread_id`
+for usage identity; never use inherited parent metadata to override it. Existing
+hook transcript hashes then join to the child's measured responses normally.
+No hooks or cumulative-total collection changes are required.
+
+For a captured call without any stop transcript reference, generation may also
+resolve the relationship by exact agent ID = measured thread ID = first
+`session_meta.id`, with the first metadata record explicitly naming the same
+`source.subagent.thread_spawn.parent_thread_id`. Inspect first complete metadata
+records only for relevant single-thread transcripts. Conflicting parent
+relationships stay unresolved. A supplied but invalid stop reference must not
+be bypassed by this fallback. This also covers interrupted calls; no elapsed-time,
+filename, agent-role, or prose matching is used.
+
+Use the local ledger's SQLite `user_version` to mark this reader upgrade and an
+additive `codex_thread_sources` table of successfully replayed transcript hashes
+to retry sources that were unavailable during the first upgrade. On
+first thread-aware collection, replay available Codex files even with saved
+checkpoints, rebuild each completely reread file's hash/session mapping, and
+correct a legacy parent-keyed response only when all its normalized measurement
+fields match the source response. Do not merge different measurements. A
+conflicting correction remains ambiguous and produces a fixed diagnostic.
+Rows and mappings from unavailable source files remain retained; an upgrade
+coverage diagnostic explains when their identities cannot be reverified. Keep
+partial-line retry and incremental checkpoint behavior unchanged. No application
+database migration or source-file deletion is involved.
 
 ### Local SQLite ledger with idempotent response keys
 
@@ -39,7 +74,22 @@ Store normalized session, response, attribution, checkpoint, and diagnostic fact
 
 ### Explicit work attribution
 
-Extend each handoff session record with provider, provider session ID, and optional work ID if the agreed template needs them. Parse only those structured fields. Multiple matches remain ambiguous, and unmatched records remain unassigned. Existing free-form summaries may continue to be read for explicitly labeled fields, but prose matching and branch-prefix inference are excluded.
+Require each Codex worker session block to record provider, provider session ID, work ID, agent role, and phase when surfaced. Root sessions are attributed only through that exact handoff match. Subagent role attribution comes from the exact transcript-hash relationship recorded by Codex hooks; work ID is inherited only through an exact parent-session handoff match. Multiple matches remain ambiguous, and unmatched records remain unassigned. Existing free-form summaries may continue to be read for explicitly labeled fields, but prose matching and branch-prefix inference are excluded.
+
+### Session timestamps and subagent drilldown
+
+The usage table displays the latest observed usage time in SGT (UTC+08:00)
+immediately after Session / group. Comparison uses the underlying instant,
+with the existing newest-first, unknown-last ordering in every grouping.
+Session rows have initially collapsed, keyboard-operable disclosure buttons.
+The report snapshot includes allowlisted captured Codex call identities and
+verified parent/child session links reconstructed during explicit generation;
+no new ledger schema or transcript data is needed. Start-only and unresolved
+calls remain visible with unknown usage. Exact, unique transcript relationships
+and unambiguous attribution are required before child metrics are shown.
+Parent row metrics remain their own measured usage; child sessions stay visible
+independently. Detail rows do not enter totals, chart data, or CSV exports.
+Child details use the same active response filters and latest-first ordering.
 
 ### Standalone report and CSV snapshot
 
