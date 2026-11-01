@@ -50,4 +50,4 @@
 - **Human follow-up:**
   - make `db-integration` a required check on `master`;
   - Developer A cross-reviews the `people` table.
-- **Dependencies added:** `pg` 8.23.1, `@types/pg` 8.23.1, `supabase` 2.122.0. No secrets were recorded. Human verification of this summary is pending.
+- **Dependencies added:** `pg` 8.23.1, `@types/pg` 8.23.1, `supabase` 2.122.0. No secrets were recorded. Human has approved the changes.
