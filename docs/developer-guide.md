@@ -57,7 +57,7 @@ These are not variables, so they are not in `.env.example`, Vercel, or the repos
 - AI quotas and rate limits. They are code constants selected by `APP_ENV`; changing one is a reviewed code change (E4).
 - The SoC LLM gateway base URL, `https://soclaas-api.comp.nus.edu.sg`. It is a code constant (E3).
 
-No application code reads these variables yet. The first of tasks 3.1, 5.1, and 6.1 adds one server-only configuration module in `src/server/config/`, which validates the variables when it is first called and reports a missing or invalid variable by name, never by value (E5).
+No application code reads these variables yet. The first of tasks 3.1, 5.1, and 6.3 adds one server-only configuration module in `src/server/config/`, which validates the variables when it is first called and reports a missing or invalid variable by name, never by value (E5).
 
 ### Setting up the environments
 
