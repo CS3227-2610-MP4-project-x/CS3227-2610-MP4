@@ -2,7 +2,8 @@
 
 The dashboard is a human-invoked, offline report for observed local Codex and
 Claude session token usage. It uses Python's standard library and does not call
-provider APIs, install hooks, or run a background collector.
+provider APIs. Optional Codex lifecycle hooks record local identity metadata;
+they do not collect token usage, scan histories, or generate the dashboard.
 
 ## Generate a report
 
@@ -71,10 +72,26 @@ attachments, and request metadata. These are skipped and counted under
 `unsupported_record` without affecting usage totals.
 
 Handoff and log Markdown can enrich work attribution only when a session block
-contains explicit `Provider`, `Provider session ID`, and optional `Work ID`,
-`Agent`, or `Phase` fields. A single exact provider/session match is attributed;
-multiple matches show as ambiguous and no match remains unknown. The tool does
-not infer links from filenames, branches, or prose.
+contains explicit `Provider`, `Provider session ID`, `Work ID`, `Agent`, or
+`Phase` fields. For a root Codex session, exact provider/session identity is
+required to connect its workflow role and work item. A single exact
+provider/session match is attributed; multiple matches show as ambiguous and
+no match remains unknown. The tool does not infer links from filenames,
+branches, or prose.
+
+The repository's `.codex/config.toml` registers `SessionStart`, `SessionEnd`,
+`SubagentStart`, and `SubagentStop` handlers. Codex requires project hooks to be
+reviewed and trusted before they run. The hook appends only event metadata,
+session/model IDs where surfaced, subagent ID/type, an observation timestamp,
+and a hash of the normalized subagent transcript path to
+`~/.agent-usage-dashboard/codex-lifecycle.jsonl` (or
+`AGENT_USAGE_STATE/codex-lifecycle.jsonl`). It never stores transcript paths or
+content. The dashboard uses the stop-event path hash to match exactly one
+scanned Codex usage file and attributes those provider-reported token records
+to the subagent identity. Codex subagent hook `session_id` is the parent ID; it
+is never used as the child session ID. Work ID is inherited only through an
+exact parent-session handoff match. Missing, conflicting, or ambiguous links
+remain unknown/ambiguous.
 
 ## After updating the reader
 
@@ -102,8 +119,10 @@ directory with restrictive permissions where supported.
 The ledger keeps provider-scoped checkpoints using a hashed local file
 identity, the byte offset after the last complete line, and a digest of the
 processed prefix. It resumes from complete lines on the next invocation and
-retries an incomplete trailing line when more data arrives. Checkpoints do not
-contain source paths or transcript contents.
+retries an incomplete trailing line when more data arrives. Codex transcript
+path hashes are mapped to session IDs in the ledger so attribution survives
+later incremental runs and source archival. Checkpoints do not contain source
+paths or transcript contents.
 
 Provider JSONL formats are version-sensitive. Missing fields remain unknown;
 malformed, partial, unreadable, or unsupported records produce generic coverage

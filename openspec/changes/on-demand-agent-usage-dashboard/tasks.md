@@ -6,6 +6,8 @@
 - [ ] 1.2 Add a private local SQLite ledger with provider-scoped response deduplication, session metadata, explicit source provenance, attribution, and coverage diagnostics; verify rescans do not duplicate records and unknown metrics remain null.
 - [ ] 1.3 Parse explicit provider/session/work/agent fields from handoff and log records and extend the handoff session template for future structured records; verify exact matches attribute correctly while unmatched and ambiguous sessions remain visible as unassigned.
 - [x] 1.4 Support the current Codex layout (top-level `token_usage_record`, `turn_context` model, `cache_write_input_tokens`) and Claude `output_tokens_details.thinking_tokens`, keeping the older layouts; never record Codex running totals as responses, and report a diagnostic when only totals exist. Verify with synthetic fixtures for each layout.
+- [x] 1.5 Add Codex-only lifecycle hooks for root and subagent start/stop events. Append only surfaced identity metadata to private local state; hooks must not scan session histories, update the ledger, or generate the dashboard.
+- [x] 1.6 During human-invoked dashboard generation, join Codex subagent hook metadata to usage sessions by an exact unique transcript-path hash, then attribute subagent ID/type and the explicitly matched parent-handoff work ID. Keep missing or ambiguous matches unknown.
 
 ## 2. Dashboard and exports
 

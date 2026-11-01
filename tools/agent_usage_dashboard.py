@@ -53,6 +53,11 @@ CREATE TABLE IF NOT EXISTS checkpoints (
   model TEXT,
   prefix_digest TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS codex_transcript_sessions (
+  transcript_path_hash TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  PRIMARY KEY(transcript_path_hash, session_id)
+);
 CREATE INDEX IF NOT EXISTS responses_session_idx ON responses(provider, session_id);
 CREATE INDEX IF NOT EXISTS responses_time_idx ON responses(observed_at);
 """
@@ -140,6 +145,11 @@ def _file_key(provider: str, root: Path, path: Path) -> str:
     return hashlib.sha256(f"{provider}\0{relative}".encode()).hexdigest()
 
 
+def _normalized_path_hash(path: Path) -> str:
+    normalized = os.path.normcase(os.path.realpath(os.path.expanduser(str(path))))
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
 def _prefix_digest(path: Path, length: int) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -154,7 +164,7 @@ def _prefix_digest(path: Path, length: int) -> str:
 
 
 def _complete_records(path: Path, provider: str, file_key: str,
-                      connection: sqlite3.Connection) -> tuple[list[tuple[dict[str, Any], int]], int, str | None, str | None, bool]:
+                      connection: sqlite3.Connection, force_from_start: bool = False) -> tuple[list[tuple[dict[str, Any], int]], int, str | None, str | None, bool]:
     """Read complete lines from the saved offset; leave a partial tail for retry."""
     try:
         size = path.stat().st_size
@@ -164,6 +174,8 @@ def _complete_records(path: Path, provider: str, file_key: str,
         ).fetchone()
         offset, session_id, model = (saved[0], saved[1], saved[2]) if saved else (0, None, None)
         if saved and (offset > size or _prefix_digest(path, offset) != saved[3]):
+            offset, session_id, model = 0, None, None
+        if force_from_start:
             offset, session_id, model = 0, None, None
         records: list[tuple[dict[str, Any], int]] = []
         complete_offset = offset
@@ -245,14 +257,20 @@ def _codex_metrics(connection: sqlite3.Connection, usage: dict[str, Any]) -> dic
     return metrics
 
 
-def _codex_records(root: Path, connection: sqlite3.Connection) -> None:
+def _codex_records(root: Path, connection: sqlite3.Connection) -> dict[str, set[str]]:
+    transcript_sessions: dict[str, set[str]] = {}
     files = list(_jsonl_files(root / "sessions")) + list(_jsonl_files(root / "archived_sessions"))
     if not files:
         _diagnose(connection, "codex", "no_files", "No Codex JSONL session files were found.")
     for path in sorted(set(files)):
         file_key = _file_key("codex", root, path)
+        transcript_hash = _normalized_path_hash(path)
+        saved_mapping = connection.execute(
+            "SELECT 1 FROM codex_transcript_sessions WHERE transcript_path_hash=? LIMIT 1",
+            (transcript_hash,),
+        ).fetchone()
         records, offset, current_session, current_model, readable = _complete_records(
-            path, "codex", file_key, connection
+            path, "codex", file_key, connection, force_from_start=saved_mapping is None
         )
         recognized = {"session_meta", "event_msg", "response_item", "turn_context",
                       "compaction", "checkpoint", "config_snapshot", "custom_tool",
@@ -260,6 +278,7 @@ def _codex_records(root: Path, connection: sqlite3.Connection) -> None:
         # Newer Codex writes per-response usage as top-level token_usage_record
         # records; its token_count events then carry only running totals.
         usage_records = running_totals = 0
+        file_usage_sessions: set[str] = set()
         for record, line_start in records:
             kind = record.get("type")
             payload = record.get("payload")
@@ -289,6 +308,7 @@ def _codex_records(root: Path, connection: sqlite3.Connection) -> None:
                     record.get("timestamp"), current_model, _codex_metrics(connection, usage),
                     "Codex top-level token_usage_record", str(line_start),
                 ))
+                file_usage_sessions.add(session_id)
                 continue
             if kind != "event_msg" or payload.get("type") != "token_count":
                 if kind not in recognized:
@@ -319,11 +339,31 @@ def _codex_records(root: Path, connection: sqlite3.Connection) -> None:
                 str(line_start),
             )
             _save_response(connection, response)
+            file_usage_sessions.add(session_id)
         if running_totals and not usage_records:
             _diagnose(connection, "codex", "per_response_usage_unavailable",
                       "Codex running totals were found without per-response usage records.")
         if readable:
             _save_checkpoint(path, "codex", file_key, offset, current_session, current_model, connection)
+        if file_usage_sessions:
+            connection.executemany(
+                "INSERT OR IGNORE INTO codex_transcript_sessions(transcript_path_hash, session_id) VALUES (?, ?)",
+                [(transcript_hash, session_id) for session_id in file_usage_sessions],
+            )
+        stored_sessions = {row[0] for row in connection.execute(
+            "SELECT session_id FROM codex_transcript_sessions WHERE transcript_path_hash=?",
+            (transcript_hash,),
+        )}
+        if stored_sessions:
+            transcript_sessions[transcript_hash] = stored_sessions
+    # Source mappings are deliberately retained when files move or disappear,
+    # matching the ledger's retention behavior. They contain hashes and parsed
+    # session IDs only, never source paths or transcript content.
+    for transcript_hash, session_id in connection.execute(
+        "SELECT transcript_path_hash, session_id FROM codex_transcript_sessions"
+    ):
+        transcript_sessions.setdefault(transcript_hash, set()).add(session_id)
+    return transcript_sessions
 
 
 def _claude_records(root: Path, connection: sqlite3.Connection) -> None:
@@ -418,7 +458,33 @@ def _handoff_records(repo: Path) -> list[dict[str, str]]:
     return entries
 
 
-def _attribute(connection: sqlite3.Connection, entries: list[dict[str, str]]) -> None:
+def _hook_records(path: Path, connection: sqlite3.Connection) -> list[dict[str, str]]:
+    records: list[dict[str, str]] = []
+    if not path.exists():
+        return records
+    allowed = {"event", "session_id", "agent_id", "agent_type", "transcript_path_hash"}
+    try:
+        with path.open(encoding="utf-8") as stream:
+            for line in stream:
+                try:
+                    item = json.loads(line)
+                except (json.JSONDecodeError, UnicodeError):
+                    _diagnose(connection, "codex", "malformed_hook_record", "A Codex lifecycle metadata record was malformed.")
+                    continue
+                if not isinstance(item, dict) or item.get("provider") != "codex":
+                    continue
+                record = {key: value for key, value in item.items()
+                          if key in allowed and isinstance(value, str) and value}
+                if record.get("event") in {"SubagentStop"} and record.get("transcript_path_hash"):
+                    records.append(record)
+    except (OSError, UnicodeError):
+        _diagnose(connection, "codex", "hook_metadata_unavailable", "Codex lifecycle metadata could not be read.")
+    return records
+
+
+def _attribute(connection: sqlite3.Connection, entries: list[dict[str, str]],
+                transcript_sessions: dict[str, set[str]],
+                hook_records: list[dict[str, str]]) -> None:
     mapping: dict[tuple[str, str], list[dict[str, str]]] = {}
     for entry in entries:
         provider = entry.get("provider", "").lower()
@@ -438,6 +504,73 @@ def _attribute(connection: sqlite3.Connection, entries: list[dict[str, str]]) ->
                 "UPDATE responses SET attribution_status='ambiguous' WHERE provider=? AND session_id=?",
                 (provider, session_id),
             )
+
+    # SubagentStop.session_id is the parent. Join the child only through the
+    # exact hashed transcript path, and accept only one hook identity and one
+    # usage session for that hash. Duplicate identical stop records collapse;
+    # conflicting identities or sessions remain ambiguous.
+    by_hash: dict[str, set[tuple[str, str, str]]] = {}
+    for record in hook_records:
+        transcript_hash = record.get("transcript_path_hash")
+        parent_id = record.get("session_id")
+        agent_id = record.get("agent_id")
+        agent_type = record.get("agent_type")
+        if transcript_hash and parent_id and (agent_id or agent_type):
+            by_hash.setdefault(transcript_hash, set()).add(
+                (parent_id, agent_id or "", agent_type or "")
+            )
+    child_assignments: dict[str, set[tuple[str, str | None, str | None]]] = {}
+    ambiguous_children: set[str] = set()
+    for transcript_hash, identities in by_hash.items():
+        sessions = transcript_sessions.get(transcript_hash, set())
+        if len(identities) != 1 or len(sessions) != 1:
+            ambiguous_children.update(sessions)
+            continue
+        parent_id, agent_id, agent_type = next(iter(identities))
+        child_session = next(iter(sessions))
+        if child_session == parent_id:
+            # Reject this invalid child relation without downgrading any exact
+            # root-session attribution already obtained from a handoff.
+            continue
+        parent_matches = mapping.get(("codex", parent_id), [])
+        # A direct handoff entry for the same child conflicts with hook-derived
+        # identity unless it independently describes that same agent label.
+        child_matches = mapping.get(("codex", child_session), [])
+        if len(child_matches) > 1 or (child_matches and child_matches[0].get("agent") and
+                                      child_matches[0].get("agent") != agent_type):
+            ambiguous_children.add(child_session)
+            continue
+        agent_label = (f"{agent_type} [{agent_id}]" if agent_type and agent_id
+                       else agent_type or agent_id)
+        child_entry = child_matches[0] if len(child_matches) == 1 else {}
+        parent_entry = parent_matches[0] if len(parent_matches) == 1 else {}
+        conflict = any(
+            child_entry.get(field) and parent_entry.get(field)
+            and child_entry[field] != parent_entry[field]
+            for field in ("work_id", "phase")
+        )
+        if conflict:
+            ambiguous_children.add(child_session)
+            continue
+        work_id = child_entry.get("work_id") or parent_entry.get("work_id")
+        phase = child_entry.get("phase") or parent_entry.get("phase")
+        child_assignments.setdefault(child_session, set()).add((agent_label, work_id, phase))
+    for child_session, assignments in child_assignments.items():
+        if child_session in ambiguous_children or len(assignments) != 1:
+            ambiguous_children.add(child_session)
+            continue
+        agent_label, work_id, phase = next(iter(assignments))
+        connection.execute(
+            "UPDATE responses SET work_id=?, agent=?, phase=?, attribution_status='matched' "
+            "WHERE provider='codex' AND session_id=?",
+            (work_id, agent_label, phase, child_session),
+        )
+    for child_session in ambiguous_children:
+        connection.execute(
+            "UPDATE responses SET work_id=NULL, agent=NULL, phase=NULL, attribution_status='ambiguous' "
+            "WHERE provider='codex' AND session_id=?",
+            (child_session,),
+        )
 
 
 def _snapshot(connection: sqlite3.Connection, scan_seconds: float) -> dict[str, Any]:
@@ -501,9 +634,13 @@ def generate(args: argparse.Namespace) -> int:
     try:
         connection.executescript(SCHEMA)
         connection.execute("DELETE FROM diagnostics")
-        _codex_records(codex_root, connection)
+        transcript_sessions = _codex_records(codex_root, connection)
         _claude_records(claude_root, connection)
-        _attribute(connection, _handoff_records(Path(args.repo).expanduser()))
+        hook_state = Path(os.environ.get("AGENT_USAGE_STATE", home / ".agent-usage-dashboard")).expanduser()
+        hook_path = hook_state / "codex-lifecycle.jsonl"
+        hook_records = _hook_records(hook_path, connection)
+        _attribute(connection, _handoff_records(Path(args.repo).expanduser()),
+                   transcript_sessions, hook_records)
         connection.commit()
         report = _render(_snapshot(connection, time.monotonic() - started))
     finally:

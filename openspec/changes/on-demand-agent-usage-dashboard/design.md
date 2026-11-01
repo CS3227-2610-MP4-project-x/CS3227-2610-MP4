@@ -13,15 +13,19 @@ See `proposal.md` for motivation and `specs/local-agent-usage-reporting/spec.md`
 - Make provider, metric provenance, and collection coverage visible in the report.
 
 **Non-Goals:**
-- No provider API calls, telemetry export, account usage/quota polling, background hook installation, or scheduled jobs.
+- No provider API calls, telemetry export, account usage/quota polling, Claude hooks, or scheduled dashboard generation.
 - No application UI, database integration, automatic task-outcome scoring, or transcript text search.
 - No inference of a missing provider metric, cost, or work attribution.
 
 ## Decisions
 
-### Human-invoked, one-shot collection
+### Human-invoked report collection with Codex lifecycle capture
 
-Both provider skill entries invoke one Python command that discovers configured local session roots, updates a local ledger, and writes a fresh HTML snapshot. No hooks or scheduler are installed. A scheduled or hook-driven design was considered because the MP3 tool uses one for catch-up, but rejected here because collection itself is explicitly limited to a human skill invocation.
+Both provider skill entries invoke one Python command that discovers configured local session roots, updates a local ledger, and writes a fresh HTML snapshot. Codex lifecycle hooks append identity metadata only; they never read session histories, update the usage ledger, or generate the dashboard. This preserves human invocation as the only collection/report trigger while letting the dashboard join Codex subagent transcripts to provider usage records.
+
+The Codex hook configuration records `SessionStart` and `SessionEnd` for root sessions, and `SubagentStart` and `SubagentStop` for child sessions. It records only fields Codex surfaces: provider session ID, event name, event observation time, model and working directory when available, and subagent ID/type. At `SubagentStop`, it records a hash of the normalized transcript path as a local join key rather than retaining the path. Hook records are appended to a private file under the local dashboard state directory, outside the repository. Hook failures do not block agent work; unavailable or untrusted hooks produce incomplete attribution.
+
+Codex subagent hook `session_id` identifies the parent session. The dashboard uses the `SubagentStop` transcript path hash to match exactly one scanned Codex JSONL source file, then uses that file's parsed provider session ID to attribute its response rows to the recorded subagent ID/type. No match or multiple matches remain unknown/ambiguous. The root session's workflow role and work ID continue to come from an exact provider-session match in the handoff. Tool-call hooks are not installed for this token/session attribution change; per-response provider usage remains the source of token metrics.
 
 ### Provider adapters over shared normalized records
 
@@ -39,7 +43,7 @@ Store normalized session, response, attribution, checkpoint, and diagnostic fact
 
 ### Explicit work attribution
 
-Extend each handoff session record with provider, provider session ID, and optional work ID if the agreed template needs them. Parse only those structured fields. Multiple matches remain ambiguous, and unmatched records remain unassigned. Existing free-form summaries may continue to be read for explicitly labeled fields, but prose matching and branch-prefix inference are excluded.
+Require each Codex worker session block to record provider, provider session ID, work ID, agent role, and phase when surfaced. Root sessions are attributed only through that exact handoff match. Subagent role attribution comes from the exact transcript-hash relationship recorded by Codex hooks; work ID is inherited only through an exact parent-session handoff match. Multiple matches remain ambiguous, and unmatched records remain unassigned. Existing free-form summaries may continue to be read for explicitly labeled fields, but prose matching and branch-prefix inference are excluded.
 
 ### Standalone report and CSV snapshot
 

@@ -104,6 +104,7 @@ class DashboardCommandTests(unittest.TestCase):
         environment = dict(os.environ)
         environment["HOME"] = str(self.root / "isolated-home")
         environment["CODEX_HOME"] = str(self.root / "unused-codex-home")
+        environment["AGENT_USAGE_STATE"] = str(self.state)
         completed = subprocess.run(
             [
                 sys.executable,
@@ -571,6 +572,227 @@ process.stdout.write(JSON.stringify(tables));
             any(d["code"] == "optional_metric_unavailable" for d in self.diagnostic_rows()),
             "reported thinking tokens were still flagged as unavailable",
         )
+
+    def hook_event(self, event: str, **fields: object) -> None:
+        environment = dict(os.environ, AGENT_USAGE_STATE=str(self.state))
+        completed = subprocess.run(
+            [sys.executable, "-m", "tools.codex_usage_hook"],
+            input=json.dumps({"hook_event_name": event, **fields}),
+            cwd=PROJECT_ROOT, env=environment, text=True, capture_output=True,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+
+    def parent_handoff(self, *, provider: str = "codex", session: str = "root-session") -> None:
+        handoffs = self.work_repo / "workflow" / "handoffs"
+        handoffs.mkdir(parents=True, exist_ok=True)
+        (handoffs / "lifecycle.md").write_text(
+            "### Session orchestrator / root\n"
+            f"- Provider: {provider}\n- Provider session ID: {session}\n"
+            "- Work ID: WORK-LIFECYCLE\n- Agent: orchestrator\n- Phase: implementation\n",
+            encoding="utf-8",
+        )
+
+    def child_transcript(self, name: str = "child.jsonl", session: str = "child-session") -> Path:
+        transcript = self.codex_root / "sessions" / name
+        write_jsonl(
+            transcript,
+            {"type": "session_meta", "payload": {"id": session}},
+            {"timestamp": "2026-06-01T01:02:03Z", "type": "token_usage_record",
+             "payload": {"session_id": session, "response_id": f"{session}-response",
+                         "usage": {"input_tokens": 317, "output_tokens": 29,
+                                   "cached_input_tokens": 50,
+                                   "reasoning_output_tokens": 5}}},
+            {"type": "response_item", "payload": {"content": PRIVATE_TEXT}},
+        )
+        return transcript
+
+    def test_codex_lifecycle_to_dashboard_preserves_usage_and_mapping_on_refresh(self) -> None:
+        """Synthetic end-to-end lifecycle with provider measurements and exact child identity."""
+        self.parent_handoff()
+        self.hook_event("SessionStart", session_id="root-session")
+        self.hook_event("SubagentStart", session_id="root-session",
+                        agent_id="agent-child-42", agent_type="test-writer")
+        transcript = self.child_transcript()
+        self.hook_event("SubagentStop", session_id="root-session",
+                        agent_id="agent-child-42", agent_type="test-writer",
+                        agent_transcript_path=str(transcript),
+                        usage={"input_tokens": 999999}, prompt=PRIVATE_TEXT)
+        self.hook_event("SessionEnd", session_id="root-session")
+        self.assertFalse(self.output.exists(), "hook generated dashboard without invocation")
+        self.assertFalse(list(self.state.glob("*.sqlite*")), "hook created usage ledger")
+
+        for generation in range(2):
+            with self.subTest(generation=generation):
+                html = self.generate()
+                rows = self.ledger_rows()
+                self.assertEqual(len(rows), 1)
+                row = rows[0]
+                self.assertEqual(row["session_id"], "child-session")
+                self.assertEqual((row["input_tokens"], row["output_tokens"]), (317, 29))
+                self.assertEqual(row["agent"], "test-writer [agent-child-42]")
+                self.assertEqual(row["work_id"], "WORK-LIFECYCLE")
+                self.assertEqual(row["phase"], "implementation")
+                self.assertEqual(row["attribution_status"], "matched")
+                table = self.rendered_tables(html)["codex"]
+                for value in ("child-session", "test-writer [agent-child-42]", ">317<", ">29<", ">346<"):
+                    self.assertIn(value, table)
+                self.assertNotIn(PRIVATE_TEXT, html)
+                self.assertNotIn(str(transcript), html)
+                for generated in self.state.rglob("*"):
+                    if generated.is_file():
+                        self.assertNotIn(PRIVATE_TEXT.encode(), generated.read_bytes())
+                        self.assertNotIn(str(transcript).encode(), generated.read_bytes())
+
+    def test_codex_verified_child_identity_does_not_infer_work_without_exact_parent(self) -> None:
+        for provider, session in (("codex", "wrong-root"), ("claude", "root-session")):
+            with self.subTest(provider=provider, session=session):
+                self.parent_handoff(provider=provider, session=session)
+                transcript = self.child_transcript()
+                self.hook_event("SubagentStop", session_id="root-session",
+                                agent_id="child-id", agent_type="reviewer",
+                                agent_transcript_path=str(transcript))
+                self.generate()
+                row = self.ledger_rows()[0]
+                self.assertEqual(row["agent"], "reviewer [child-id]")
+                self.assertIsNone(row["work_id"])
+                self.assertIsNone(row["phase"])
+
+    def test_codex_missing_or_wrong_transcript_does_not_assign_parent_to_child(self) -> None:
+        self.parent_handoff()
+        self.child_transcript()
+        self.hook_event("SubagentStart", session_id="root-session",
+                        agent_id="child-id", agent_type="reviewer")
+        self.hook_event("SubagentStop", session_id="root-session",
+                        agent_id="child-id", agent_type="reviewer")
+        self.hook_event("SubagentStop", session_id="root-session",
+                        agent_id="child-id", agent_type="reviewer",
+                        agent_transcript_path=str(self.root / "elsewhere" / "child.jsonl"))
+        self.generate()
+        row = self.ledger_rows()[0]
+        self.assertEqual(row["attribution_status"], "unknown")
+        self.assertIsNone(row["agent"])
+        self.assertIsNone(row["work_id"])
+
+    def test_codex_conflicting_hook_identities_are_ambiguous(self) -> None:
+        transcript = self.child_transcript()
+        for agent in ("agent-one", "agent-two"):
+            self.hook_event("SubagentStop", session_id="root-session",
+                            agent_id=agent, agent_type="reviewer",
+                            agent_transcript_path=str(transcript))
+        self.generate()
+        row = self.ledger_rows()[0]
+        self.assertEqual(row["attribution_status"], "ambiguous")
+        self.assertIsNone(row["agent"])
+
+    def test_codex_transcript_with_multiple_usage_sessions_is_ambiguous(self) -> None:
+        transcript = self.child_transcript()
+        with transcript.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps({
+                "timestamp": "2026-06-01T01:02:04Z", "type": "token_usage_record",
+                "payload": {"session_id": "second-child", "response_id": "response-two",
+                            "usage": {"input_tokens": 7, "output_tokens": 2}},
+            }) + "\n")
+        self.hook_event("SubagentStop", session_id="root-session",
+                        agent_id="child-id", agent_type="reviewer",
+                        agent_transcript_path=str(transcript))
+        self.generate()
+        rows = self.ledger_rows()
+        self.assertEqual(len(rows), 2)
+        for row in rows:
+            self.assertEqual(row["attribution_status"], "ambiguous")
+            self.assertIsNone(row["agent"])
+
+    def test_codex_direct_child_handoff_conflicting_with_hook_is_ambiguous(self) -> None:
+        self.parent_handoff(session="child-session")
+        transcript = self.child_transcript()
+        self.hook_event("SubagentStop", session_id="root-session",
+                        agent_id="child-id", agent_type="reviewer",
+                        agent_transcript_path=str(transcript))
+        self.generate()
+        row = self.ledger_rows()[0]
+        self.assertEqual(row["attribution_status"], "ambiguous")
+
+    def test_codex_hook_cannot_relabel_parent_session_as_child(self) -> None:
+        self.parent_handoff()
+        transcript = self.child_transcript(session="root-session")
+        self.hook_event("SubagentStop", session_id="root-session",
+                        agent_id="child-id", agent_type="reviewer",
+                        agent_transcript_path=str(transcript))
+        self.generate()
+        row = self.ledger_rows()[0]
+        # Either retain the explicit root handoff or flag contradictory evidence
+        # as ambiguous. Neither interpretation may label the parent as a child.
+        self.assertIn(row["agent"], {None, "orchestrator"})
+        if row["agent"] is None:
+            self.assertEqual(row["attribution_status"], "ambiguous")
+            self.assertIsNone(row["work_id"])
+        else:
+            self.assertEqual(row["work_id"], "WORK-LIFECYCLE")
+
+    def test_codex_parent_without_handoff_cannot_be_its_own_child(self) -> None:
+        transcript = self.child_transcript(session="root-session")
+        self.hook_event("SubagentStop", session_id="root-session",
+                        agent_id="child-id", agent_type="reviewer",
+                        agent_transcript_path=str(transcript))
+        self.generate()
+        row = self.ledger_rows()[0]
+        self.assertIsNone(row["agent"])
+        self.assertIsNone(row["work_id"])
+        self.assertIn(row["attribution_status"], {"unknown", "ambiguous"})
+
+    def test_codex_conflicting_child_and_parent_work_metadata_is_ambiguous(self) -> None:
+        self.parent_handoff()
+        child_handoff = self.work_repo / "workflow" / "handoffs" / "child.md"
+        child_handoff.write_text(
+            "### Session reviewer / child\n- Provider: codex\n"
+            "- Provider session ID: child-session\n- Agent: reviewer\n"
+            "- Work ID: WORK-OTHER\n- Phase: review\n",
+            encoding="utf-8",
+        )
+        transcript = self.child_transcript()
+        self.hook_event("SubagentStop", session_id="root-session",
+                        agent_id="child-id", agent_type="reviewer",
+                        agent_transcript_path=str(transcript))
+        self.generate()
+        self.assertEqual(self.ledger_rows()[0]["attribution_status"], "ambiguous")
+
+    def test_codex_repeated_identical_stop_keeps_one_measured_session(self) -> None:
+        self.parent_handoff()
+        transcript = self.child_transcript()
+        for _ in range(2):
+            self.hook_event("SubagentStop", session_id="root-session",
+                            agent_id="child-id", agent_type="reviewer",
+                            agent_transcript_path=str(transcript))
+        self.generate()
+        rows = self.ledger_rows()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["agent"], "reviewer [child-id]")
+        self.assertEqual(rows[0]["attribution_status"], "matched")
+        self.assertEqual((rows[0]["input_tokens"], rows[0]["output_tokens"]), (317, 29))
+
+    def test_codex_child_mapping_survives_source_archive_then_disappearance(self) -> None:
+        self.parent_handoff()
+        transcript = self.child_transcript()
+        self.hook_event("SubagentStop", session_id="root-session",
+                        agent_id="child-id", agent_type="reviewer",
+                        agent_transcript_path=str(transcript))
+        self.generate()
+        row = self.ledger_rows()[0]
+        self.assertEqual(row["agent"], "reviewer [child-id]")
+        archived = self.codex_root / "archived_sessions" / transcript.name
+        archived.parent.mkdir()
+        transcript.rename(archived)
+        for source_state in ("archived", "absent"):
+            with self.subTest(source_state=source_state):
+                if source_state == "absent":
+                    # Move the synthetic file out of the scanned provider store.
+                    archived.rename(self.root / "retired-transcript.jsonl")
+                self.generate()
+                rows = self.ledger_rows()
+                self.assertEqual(len(rows), 1)
+                self.assertEqual(rows[0]["agent"], "reviewer [child-id]")
+                self.assertEqual(rows[0]["work_id"], "WORK-LIFECYCLE")
+                self.assertEqual(rows[0]["attribution_status"], "matched")
 
 
 if __name__ == "__main__":
