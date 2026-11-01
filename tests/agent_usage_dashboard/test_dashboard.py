@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from contextlib import closing
 import json
+import hashlib
 import os
 from pathlib import Path
 import re
@@ -170,7 +171,7 @@ class DashboardCommandTests(unittest.TestCase):
                     return connection.execute(f'SELECT * FROM "{name}"').fetchall()
         self.fail("SQLite ledger has no diagnostic table")
 
-    def rendered_tables(self, html: str) -> dict[str, str]:
+    def rendered_tables(self, html: str, group: str = "session") -> dict[str, str]:
         """Run the generated report script with a minimal DOM to observe its rows."""
         if shutil.which("node") is None:
             self.skipTest("Node.js is unavailable for report interaction check")
@@ -185,8 +186,8 @@ const document = {
   getElementById(id) {
     if (id === 'usage-data') return {textContent: JSON.stringify(payload.data)};
     if (!elements.has(id)) elements.set(id, {
-      value: id === 'group' ? 'session' : '',
-      selectedOptions: [{text: 'Session'}],
+      value: id === 'group' ? payload.group : '',
+      selectedOptions: [{text: payload.group}],
       textContent: '', innerHTML: '', clientWidth: 600,
       getContext(){return canvas}, addEventListener(){},
     });
@@ -206,13 +207,75 @@ process.stdout.write(JSON.stringify(tables));
 """
         completed = subprocess.run(
             ["node", "-e", harness],
-            input=json.dumps({"data": json.loads(scripts[-2]), "script": scripts[-1]}),
+            input=json.dumps({"data": json.loads(scripts[-2]), "script": scripts[-1], "group": group}),
             text=True,
             capture_output=True,
             check=False,
         )
         self.assertEqual(completed.returncode, 0, completed.stderr)
         return json.loads(completed.stdout)
+
+    def test_grouped_rows_sort_latest_first_with_missing_last_and_stable_ties(self) -> None:
+        """Every grouping uses its latest observation and stable provider/label ties."""
+        early = "2026-07-01T00:00:00Z"
+        tied = "2026-07-05T00:00:00Z"
+        latest = "2026-07-09T00:00:00Z"
+        fixtures = [
+            ("codex", "z-recent", [early, latest, None], "z-recent"),
+            # Reverse session and work/agent labels so ties cannot accidentally
+            # pass by retaining the source's session ordering.
+            ("codex", "b-tie", [tied], "a-tie"),
+            ("codex", "a-tie", [tied], "b-tie"),
+            ("claude", "a-tie", [tied], "a-tie"),
+            ("claude", "old", ["2026-07-02T00:00:00Z"], "old"),
+            ("codex", "early-helper", [early], "z-recent"),
+            ("codex", "no-time", [None], "no-time"),
+            ("claude", "no-time", [None], "no-time"),
+        ]
+        entries = []
+        for provider, session, timestamps, label in fixtures:
+            records = []
+            for index, timestamp in enumerate(timestamps):
+                if provider == "codex":
+                    records.extend(codex_usage(session=session, timestamp=timestamp))
+                else:
+                    records.append(claude_usage(
+                        session=session, message=f"{session}-{index}", timestamp=timestamp,
+                    ))
+            source = (self.codex_root / "sessions" if provider == "codex"
+                      else self.claude_root / "projects")
+            write_jsonl(source / f"{session}.jsonl", *records)
+            entries.append(
+                f"### Session worker / {provider}-{session}\n"
+                f"- Provider: {provider}\n- Provider session ID: {session}\n"
+                f"- Work ID: work-{label}\n- Agent: agent-{label}\n"
+            )
+        handoffs = self.work_repo / "workflow" / "handoffs"
+        handoffs.mkdir(parents=True)
+        (handoffs / "sorting.md").write_text("\n".join(entries), encoding="utf-8")
+        html = self.generate()
+
+        session_order = [
+            "codex / z-recent", "claude / a-tie", "codex / a-tie",
+            "codex / b-tie", "claude / old", "codex / early-helper",
+            "claude / no-time", "codex / no-time",
+        ]
+        grouped_order = [
+            ("codex", "z-recent"), ("claude", "a-tie"), ("codex", "a-tie"),
+            ("codex", "b-tie"), ("claude", "old"),
+            ("claude", "no-time"), ("codex", "no-time"),
+        ]
+        for group in ("session", "work_id", "agent"):
+            with self.subTest(group=group):
+                table = self.rendered_tables(html, group=group)["all"]
+                labels = [re.findall(r"<td[^>]*>(.*?)</td>", row)[1]
+                          for row in re.findall(r'<tr class="usage-row">(.*?)</tr>', table)]
+                prefix = "work-" if group == "work_id" else "agent-"
+                expected = session_order if group == "session" else [
+                    f"{provider} / {prefix}{label}" for provider, label in grouped_order
+                ]
+                labels = [re.sub(r"<button.*?</button>", "", label) for label in labels]
+                self.assertEqual(labels, expected)
 
     def test_one_invocation_collects_both_providers_and_writes_offline_report(self) -> None:
         """Collection, provider separation, graph/filter controls, and privacy."""
@@ -364,9 +427,9 @@ process.stdout.write(JSON.stringify(tables));
         self.assertEqual(len(rows), 2)
         self.assertEqual({row["provider"] for row in rows}, {"codex", "claude"})
         tables = self.rendered_tables(html)
-        self.assertEqual(len(re.findall(r"<tr\b", tables["all"])), 2)
-        self.assertEqual(len(re.findall(r"<tr\b", tables["codex"])), 1)
-        self.assertEqual(len(re.findall(r"<tr\b", tables["claude"])), 1)
+        self.assertEqual(len(re.findall(r'<tr class="usage-row">', tables["all"])), 2)
+        self.assertEqual(len(re.findall(r'<tr class="usage-row">', tables["codex"])), 1)
+        self.assertEqual(len(re.findall(r'<tr class="usage-row">', tables["claude"])), 1)
         self.assertIn("codex", tables["all"])
         self.assertIn("claude", tables["all"])
 
@@ -572,6 +635,274 @@ process.stdout.write(JSON.stringify(tables));
             any(d["code"] == "optional_metric_unavailable" for d in self.diagnostic_rows()),
             "reported thinking tokens were still flagged as unavailable",
         )
+
+    def test_timestamp_column_uses_latest_usage_in_sgt_with_date_rollover(self) -> None:
+        write_jsonl(self.codex_root / "sessions" / "time.jsonl",
+                    *codex_usage(session="sgt-session", timestamp="2026-10-31T17:02:03Z"),
+                    *codex_usage(session="sgt-session", timestamp="2026-10-31T18:04:05Z"))
+        write_jsonl(self.codex_root / "sessions" / "unknown.jsonl",
+                    *codex_usage(session="no-time", timestamp=None))
+        html = self.generate()
+        self.assertIn("<th>Session / group</th><th>Timestamp (SGT)</th>", html)
+        table = self.rendered_tables(html)["all"]
+        roots = re.findall(r'<tr class="usage-row">(.*?)</tr>', table)
+        self.assertIn("sgt-session", roots[0])
+        self.assertIn("<td>2026-11-01 02:04:05 SGT</td>", roots[0])
+        self.assertIn("<td>Unknown</td>", roots[1])
+        self.assertIn('aria-expanded="false"', roots[0])
+        self.assertIn('class="child-row" hidden', table)
+        self.assertIn("No captured subagent calls", table)
+
+    def test_drilldown_contains_verified_child_and_unknown_unmeasured_call(self) -> None:
+        self.parent_handoff()
+        write_jsonl(self.codex_root / "sessions" / "parent.jsonl",
+                    *codex_usage(session="root-session", timestamp="2026-06-02T00:00:00Z"))
+        transcript = self.child_transcript()
+        self.hook_event("SubagentStart", session_id="root-session",
+                        agent_id="measured-child", agent_type="implementer")
+        for _ in range(2):
+            self.hook_event("SubagentStop", session_id="root-session",
+                            agent_id="measured-child", agent_type="implementer",
+                            agent_transcript_path=str(transcript))
+        self.hook_event("SubagentStart", session_id="root-session",
+                        agent_id="unmeasured-child", agent_type="reviewer")
+        for _ in range(2):
+            html = self.generate()
+            data = json.loads(re.findall(r'<script[^>]*>(.*?)</script>', html, re.DOTALL)[-2])
+            calls = {call["agent_id"]: call for call in data["subagents"]}
+            self.assertEqual(len(calls), 2)
+            self.assertEqual(calls["measured-child"]["session_id"], "child-session")
+            self.assertIsNone(calls["unmeasured-child"]["session_id"])
+            table = self.rendered_tables(html)["codex"]
+            details = table.split('aria-label="Subagent usage for codex / root-session"', 1)[1]
+            self.assertIn("implementer [measured-child]", details)
+            self.assertIn("reviewer [unmeasured-child]", details)
+            self.assertIn(">317</td><td>29</td><td>346<", details)
+            self.assertIn("2026-06-01 09:02:03 SGT", details)
+            unknown_row = next(row for row in re.findall(r'<tr class="child-row">(.*?)</tr>', details)
+                               if "unmeasured-child" in row)
+            self.assertNotIn(">100<", unknown_row)
+            self.assertGreaterEqual(unknown_row.count(">Unknown<"), 7)
+            self.assertEqual(len(data["responses"]), 2)
+
+    def test_parent_only_and_conflicting_child_links_have_no_drilldown_usage(self) -> None:
+        self.parent_handoff()
+        parent_transcript = self.child_transcript("parent.jsonl", "root-session")
+        self.hook_event("SubagentStop", session_id="root-session",
+                        agent_id="parent-only", agent_type="analyst",
+                        agent_transcript_path=str(parent_transcript))
+        child = self.child_transcript()
+        for parent in ("root-session", "other-parent"):
+            self.hook_event("SubagentStop", session_id=parent,
+                            agent_id="conflicting", agent_type="reviewer",
+                            agent_transcript_path=str(child))
+        html = self.generate()
+        data = json.loads(re.findall(r'<script[^>]*>(.*?)</script>', html, re.DOTALL)[-2])
+        self.assertEqual(len(data["subagents"]), 3)
+        self.assertTrue(all(call["session_id"] is None for call in data["subagents"]))
+
+    def thread_transcript(self, *, include_thread: bool = True) -> Path:
+        transcript = self.codex_root / "sessions" / "thread-child.jsonl"
+        payload = {
+            "session_id": "root-session", "response_id": "thread-response",
+            "usage": {"input_tokens": 317, "output_tokens": 29,
+                      "cached_input_tokens": 50, "reasoning_output_tokens": 5},
+        }
+        if include_thread:
+            payload["thread_id"] = "explicit-child"
+        write_jsonl(
+            transcript,
+            {"type": "session_meta", "payload": {
+                "id": "explicit-child", "session_id": "root-session",
+                "source": {"subagent": {"thread_spawn": {"parent_thread_id": "root-session"}}},
+            }},
+            # Forked history includes parent metadata; this must not override
+            # the explicit child thread ID on the measured response.
+            {"type": "session_meta", "payload": {"id": "root-session"}},
+            {"timestamp": "2026-10-31T18:00:00Z", "type": "token_usage_record", "payload": payload},
+            {"timestamp": "2026-10-31T18:00:01Z", "type": "event_msg", "payload": {
+                "type": "token_count", "info": {"total_token_usage": {
+                    "input_tokens": 999999, "output_tokens": 999999,
+                }},
+            }},
+            {"type": "response_item", "payload": {"content": PRIVATE_TEXT}},
+        )
+        return transcript
+
+    def report_data(self, html: str) -> dict:
+        return json.loads(re.findall(r'<script[^>]*>(.*?)</script>', html, re.DOTALL)[-2])
+
+    def test_explicit_thread_usage_survives_parent_metadata_refresh_append_and_archive(self) -> None:
+        self.parent_handoff()
+        write_jsonl(self.codex_root / "sessions" / "parent.jsonl",
+                    *codex_usage(session="root-session", timestamp="2026-10-31T17:00:00Z"))
+        transcript = self.thread_transcript()
+        self.hook_event("SubagentStop", session_id="root-session", agent_id="explicit-child",
+                        agent_type="reviewer", agent_transcript_path=str(transcript))
+        for _ in range(2):
+            data = self.report_data(self.generate())
+            self.assertEqual(len(data["responses"]), 2)
+            child = next(row for row in data["responses"] if row["session_id"] == "explicit-child")
+            self.assertEqual((child["input_tokens"], child["output_tokens"]), (317, 29))
+            self.assertEqual(child["agent"], "reviewer [explicit-child]")
+            self.assertEqual(data["subagents"][0]["session_id"], "explicit-child")
+            self.assertEqual(data["subagents"][0]["usage_status"], "Measured child usage")
+        with transcript.open("a") as stream:
+            stream.write(json.dumps({"type": "token_usage_record", "timestamp": "2026-11-01T00:00:00Z",
+                "payload": {"session_id": "root-session", "thread_id": "explicit-child",
+                            "response_id": "appended-response", "usage": {"input_tokens": 7, "output_tokens": 3}}}) + "\n")
+        data = self.report_data(self.generate())
+        self.assertEqual(len(data["responses"]), 3)
+        archived = self.codex_root / "archived_sessions" / "child.jsonl"
+        archived.parent.mkdir()
+        transcript.rename(archived)
+        html = self.generate()
+        data = self.report_data(html)
+        self.assertEqual(len(data["responses"]), 3)
+        child_rows = [r for r in data["responses"] if r["session_id"] == "explicit-child"]
+        self.assertEqual(sum(r["input_tokens"] + r["output_tokens"] for r in child_rows), 356)
+        self.assertEqual(data["subagents"][0]["session_id"], "explicit-child")
+        table = self.rendered_tables(html)["codex"]
+        self.assertIn("Measured child usage", table)
+        self.assertIn(">324</td><td>32</td><td>356<", table)
+        self.assertNotIn(PRIVATE_TEXT, html)
+
+    def test_thread_reader_upgrades_checkpointed_ledger_without_duplicating_usage(self) -> None:
+        self.parent_handoff()
+        transcript = self.thread_transcript(include_thread=False)
+        self.hook_event("SubagentStop", session_id="root-session", agent_id="explicit-child",
+                        agent_type="implementer", agent_transcript_path=str(transcript))
+        before = self.report_data(self.generate())
+        self.assertEqual(before["responses"][0]["session_id"], "root-session")
+        self.assertEqual(before["subagents"][0]["usage_status"], "Only parent usage reported")
+        transcript = self.thread_transcript()
+        # Freeze an old-version checkpoint at EOF of the current provider file.
+        # This emulates the old reader ignoring thread_id, without importing it.
+        content = transcript.read_bytes()
+        with sqlite3.connect(self.state / "usage.sqlite3") as db:
+            db.execute("PRAGMA user_version=0")
+            db.execute("DELETE FROM codex_thread_sources")
+            db.execute("UPDATE checkpoints SET byte_offset=?, prefix_digest=?",
+                       (len(content), hashlib.sha256(content).hexdigest()))
+        for _ in range(2):
+            data = self.report_data(self.generate())
+            self.assertEqual(len(data["responses"]), 1)
+            self.assertEqual(data["responses"][0]["session_id"], "explicit-child")
+            self.assertEqual(data["responses"][0]["input_tokens"], 317)
+            self.assertEqual(data["subagents"][0]["session_id"], "explicit-child")
+        with sqlite3.connect(self.state / "usage.sqlite3") as db:
+            self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 1)
+            self.assertEqual(db.execute("SELECT session_id FROM codex_transcript_sessions").fetchall(),
+                             [("explicit-child",)])
+
+    def test_start_only_call_uses_exact_first_metadata_parent_and_measured_thread(self) -> None:
+        self.parent_handoff()
+        self.thread_transcript()
+        self.hook_event("SubagentStart", session_id="root-session", agent_id="explicit-child",
+                        agent_type="analyst")
+        for _ in range(2):
+            data = self.report_data(self.generate())
+            self.assertEqual(len(data["responses"]), 1)
+            self.assertEqual(data["responses"][0]["agent"], "analyst [explicit-child]")
+            self.assertEqual(data["subagents"][0]["session_id"], "explicit-child")
+            self.assertEqual(data["subagents"][0]["usage_status"], "Measured child usage")
+
+    def test_first_metadata_lineage_does_not_bypass_stop_reference_or_parent_conflicts(self) -> None:
+        self.thread_transcript()
+        self.hook_event("SubagentStart", session_id="root-session", agent_id="explicit-child",
+                        agent_type="analyst")
+        self.hook_event("SubagentStop", session_id="root-session", agent_id="explicit-child",
+                        agent_type="analyst", agent_transcript_path=str(self.root / "missing.jsonl"))
+        data = self.report_data(self.generate())
+        self.assertIsNone(data["subagents"][0]["session_id"])
+        self.hook_event("SubagentStart", session_id="different-parent", agent_id="explicit-child",
+                        agent_type="reviewer")
+        data = self.report_data(self.generate())
+        self.assertTrue(all(c["session_id"] is None for c in data["subagents"]))
+        other = next(c for c in data["subagents"] if c["parent_session_id"] == "different-parent")
+        self.assertEqual(other["usage_status"], "Ambiguous session relationship")
+
+    def test_start_only_conflicting_metadata_parents_remain_unmatched(self) -> None:
+        transcript = self.thread_transcript()
+        conflicting = transcript.with_name("conflicting-child.jsonl")
+        conflicting.write_text(transcript.read_text().replace('"parent_thread_id": "root-session"',
+                                                            '"parent_thread_id": "other-parent"'))
+        self.hook_event("SubagentStart", session_id="root-session", agent_id="explicit-child",
+                        agent_type="reviewer")
+        data = self.report_data(self.generate())
+        self.assertIsNone(data["subagents"][0]["session_id"])
+        self.assertEqual(data["subagents"][0]["usage_status"], "Ambiguous session relationship")
+
+    def test_thread_upgrade_collapses_identical_legacy_and_corrected_rows(self) -> None:
+        self.parent_handoff()
+        transcript = self.thread_transcript()
+        self.hook_event("SubagentStop", session_id="root-session", agent_id="explicit-child",
+                        agent_type="reviewer", agent_transcript_path=str(transcript))
+        self.generate()
+        columns = list(self.ledger_rows()[0].keys())
+        row = dict(self.ledger_rows()[0])
+        row["session_id"] = "root-session"
+        row["response_key"] = hashlib.sha256(b"codex\0root-session\0thread-response").hexdigest()
+        with sqlite3.connect(self.state / "usage.sqlite3") as db:
+            db.execute("PRAGMA user_version=0")
+            db.execute("INSERT INTO responses (" + ",".join(columns) + ") VALUES ("
+                       + ",".join("?" for _ in columns) + ")", [row[c] for c in columns])
+        data = self.report_data(self.generate())
+        self.assertEqual(len(data["responses"]), 1)
+        self.assertEqual(data["responses"][0]["session_id"], "explicit-child")
+        self.assertEqual(data["responses"][0]["input_tokens"], 317)
+        self.assertEqual(data["subagents"][0]["usage_status"], "Measured child usage")
+
+    def test_thread_upgrade_does_not_merge_conflicting_measurements(self) -> None:
+        self.parent_handoff()
+        self.thread_transcript(include_thread=False)
+        self.generate()
+        transcript = self.thread_transcript()
+        self.hook_event("SubagentStop", session_id="root-session", agent_id="explicit-child",
+                        agent_type="reviewer", agent_transcript_path=str(transcript))
+        with sqlite3.connect(self.state / "usage.sqlite3") as db:
+            db.execute("PRAGMA user_version=0")
+            db.execute("UPDATE responses SET input_tokens=123")
+        data = self.report_data(self.generate())
+        self.assertEqual(len(data["responses"]), 1)
+        self.assertEqual(data["responses"][0]["input_tokens"], 123)
+        self.assertEqual(data["responses"][0]["attribution_status"], "ambiguous")
+        self.assertIsNone(data["subagents"][0]["session_id"])
+        self.assertEqual(data["subagents"][0]["usage_status"], "Ambiguous session relationship")
+        self.assertIn("thread_identity_conflict", {d["code"] for d in data["diagnostics"]})
+
+    def test_thread_upgrade_reports_unavailable_sources_and_retries_returning_source(self) -> None:
+        transcript = self.thread_transcript(include_thread=False)
+        self.generate()
+        hidden = self.root / "temporarily-unavailable.jsonl"
+        transcript.rename(hidden)
+        with sqlite3.connect(self.state / "usage.sqlite3") as db:
+            db.execute("PRAGMA user_version=0")
+            db.execute("DELETE FROM codex_thread_sources")
+        data = self.report_data(self.generate())
+        self.assertEqual(len(data["responses"]), 1)
+        self.assertIn("thread_upgrade_sources_unavailable", {d["code"] for d in data["diagnostics"]})
+        hidden.rename(transcript)
+        transcript = self.thread_transcript()
+        content = transcript.read_bytes()
+        with sqlite3.connect(self.state / "usage.sqlite3") as db:
+            db.execute("UPDATE checkpoints SET byte_offset=?, prefix_digest=?",
+                       (len(content), hashlib.sha256(content).hexdigest()))
+        data = self.report_data(self.generate())
+        self.assertEqual(len(data["responses"]), 1)
+        self.assertEqual(data["responses"][0]["session_id"], "explicit-child")
+
+    def test_unknown_subagent_usage_has_explanation_and_escaped_identity(self) -> None:
+        write_jsonl(self.codex_root / "sessions" / "parent.jsonl",
+                    *codex_usage(session="root-session", timestamp="2026-10-31T17:00:00Z"))
+        self.hook_event("SubagentStart", session_id="root-session", agent_id="unknown-child",
+                        agent_type='<script>alert("role")</script>')
+        html = self.generate()
+        table = self.rendered_tables(html)["codex"]
+        self.assertIn("No separate usage reported", table)
+        self.assertIn("&lt;script&gt;", table)
+        self.assertNotIn("<script>", table)
+        self.assertIsNone(self.report_data(html)["subagents"][0]["session_id"])
 
     def hook_event(self, event: str, **fields: object) -> None:
         environment = dict(os.environ, AGENT_USAGE_STATE=str(self.state))

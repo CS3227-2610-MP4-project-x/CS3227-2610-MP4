@@ -32,6 +32,16 @@ The system MUST keep Codex and Claude records separately attributable and retain
 - **WHEN** a provider version stores per-response usage, model, or reasoning metrics in a different recognized record layout or field name
 - **THEN** the system normalizes those metrics to the same token categories as the older layout and records each response once
 
+#### Scenario: Codex response identifies a child thread inside a parent session
+- **WHEN** a top-level Codex per-response usage record contains a non-empty `thread_id` and a parent-valued `session_id`
+- **THEN** the collector uses the explicit `thread_id` as the response's usage-session identity and retains the measured token categories
+- **AND** it does not replace child identity with an inherited parent `session_meta` record or infer identity from a filename
+
+#### Scenario: A previously collected ledger used parent-valued session identities
+- **WHEN** the thread-aware reader first processes an existing local ledger
+- **THEN** it replays available Codex sources, corrects exactly matching previously collected response identities without duplicating tokens, and rebuilds those files' transcript relationships
+- **AND** repeated generation, incremental appends, and archival remain idempotent; missing sources are retained with an explicit upgrade-coverage diagnostic
+
 #### Scenario: Only running totals are available
 - **WHEN** a session file reports cumulative or running-total usage without per-response usage records
 - **THEN** the system does not record the totals as responses and exposes a coverage diagnostic
@@ -76,8 +86,13 @@ The dashboard MUST attribute a Codex child session only when its transcript rela
 - **WHEN** dashboard collection can verify that one Codex usage session corresponds to one captured subagent transcript path
 - **THEN** the session's measured usage may be attributed to that captured subagent identity
 
+#### Scenario: A captured call has explicit child and parent metadata but no stop transcript reference
+- **WHEN** a captured call's exact agent ID matches the child's measured `thread_id` and its transcript's first metadata record identifies that same child and the same explicit `source.subagent.thread_spawn.parent_thread_id`
+- **AND** no conflicting parent relationship or captured stop transcript reference exists
+- **THEN** collection may verify that relationship during generation and show the child's measured usage even when its stop reference is unavailable
+
 #### Scenario: A child usage session cannot be uniquely verified
-- **WHEN** a transcript path is absent, cannot be matched, or resolves to multiple usage sessions
+- **WHEN** neither an exact unique transcript-path join nor the explicit child/parent metadata relationship can be verified
 - **THEN** that usage remains visible with unknown or ambiguous agent attribution and is not assigned by heuristic
 
 ### Requirement: Codex work and root-agent attribution are explicit
@@ -112,6 +127,31 @@ The dashboard MUST present available usage grouped at session, work-item, and ag
 #### Scenario: User groups usage
 - **WHEN** the user selects a grouping dimension
 - **THEN** usage is aggregated for that dimension and missing component values remain visible as missing
+
+#### Scenario: Grouped usage rows are ordered by recency
+- **WHEN** the dashboard displays session, work, or agent rows
+- **THEN** each row is ordered by its latest non-null `observed_at`, newest first; rows with no observed timestamp appear last, and equal or missing timestamps are ordered deterministically by provider and then the row's stable group key in ascending lexical order
+
+### Requirement: Session rows expose timestamps and subagent usage
+The dashboard MUST insert a Timestamp column immediately after Session / group. It MUST display each row's latest valid observed usage time in Singapore Time (SGT, UTC+08:00), or Unknown when unavailable, and retain newest-first ordering in every grouping mode.
+
+#### Scenario: A session is expanded or collapsed
+- **WHEN** the user activates a session row's disclosure control with a pointer or keyboard
+- **THEN** the initially collapsed row reveals or hides its captured subagent calls, labeled by available agent role/identity, with each child's available token categories and total usage
+- **AND** sessions without captured calls show an explicit empty state
+
+#### Scenario: Child usage can be verified
+- **WHEN** a captured call has an exact unique child transcript/session relationship and unambiguous attribution
+- **THEN** its expanded detail shows only that child's measured usage, with latest usage time, newest child first
+- **AND** parent row metrics continue to describe the parent's own usage; expanding details never changes dashboard totals or exports, and child sessions remain independently visible in the session table
+
+#### Scenario: A captured call lacks separate child measurements
+- **WHEN** a captured subagent identity has missing, conflicting, or parent-only usage relationships
+- **THEN** the call remains visible in the parent's expanded detail with unknown token values, without substituting parent usage or inferring a child identity
+
+#### Scenario: Child usage availability is explained
+- **WHEN** the user expands a session's subagent calls
+- **THEN** each call indicates measured child usage, no separate usage reported, only parent usage reported, or an ambiguous session relationship, as supported by collection evidence
 
 ### Requirement: Dashboard supports provider and time analysis
 The dashboard MUST provide a Codex/Claude provider filter and a graph of observed token usage over time.
