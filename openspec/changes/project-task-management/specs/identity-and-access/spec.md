@@ -29,6 +29,33 @@ The system SHALL authenticate people through GitHub sign-in and SHALL record the
 - **WHEN** a signed-in person sends a POST request to `/api/v1/auth/sign-out`
 - **THEN** their session ends and private pages and API routes require signing in again
 
+#### Scenario: Sign-out from the workspace succeeds
+- **WHEN** a signed-in person chooses the account's sign-out action and the sign-out request succeeds
+- **THEN** the browser navigates to `/sign-in`
+
+#### Scenario: Sign-out fails
+- **WHEN** a signed-in person chooses the account's sign-out action and the sign-out request fails
+- **THEN** the workspace remains visible and the account UI shows the generic message `Try again later`
+- **AND** it does not expose provider or server error details
+
+#### Scenario: Signed-in account identity is shown
+- **WHEN** a signed-in person views the workspace account UI
+- **THEN** it shows their verified GitHub username and avatar from the verified GitHub identity
+- **AND** it offers a sign-out action
+
+#### Scenario: Successful GitHub sign-in opens the workspace
+- **WHEN** the callback establishes a valid session
+- **THEN** the browser navigates to the signed-in workspace at `/`
+
+#### Scenario: GitHub sign-in callback fails
+- **WHEN** the callback cannot establish a valid session
+- **THEN** the browser is redirected to `/sign-in?auth=failed`
+- **AND** the sign-in page displays a generic sign-in error without provider or server error details
+
+#### Scenario: Sign-in page is separate from the workspace
+- **WHEN** a person without a valid session opens `/sign-in`
+- **THEN** the system shows a public sign-in page with an action to start GitHub sign-in
+
 ### Requirement: Access is enforced by project role on the server
 The system SHALL enforce project membership and role on the server for every page and API request. Hiding controls in the UI SHALL NOT be the only protection.
 
@@ -43,3 +70,11 @@ The system SHALL enforce project membership and role on the server for every pag
 #### Scenario: Unauthenticated request
 - **WHEN** a request without a valid session reaches a private API route
 - **THEN** the system refuses it
+
+#### Scenario: Unauthenticated request to the protected workspace
+- **WHEN** a person without a valid session requests the protected workspace
+- **THEN** the browser is redirected to `/sign-in`
+
+#### Scenario: Authenticated person opens the sign-in page
+- **WHEN** a person with a valid session requests `/sign-in`
+- **THEN** the browser is redirected to the signed-in workspace at `/`

@@ -22,6 +22,7 @@ Depends on: 2.
 
 - [x] 3.1 Implement GitHub sign-in and sign-out with Supabase Auth, storing the verified GitHub user ID and username; add tests for first sign-in and sign-out.
 - [ ] 3.2 Implement server-side membership and role checks used by every Route Handler and service; add API tests for non-members, developers calling product-manager actions, and unauthenticated requests.
+- [ ] 3.3 Build the public `/sign-in` page and signed-in workspace account UI with verified GitHub username and avatar, sign-out success and generic failure handling, and session-based redirects; follow `specs/ui-spec.md` and cover the identity-and-access scenarios.
 
 ## 4. Task Management
 

@@ -10,10 +10,13 @@ export async function GET(request: NextRequest) {
   try {
     composition = getServerComposition();
   } catch {
-    return NextResponse.json(
-      { error: { code: "AUTHENTICATION_FAILED", message: "Sign-in could not be completed." } },
-      { status: 500, headers: { "Cache-Control": "no-store" } },
-    );
+    return new NextResponse(null, {
+      status: 303,
+      headers: {
+        Location: "/sign-in?auth=failed",
+        "Cache-Control": "no-store",
+      },
+    });
   }
 
   const { authService, config } = composition;
@@ -32,7 +35,7 @@ export async function GET(request: NextRequest) {
 }
 
 function callbackFailure(appOrigin: string) {
-  const response = NextResponse.redirect(new URL("/?auth=failed", appOrigin), 303);
+  const response = NextResponse.redirect(new URL("/sign-in?auth=failed", appOrigin), 303);
   response.headers.set("Cache-Control", "no-store");
   return response;
 }
