@@ -68,3 +68,22 @@ The system SHALL record, for every LLM call, the feature, project, person, envir
 #### Scenario: Product manager views AI usage
 - **WHEN** the product manager opens the project's AI usage view
 - **THEN** they see token use and cache hits per feature per day for that project
+
+### Requirement: The LLM provider is behind a replaceable adapter
+The system SHALL call the LLM only through an adapter interface defined by the application, so that the SoC LLM adapter and a deterministic fake adapter are interchangeable. The adapter SHALL return the response text, the model name used, and the provider-reported token usage when the provider reports it, and SHALL expose no provider-specific types to callers. The adapter SHALL NOT call any task or project mutation service.
+
+#### Scenario: Adapter selected by configuration
+- **WHEN** `AI_PROVIDER` is `fake`, or is `soclaas` with a key and model configured
+- **THEN** AI features use the corresponding adapter, and production refuses `fake`
+
+#### Scenario: Provider error is mapped safely
+- **WHEN** the SoC LLM returns 400, 401, 403, 429, a 5xx status, or times out
+- **THEN** the adapter reports a categorized error that contains no raw provider message, response body, or credential
+
+#### Scenario: Pinned model is used
+- **WHEN** the SoC adapter makes a call
+- **THEN** it sends the configured model name, never the `default` alias, and returns that model name with the result
+
+#### Scenario: Fake adapter is deterministic
+- **WHEN** the same input is sent to the fake adapter in the same configured mode
+- **THEN** it returns the same output, and it can be configured to return valid output, schema-invalid output, a provider error, or no usage
