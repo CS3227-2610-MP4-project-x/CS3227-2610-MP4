@@ -11,6 +11,11 @@ test-results/
 # Environment files
 .env
 .env.*
+!.env.example
+.vercel/
+
+# Supabase CLI working files
+supabase/.temp/
 
 # Local scratch notes (not shared)
 temp/

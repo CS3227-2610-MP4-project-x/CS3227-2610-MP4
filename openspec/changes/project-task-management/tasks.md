@@ -13,8 +13,8 @@ Depends on: none.
 
 - [x] 2.1 Scaffold the Next.js App Router project with TypeScript, linting, Vitest, and Playwright; commit the lockfile.
 - [x] 2.2 **[P]** Set up GitHub Actions: lint, type-check, unit tests, build, secret scanning, and dependency audit.
-- [ ] 2.3 **[P]** Create the development and production Supabase projects, Vercel environments (`dev` and `master`), and GitHub OAuth apps; document every environment variable in `.env.example`.
-- [ ] 2.4 **[P]** Create the database schema and migrations for people, projects, memberships, tasks, acceptance criteria, task events, progress updates, attached commits, check results, reports, and usage records.
+- [x] 2.3 **[P]** Create the development and production Supabase projects, Vercel environments (`dev` and `master`), and GitHub OAuth apps; document every environment variable in `.env.example`.
+- [x] 2.4 **[P]** Create the database schema and migrations for people, projects, memberships, tasks, acceptance criteria, task events, progress updates, attached commits, check results, reports, and usage records.
 
 ## 3. Identity and Access
 
@@ -27,8 +27,8 @@ Depends on: 2.
 
 Depends on: 3.
 
-- [ ] 4.1 **[P]** Implement projects, memberships, and the one-product-manager invariant; add PostgreSQL tests for multiple memberships and manager uniqueness.
-- [ ] 4.2 **[P]** Implement task create, edit, reassign, and delete with acceptance criteria; add tests for missing criteria and assignees outside the project.
+- [ ] 4.1 **[P]** Implement projects with keys, memberships, the one-product-manager invariant, and product-manager transfer; add PostgreSQL tests for multiple memberships, manager uniqueness, and transfer.
+- [ ] 4.2 **[P]** Implement task create, edit, reassign, and soft delete with acceptance criteria and task IDs; add tests for missing criteria, assignees outside the project, and task IDs that are never reused.
 - [ ] 4.3 Implement the To Do → In Progress → In Review → Done lifecycle, request-changes with feedback, and progress updates; add transition, permission, and competing-write tests.
 - [ ] 4.4 Build the board, task detail, and review queue pages following `specs/ui-spec.md`.
 
@@ -71,5 +71,5 @@ Depends on: all groups above.
 - [ ] 9.1 **[P]** Run the AI security evaluation: prompt-injection and secret-redaction fixtures for both AI features against the live SoC LLM in development; record outcomes without asserting exact model wording.
 - [ ] 9.2 **[P]** Write end-to-end tests for one complete developer journey and one complete product-manager journey, including fake-provider success and failure paths.
 - [ ] 9.3 **[P]** Run accessibility checks on the main pages and record results.
-- [ ] 9.4 Deploy to production, run the release checks (including one real SoC LLM call from each environment, after confirming with `GET /v1/models` that each key can use the pinned model), and record commands, revision, environment, results, and evidence paths.
+- [ ] 9.4 Deploy to production, run the release checks (including one real SoC LLM call from each environment, after confirming with `GET /v1/models` that each key can use the pinned model, and a GitHub sign-in on each environment that returns to that environment's own URL), and record commands, revision, environment, results, and evidence paths.
 - [ ] 9.5 Run OpenSpec validation and all lint, type-check, test, and build checks; resolve findings and record the final results.

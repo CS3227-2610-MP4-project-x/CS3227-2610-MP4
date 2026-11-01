@@ -1,0 +1,11 @@
+# Supabase CLI configuration (task 2.4, design D-A and D-K).
+# Only the settings the migration workflow needs. No secrets, keys, or credentials.
+# Migrations live in supabase/migrations/ and an operator applies them with
+# `supabase db push` (see docs/developer-guide.md).
+
+project_id = "cs3227-2610-mp4"
+
+[db]
+# Matches the Supabase projects (PostgreSQL 17.11, recorded 30 October 2026) and the
+# postgres:17 container used by the integration tests.
+major_version = 17
