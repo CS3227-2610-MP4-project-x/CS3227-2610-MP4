@@ -114,6 +114,7 @@ beforeEach(() => {
   vi.stubEnv("SUPABASE_PUBLISHABLE_KEY", "sb_publishable_synthetic_test_key");
   vi.stubEnv("APP_ORIGIN", appOrigin);
   vi.stubEnv("APP_ENV", "development");
+  vi.stubEnv("AI_PROVIDER", "fake");
   vi.stubEnv("DATABASE_URL", "postgresql://synthetic:synthetic@localhost:5432/synthetic?sslmode=verify-full");
   vi.stubEnv("DATABASE_CA_CERT", "-----BEGIN CERTIFICATE-----\nSYNTHETIC\n-----END CERTIFICATE-----");
 
