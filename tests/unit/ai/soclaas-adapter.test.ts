@@ -117,9 +117,9 @@ afterEach(() => {
 });
 
 describe("public entry point (AC1, AC13)", () => {
-  it("exports only the two adapter classes at runtime", async () => {
+  it("exports only the two adapter classes and redactSecrets at runtime", async () => {
     const entry = await import("../../../src/server/ai");
-    expect(Object.keys(entry).sort()).toEqual(["FakeAdapter", "SoclaasAdapter"]);
+    expect(Object.keys(entry).sort()).toEqual(["FakeAdapter", "SoclaasAdapter", "redactSecrets"]);
   });
 
   it("lets both adapters be used through the one application interface", async () => {
