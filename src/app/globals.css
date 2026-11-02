@@ -35,3 +35,84 @@ body {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
+
+.workspace-page,
+.sign-in-page {
+  min-height: 100vh;
+  background: var(--background);
+}
+
+.workspace-page { padding: 28px clamp(20px, 5vw, 72px) 64px; }
+.workspace-shell { max-width: 1120px; margin: 0 auto; }
+.workspace-header { display:flex; align-items:center; justify-content:space-between; gap:24px; }
+.workspace-brand { display:flex; align-items:center; gap:14px; }
+.brand-mark { width:38px; height:38px; display:grid; place-items:center; border-radius:14px; color:#dffbe7; background:#25372a; box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 5px 16px rgba(0,0,0,.24); font-weight:700; }
+.workspace-kicker { margin:0; color:var(--muted); font-size:11px; font-weight:600; letter-spacing:.12em; }
+.workspace-brand h1 { margin:3px 0 0; font-size:18px; font-weight:600; letter-spacing:-.02em; }
+.workspace-nav { display:flex; gap:5px; width:max-content; margin:32px 0 56px; padding:5px; border-radius:999px; background:#202020; box-shadow:inset 0 1px 2px rgba(0,0,0,.48),0 1px 0 rgba(255,255,255,.025); }
+.workspace-nav-link { display:inline-flex; align-items:center; min-height:38px; padding:0 19px; border-radius:999px; color:#a1a1a1; text-decoration:none; font-size:13px; font-weight:500; }
+.workspace-nav-link-active { color:#f3f3f3; background:#2d2d2d; box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 2px 6px rgba(0,0,0,.2); }
+.workspace-nav-link-disabled { color:#949494; }
+.workspace-welcome { display:flex; justify-content:space-between; align-items:flex-end; gap:24px; margin-bottom:30px; }
+.welcome-copy h2 { margin:12px 0 8px; font-size:clamp(25px,4vw,34px); line-height:1.2; font-weight:600; letter-spacing:-.035em; }
+.welcome-copy > p:last-child { margin:0; color:#a1a1a1; font-size:15px; line-height:1.6; }
+.workspace-status,.placeholder-chip { display:inline-flex; align-items:center; gap:9px; border-radius:999px; padding:9px 13px; background:#242424; color:#bdbdbd; font-size:12px; white-space:nowrap; box-shadow:inset 0 1px 0 rgba(255,255,255,.035); }
+.status-dot { width:7px; height:7px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 3px rgba(34,197,94,.12); }
+.workspace-placeholder { padding:26px 28px 22px; border-radius:26px; background:#222; box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 12px 34px rgba(0,0,0,.22); }
+.placeholder-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.placeholder-heading h2 { margin:8px 0 0; font-size:17px; font-weight:500; }
+.placeholder-chip { background:#292929; color:#a1a1a1; }
+.placeholder-description { margin:28px 0 20px; color:#b0b0b0; font-size:14px; }
+.placeholder-track { height:6px; overflow:hidden; border-radius:999px; background:#353535; }
+.placeholder-track span { display:block; width:0; height:100%; border-radius:inherit; background:var(--accent); }
+.placeholder-footnote { display:flex; justify-content:space-between; margin-top:13px; color:#949494; font-size:12px; }
+
+.account-control { position:relative; }
+.account-trigger { display:flex; align-items:center; gap:11px; min-width:208px; padding:6px 10px 6px 6px; border:1px solid rgba(255,255,255,.035); border-radius:999px; background:#222; cursor:pointer; list-style:none; box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 5px 18px rgba(0,0,0,.18); }
+.account-trigger::-webkit-details-marker { display:none; }
+.account-avatar { width:40px; height:40px; flex:none; border-radius:50%; object-fit:cover; background:#333; }
+.account-avatar-fallback { display:grid; place-items:center; color:#d3f3da; font-size:15px; font-weight:600; }
+.account-trigger-copy { display:flex; flex:1; flex-direction:column; gap:2px; text-align:left; }
+.account-eyebrow,.account-menu-label { color:#949494; font-size:11px; }
+.account-username,.account-menu-username { color:#f3f3f3; font-size:13px; font-weight:500; }
+.account-chevron { padding-right:5px; color:#a1a1a1; font-size:16px; }
+.account-menu { position:absolute; z-index:10; top:calc(100% + 9px); right:0; width:230px; padding:17px; border:1px solid rgba(255,255,255,.05); border-radius:18px; background:#292929; box-shadow:0 14px 32px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.04); }
+.account-menu-label { margin:0 0 5px; }
+.account-menu-username { margin:0 0 15px; }
+.sign-out-button { width:100%; min-height:40px; border:1px solid rgba(255,255,255,.07); border-radius:12px; background:#333; color:#f3f3f3; font:inherit; font-size:13px; text-align:left; padding:0 13px; cursor:pointer; }
+.sign-out-button:hover:not(:disabled) { background:#3a3a3a; }
+.sign-out-button:disabled { color:#a1a1a1; cursor:wait; }
+.account-error,.sign-in-error { color:#f3f3f3; font-size:13px; line-height:1.5; }
+.account-error { margin:0 0 11px; }
+
+.sign-in-page { display:grid; place-items:center; padding:30px 22px; }
+.sign-in-shell { width:min(100%, 460px); }
+.sign-in-brand { display:flex; align-items:center; gap:12px; color:#c7c7c7; font-size:11px; font-weight:600; letter-spacing:.11em; }
+.sign-in-brand .brand-mark { width:34px; height:34px; border-radius:12px; }
+.brand-separator { margin:0 4px; color:#949494; }
+.sign-in-card { position:relative; overflow:hidden; margin-top:38px; padding:37px 38px 30px; border:1px solid rgba(255,255,255,.035); border-radius:28px; background:linear-gradient(145deg,#252525,#212121 65%); box-shadow:inset 0 1px 0 rgba(255,255,255,.045),0 22px 60px rgba(0,0,0,.34); }
+.sign-in-card h1 { margin:10px 0 12px; font-size:clamp(25px,5vw,30px); line-height:1.2; letter-spacing:-.035em; font-weight:600; }
+.sign-in-description { max-width:340px; margin:0; color:#a1a1a1; font-size:14px; line-height:1.65; }
+.github-sign-in-button { display:flex; align-items:center; justify-content:center; gap:12px; width:100%; min-height:54px; margin-top:26px; border:1px solid rgba(255,255,255,.07); border-radius:15px; background:#2a2a2a; color:#f3f3f3; text-decoration:none; font-size:14px; font-weight:600; box-shadow:inset 0 1px 0 rgba(255,255,255,.055),0 7px 16px rgba(0,0,0,.24); transition:transform .15s ease,background .15s ease; }
+.github-sign-in-button:hover { transform:translateY(-1px); background:#323232; }
+.github-sign-in-button:active { transform:translateY(0); }
+.github-mark { flex:none; width:20px; height:20px; }
+.sign-in-note { margin:16px 0 0; color:#949494; text-align:center; font-size:11px; }
+.sign-in-error { margin:19px 0 -13px; padding:11px 13px; border-radius:12px; background:#303030; }
+.sign-in-footer { display:flex; justify-content:center; align-items:center; gap:10px; margin-top:24px; color:#949494; font-size:10px; letter-spacing:.07em; }
+.footer-dot { width:3px; height:3px; border-radius:50%; background:#747474; }
+
+@media (max-width:600px) {
+  .workspace-page { padding-top:20px; }
+  .workspace-header { align-items:flex-start; }
+  .account-trigger { min-width:0; gap:8px; }
+  .account-trigger-copy,.account-chevron { display:none; }
+  .workspace-nav { margin:25px 0 42px; }
+  .workspace-welcome { align-items:flex-start; flex-direction:column; }
+  .workspace-placeholder { padding:21px 19px 18px; }
+  .sign-in-card { padding:30px 24px 26px; }
+}
+
+@media (prefers-reduced-motion:reduce) {
+  *,*::before,*::after { scroll-behavior:auto !important; transition-duration:.01ms !important; }
+}
