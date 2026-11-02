@@ -57,19 +57,107 @@ The system SHALL authenticate people through GitHub sign-in and SHALL record the
 - **THEN** the system shows a public sign-in page with an action to start GitHub sign-in
 
 ### Requirement: Access is enforced by project role on the server
-The system SHALL enforce project membership and role on the server for every page and API request. Hiding controls in the UI SHALL NOT be the only protection.
+For every private page and API request, the system SHALL verify the session and enforce project membership and role on the server. Hiding controls in the UI SHALL NOT be the only protection. Public authentication lifecycle routes are excluded from project membership and role authorization.
 
 #### Scenario: Non-member requests a project
 - **WHEN** a signed-in person who is not a member requests a project or any of its tasks
-- **THEN** the system refuses the request without revealing the project's contents
+- **THEN** the system returns HTTP 404 without revealing the project's contents
 
 #### Scenario: Developer calls a product-manager action directly
-- **WHEN** a developer sends an API request for a product-manager action, such as creating a task or approving a submission
-- **THEN** the system refuses the request and nothing changes
+- **WHEN** a developer sends an API request for a product-manager action, such as creating or editing a task
+- **THEN** the system returns HTTP 403 and nothing changes
 
 #### Scenario: Unauthenticated request
 - **WHEN** a request without a valid session reaches a private API route
-- **THEN** the system refuses it
+- **THEN** the system returns HTTP 401
+
+#### Scenario: Public authentication lifecycle routes
+- **WHEN** a person uses `GET /api/v1/auth/sign-in`, `GET /api/v1/auth/callback`, or `POST /api/v1/auth/sign-out`
+- **THEN** the system does not require project membership or role authorization for that route
+
+### Requirement: Protected route authorization stubs
+The system SHALL provide temporary project and task route stubs to verify server-side access enforcement. An authorized request to a stub SHALL return HTTP 501 and SHALL make no state changes. Feature tasks SHALL replace stubs with functional endpoints and add route-level authorization tests.
+
+#### Scenario: Project details require membership
+- **WHEN** a person requests `GET /api/v1/projects/{projectId}`
+- **THEN** an authenticated project member reaches the stub, while an authenticated non-member receives HTTP 404
+
+#### Scenario: Project creation stub requires authentication
+- **WHEN** a person requests `POST /api/v1/projects`
+- **THEN** an unauthenticated person receives HTTP 401 and an authenticated person reaches the stub
+- **AND** the stub does not create a project or determine its initial product manager
+- **AND** project creation policy remains a task 4.1 design decision, and payload and successful-response schemas are unspecified
+
+#### Scenario: Task creation stub requires the product-manager role
+- **WHEN** a person requests `POST /api/v1/projects/{projectId}/tasks`
+- **THEN** a project product manager reaches the stub, a project developer receives HTTP 403, and a non-member receives HTTP 404
+
+#### Scenario: Task read stub requires membership
+- **WHEN** a person requests `GET /api/v1/projects/{projectId}/tasks/{taskId}`
+- **THEN** an authenticated project member reaches the stub, while an authenticated non-member receives HTTP 404
+
+#### Scenario: Task field edit stub requires the product-manager role
+- **WHEN** a person requests a field edit using `PATCH /api/v1/projects/{projectId}/tasks/{taskId}`
+- **THEN** a project product manager reaches the stub, a project developer receives HTTP 403, and a non-member receives HTTP 404
+
+#### Scenario: Task state transition stub enforces lifecycle permissions
+- **WHEN** a person sends PATCH to `/api/v1/projects/{projectId}/tasks/{taskId}/state` with a JSON body whose `state` is `To Do`, `In Progress`, `In Review`, or `Done`
+- **THEN** only the assigned developer is authorized to request `In Progress` from `To Do` or `In Review` from `In Progress`
+- **AND** only the project's product manager is authorized to request `Done` or `In Progress` from `In Review`
+- **AND** an authenticated project member without the required assignment or role receives HTTP 403, while a non-member receives HTTP 404
+- **AND** an authorized request reaches a stub that returns HTTP 501 without changing the task state
+
+#### Scenario: Authorized request reaches a protected route stub
+- **WHEN** an authenticated person with the required project access requests one of the initial protected route stubs before its feature is implemented
+- **THEN** the system returns HTTP 501 with code `NOT_IMPLEMENTED` and message `Endpoint not implemented` in the safe JSON error envelope
+- **AND** no state changes
+
+#### Scenario: Invalid session uses a stable safe error
+- **WHEN** a request without a valid session reaches a private API route
+- **THEN** the system returns HTTP 401 with code `UNAUTHENTICATED` and message `Authentication required`
+- **AND** the response contains no provider or internal details
+
+#### Scenario: Invalid request body or UUID uses a stable safe error
+- **WHEN** a protected route receives malformed JSON, a missing or invalid state value, or a malformed project or task UUID
+- **THEN** the system returns HTTP 400 with code `INVALID_REQUEST` and message `Invalid request`
+- **AND** the system performs no state changes
+
+#### Scenario: Missing project or concealed cross-project task uses a stable not-found error
+- **WHEN** a project or task does not exist, a person is not a member of the project, or a task UUID belongs to a different project than the project in the request path
+- **THEN** the system returns HTTP 404 with code `NOT_FOUND` and message `Resource not found`
+- **AND** the response does not reveal whether the project or task exists
+
+#### Scenario: Member without permission uses a stable safe error
+- **WHEN** an authenticated project member lacks the required project role or task assignment
+- **THEN** the system returns HTTP 403 with code `FORBIDDEN` and message `Insufficient permissions`
+
+#### Scenario: Identity, membership, or task lookup fails operationally
+- **WHEN** an identity, membership, project, or task lookup fails because of an operational error
+- **THEN** the system returns HTTP 500 with code `INTERNAL_ERROR` and message `Internal server error`
+- **AND** the response does not expose the underlying failure details
+
+#### Scenario: State transition validation remains with task lifecycle implementation
+- **WHEN** a requested state transition is invalid for the task's current state
+- **THEN** task 3.2's authorization stubs do not implement transition validation or mutation
+- **AND** task 4.3 defines the functional invalid-transition response and behavior
+
+### Requirement: Protected API errors use stable safe responses
+Protected API errors SHALL use the JSON envelope `{ "error": { "code": "...", "message": "..." } }`. Codes and generic messages SHALL be stable and SHALL NOT expose provider, database, or other internal details.
+
+#### Scenario: Error codes and messages are stable
+- **WHEN** a protected API route returns an error
+- **THEN** HTTP 401 uses `UNAUTHENTICATED` and `Authentication required`
+- **AND** HTTP 404 uses `NOT_FOUND` and `Resource not found`
+- **AND** HTTP 403 uses `FORBIDDEN` and `Insufficient permissions`
+- **AND** HTTP 501 uses `NOT_IMPLEMENTED` and `Endpoint not implemented`
+- **AND** HTTP 400 uses `INVALID_REQUEST` and `Invalid request`
+- **AND** HTTP 500 uses `INTERNAL_ERROR` and `Internal server error`
+
+#### Scenario: Route-level authorization is tested before feature implementation
+- **WHEN** task 3.2's authorization boundary is tested
+- **THEN** API tests exercise the initial protected route stubs for unauthenticated requests, non-member project concealment, and a developer calling a product-manager action
+- **AND** tests distinguish task-field edit permissions from state-transition permissions, including assigned versus unassigned developers and product-manager transitions from In Review
+- **AND** the tests confirm denied requests make no state changes
 
 #### Scenario: Unauthenticated request to the protected workspace
 - **WHEN** a person without a valid session requests the protected workspace

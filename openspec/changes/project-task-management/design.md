@@ -139,6 +139,18 @@ Approved by thegrimbee on 31 October 2026 for task 2.3. The human approved the `
 - **Task 2.3 scope after task 2.4.** Task 2.4 created `.env.example` and its `.gitignore` exception (commit `88e12f8`), and the Supabase projects already exist (D-J, D-K). Task 2.3 therefore extends `.env.example` with the E1 to E9 variables, adds `.vercel/` to `.gitignore`, documents the environments in the developer guide, and lists the remaining human provisioning: confirming both Supabase projects, the GitHub provider and redirect settings (E2), two GitHub OAuth apps, the Vercel project and scopes (E8), the `dev` branch, and per-environment keys and passwords.
 - **Verifying sign-in per environment.** CI cannot check the spec's per-environment callback scenario. Task 9.4 includes a sign-in on each deployed environment, recorded with the release checks.
 
+## Identity and Authorization Decisions
+
+Approved by Lim-ZY on 2 November 2026 for task 3.2. Project and task route paths were not present in the original feature specifications; the following temporary API surface is approved to exercise authorization before the domain features are implemented. No formal API requirement IDs are assigned.
+
+- **Private route stubs.** `GET /api/v1/projects/{projectId}` and `GET /api/v1/projects/{projectId}/tasks/{taskId}` require project membership. `POST /api/v1/projects` requires a valid application session but does not create a project or decide its initial product manager. `POST /api/v1/projects/{projectId}/tasks` and `PATCH /api/v1/projects/{projectId}/tasks/{taskId}` require the project's product manager. Task-field edits and task-state transitions use separate routes.
+- **Task-state route.** `PATCH /api/v1/projects/{projectId}/tasks/{taskId}/state` accepts a JSON `state` field containing one of the task-management state names: `To Do`, `In Progress`, `In Review`, or `Done`. The assigned developer may request To Do → In Progress and In Progress → In Review. The project manager may request In Review → Done or In Review → In Progress. Authorization resolves the task's project, current state, and assignee through a server-side task access repository; actual state transitions, task-event writes, invalid-transition behavior, feedback handling, and competing-write protection remain with task 4.3.
+- **Authorization responses.** Private requests without a valid session return HTTP 401. A signed-in person who is not a project member receives HTTP 404 without project contents. A project member without the required role or task assignment receives HTTP 403. These errors and the temporary HTTP 501 response use `{ "error": { "code": "...", "message": "..." } }`; responses contain no stack traces or internal details.
+- **Temporary behavior.** A permitted request to any approved stub returns HTTP 501 using the safe error envelope and performs no state change. The feature tasks replace each stub with its functional API and include route-level authorization tests. Stubs do not accept or promise feature payload or success-response schemas beyond the transition target field.
+- **Public authentication routes.** `GET /api/v1/auth/sign-in`, `GET /api/v1/auth/callback`, and `POST /api/v1/auth/sign-out` remain outside project membership and role authorization. They retain their authentication-flow-specific protections. The Next.js Proxy remains limited to session refresh; it does not authorize project access.
+- **Server-side lookup.** The application maps the verified Supabase Auth user to `people.auth_user_id`, then reads project membership and role using server-only repositories. Task transition authorization additionally reads task project, state, and assignee. No browser, Proxy, or Supabase Data API performs these checks.
+- **Feature ownership.** Task 4.1 decides who may create a project and who becomes its initial product manager. Task 4.3 owns transition execution and state-conflict behavior. Later feature tasks define functional payload and success-response contracts for their routes.
+
 ## LLM Adapter Decisions
 
 Approved by thegrimbee on 1 November 2026 for task 6.1. The human approved the `ai-safeguards` requirement "The LLM provider is behind a replaceable adapter" and asked the agent to resolve these decisions as it recommended. The numbering follows the task 6.1 analyst brief.
@@ -166,6 +178,7 @@ Approved by thegrimbee on 1 November 2026 for task 6.1. The human approved the `
 ## Open Questions
 
 - Tester accounts for the deployed environments.
+- Task 4.1 must decide who may create a project and how its initial product manager is selected. The task 3.2 project-creation stub does not settle this.
 
 ## Migration Plan
 
