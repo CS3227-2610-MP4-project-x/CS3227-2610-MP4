@@ -152,6 +152,20 @@ Approved by thegrimbee on 1 November 2026 for task 6.1. The human approved the `
 - **D7 Logging.** The adapters do not log. They return metadata to the gateway, which records usage without prompt or response content.
 - **D8 Model availability.** Checking that `GET /v1/models` lists the pinned model stays a manual step before AI is enabled (developer guide) and in the release checks. The adapter has no model-listing method.
 
+## Secret Redaction Decisions
+
+Approved by thegrimbee on 2 November 2026 for task 6.2. The human approved the new `ai-safeguards` requirement "Redaction is complete, marked, and reported", which extends "Secrets are redacted before LLM calls" (split in two to meet the OpenSpec requirement length limit), and approved these decisions as the analyst recommended. The numbering follows the task 6.2 analyst brief.
+
+- **D1 Pattern coverage.** Redaction covers known token formats and keyword assignments. It uses no entropy heuristics, which would corrupt hashes, UUIDs, and lockfiles in diffs. The patterns are: GitHub tokens (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`, `github_pat_`); SoC LLM keys (`clsk_<prefix>_<secret>`); AWS access key IDs (`AKIA` or `ASIA` followed by 16 characters); PEM private key blocks from `-----BEGIN ... PRIVATE KEY-----` to the matching `END` line, including a truncated block with no `END`; JWTs (three base64url segments, the first starting `eyJ`); Supabase secret keys (`sb_secret_`; `service_role` JWTs are covered by the JWT pattern); `postgres://`, `postgresql://`, `mysql://`, `mongodb://`, `mongodb+srv://`, and `redis://` URLs with `user:password@` credentials; `Authorization: Bearer <value>`; and assignments with `=` or `:` whose key name contains `password`, `passwd`, `secret`, `token`, `api_key` or `api-key` or `apikey`, `private_key` or `private-key`, or `access_key` or `access-key`, where the value is redacted and the key name kept.
+- **D2 Marker.** Each secret is replaced by a typed marker `[REDACTED:<kind>]`, for example `[REDACTED:github-token]`. A keyword assignment keeps its key name, for example `password=[REDACTED:credential]`. The marker never contains a hash or any part of the secret.
+- **D3 Result and visibility.** Redaction returns the redacted text, the number of replacements, and the kinds found, never the matched text. The gateway and feature services decide what to store. The Acceptance Criteria Check stores its existing redaction flag in `check_results` (Data Persistence Decisions). Progress Reports store nothing new. Showing a redaction note in the UI is not decided; `specs/ui-spec.md` has no wording for it, and adding one needs a UI-spec decision.
+- **D4 Order.** Redaction runs on each whole text segment before diff filtering and the input budget (task 7.1), so truncation cannot cut a secret into a fragment that no pattern matches. Marker length differences are accepted because the budget is an estimate.
+- **D5 Evidence verification.** Evidence quotes are verified against the redacted diff, which is the diff that was assessed, so a stored quote never contains a secret. Task 7.2 applies this.
+- **D6 Model output.** Redaction applies to input sent to the LLM only. Model output is not redacted in task 6.2; redacting it would be a separate requirement.
+- **D7 Recording and logging.** No usage-record field is added. Counts and kinds never include matched text. The redaction module does not log.
+- **D8 Placement and API.** Redaction is one pure function over a string in `src/server/ai/redaction.ts`, exported through `src/server/ai/index.ts` with its result type only. The gateway (task 6.3) applies it to each prompt segment. It takes no flag arguments, and the adapters do not call it.
+- **D9 Overlapping patterns.** The most specific patterns run first (PEM blocks, connection URLs, token prefixes, JWTs) and keyword assignments last, so a marker is never nested or redacted again. Tests cover the overlap cases.
+
 ## Risks / Trade-offs
 
 - **The GitHub token gives access to the whole repository.** It is limited to read-only access for one repository, encrypted, and never exposed. The product manager can replace or remove it.
