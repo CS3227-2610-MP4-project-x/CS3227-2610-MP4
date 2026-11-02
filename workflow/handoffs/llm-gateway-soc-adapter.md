@@ -6,8 +6,8 @@
 - Summary: OpenSpec task 6.1 of `openspec/changes/project-task-management`, "Implement the SoC LLM adapter and a deterministic fake adapter". Add one application-defined adapter interface with a single `complete` method, a SoC LLM (SoCLaaS) adapter that calls `POST /v1/chat/completions` through the built-in `fetch`, a deterministic fake adapter, and a public entry point in `src/server/ai/`, plus unit tests in `tests/unit/ai/`. Selecting the adapter from `AI_PROVIDER` is not part of this task; task 6.3 does it in the composition root (D3).
 - Human owner (Developer A / Developer B): Developer B (thegrimbee), who owns this task assignment. The adapter is consumed by the gateway (task 6.3) and later by Developer A's Acceptance Criteria Check; Developer A is not a required reviewer for 6.1.
 - Requirement IDs: none beyond the task number 6.1; none are invented. The requirement is referenced by name: "The LLM provider is behind a replaceable adapter" in `openspec/changes/project-task-management/specs/ai-safeguards/spec.md`.
-- Status: implemented and reviewed; ready for a human commit decision. The spec requirement and LLM Adapter Decisions D1–D8 were approved by thegrimbee on 1 November 2026 (commits `bcec95d`, `15b2a0e`). The human resolved Q1–Q4 on 1 November 2026 (see Decisions). Gitleaks stays unverified until CI runs; AC17 is deferred to task 6.3.
-- Next human action: Developer B (thegrimbee) reviews the working-tree changes and decides whether to authorize commits on `feat/llm-gateway-soc-adapter`.
+- Status: complete. Implemented, reviewed, and committed on `feat/llm-gateway-soc-adapter` (`71e29b0` tests, `cb04194` implementation, `1567ed8` handoff and session summary); task 6.1 is checked in `tasks.md`. The spec requirement and LLM Adapter Decisions D1–D8 were approved by thegrimbee on 1 November 2026 (commits `bcec95d`, `15b2a0e`). The human resolved Q1–Q4 on 1 November 2026 (see Decisions). Gitleaks stays unverified until CI runs; AC17 is deferred to task 6.3.
+- Next human action: Developer B (thegrimbee) decides whether to push `feat/llm-gateway-soc-adapter` and open a PR; CI `secret-scan` then verifies AC16.
 
 ## Source and scope `[ORCH]`
 
@@ -306,6 +306,7 @@ Spec: "The LLM provider is behind a replaceable adapter". Decisions: D2–D7. "U
   - `npx tsc --noEmit`: pass.
   - `npm run build`: pass. The build-rewritten `next-env.d.ts` was restored, so it is not part of the change.
   - `npm test`: 119/119 passed before the should-fix 2 change to `source-boundaries.test.ts`. A run after that change was not reported to the orchestrator.
+  - Re-run on 2 November 2026 at `c228258` (after merging `dev`), Windows locally, after `npm ci`: `npm test` 165/165 passed (9 files, including `tests/unit/ai/`); `npx tsc --noEmit` pass; `npm run lint` pass; `npm run build` pass (`next-env.d.ts` restored).
   - Live provider check: see "Live provider check" (human-run, outside the repository).
   - gitleaks: not run locally.
 - Generated artifacts: none kept (`next-env.d.ts` restored).
@@ -313,14 +314,13 @@ Spec: "The LLM provider is behind a replaceable adapter". Decisions: D2–D7. "U
 - Known gaps and unverified items:
   - AC17 "Adapter selected by configuration" is deferred to task 6.3 (D3).
   - AC16 gitleaks result is unverified until the CI `secret-scan` job runs after push.
-  - `npm test` after the should-fix 2 change to `source-boundaries.test.ts` is not yet reported; rerun before committing.
   - No second reviewer pass after the test-side fixes.
   - D8: confirming that `GET /v1/models` lists the pinned model stays a manual step before AI is enabled; the adapter has no model-listing method.
   - Follow-ups (accepted reviewer nits, not fixed): non-2xx bodies are never cancelled; timeout-during-body-read path untested; real `AbortSignal.timeout` not exercised; fake keeps a shallow copy of the script; `JSON.stringify` sits inside the `try`; regex boundary checks are coarse.
   - For task 6.3: an unknown or retired model surfaces as 503 `unavailable`, not 403 `forbidden`.
 - Reviewer findings: no must-fix. Should-fix 1 and 2 fixed (test-side only); six nits accepted as follow-ups. No implementer fix round was run.
 - Suggested skills / references for the next worker: `workflow/handoffs/environment-configuration.md` (gitleaks-safe placeholders). Task 6.3 should read D3, E5, and this handoff's "Live provider check" before creating `src/server/config/` and `src/server/composition.ts`.
-- Next action and responsible human: Developer B (thegrimbee) confirms `npm test` after the boundary-test change, reviews the changes, and decides whether to authorize commits on `feat/llm-gateway-soc-adapter`.
+- Next action and responsible human: Developer B (thegrimbee) decides whether to push `feat/llm-gateway-soc-adapter` and open a PR.
 
 ## Change log `[ORCH]`
 
@@ -332,3 +332,4 @@ Spec: "The LLM provider is behind a replaceable adapter". Decisions: D2–D7. "U
 | 2026-11-01 | reviewer / not available | No must-fix; should-fix 1–2 and six nits reported. |
 | 2026-11-01 | test-writer / fix rounds | Should-fix 1 (AC3 tests) and should-fix 2 (config/composition existence check removed) addressed; no implementer fix round. |
 | 2026-11-01 | orchestrator / not available | Consolidated outcome. Status: implemented, reviewed, ready for human commit decision. |
+| 2026-11-02 | main session | Re-ran checks at `c228258` (165/165 tests, tsc, lint, build pass). Marked task 6.1 complete in `tasks.md`; status complete. |
