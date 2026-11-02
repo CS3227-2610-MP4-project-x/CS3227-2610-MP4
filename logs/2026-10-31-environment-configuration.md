@@ -56,4 +56,4 @@
   - whether Vercel Hobby offers branch-specific Preview variables and can deploy this organisation-owned repository (E8).
 - **Dependencies added:** none. `@supabase/ssr` and `@supabase/supabase-js` are planned for task 3.1.
 - **Secrets:** none recorded.
-- **Human verification:** of this summary is pending.
+- **Human verification:** approved

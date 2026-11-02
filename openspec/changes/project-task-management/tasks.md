@@ -45,7 +45,7 @@ Depends on: 3. Can run alongside group 4.
 
 Depends on: 2. Can run alongside groups 3–5.
 
-- [ ] 6.1 **[P]** Implement the SoC LLM adapter and a deterministic fake adapter.
+- [x] 6.1 **[P]** Implement the SoC LLM adapter and a deterministic fake adapter.
 - [ ] 6.2 **[P]** Implement secret redaction; add unit tests for common secret patterns.
 - [ ] 6.3 Implement the gateway: prompt building with untrusted content separated, schema validation with one retry, safe errors, per-person rate limits and quotas (reserved before the call, reset at 00:00 SGT, cached results not counted), and usage records; add unit tests for each.
 
