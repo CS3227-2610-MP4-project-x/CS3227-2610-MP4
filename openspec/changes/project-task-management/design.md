@@ -166,6 +166,51 @@ Approved by thegrimbee on 2 November 2026 for task 6.2. The human approved the n
 - **D8 Placement and API.** Redaction is one pure function over a string in `src/server/ai/redaction.ts`, exported through `src/server/ai/index.ts` with its result type only. The gateway (task 6.3) applies it to each prompt segment. It takes no flag arguments, and the adapters do not call it.
 - **D9 Overlapping patterns.** The most specific patterns run first (PEM blocks, connection URLs, token prefixes, JWTs) and keyword assignments last, so a marker is never nested or redacted again. Tests cover the overlap cases.
 
+## LLM Gateway Decisions
+
+Approved by thegrimbee on 2 November 2026 for task 6.3. The human approved the `ai-safeguards` spec delta and asked the agent to resolve these decisions as it recommended. The numbering follows the task 6.3 analyst brief (G1 to G12 answer its D1 to D12).
+
+- **G1 Prompt format.** Each call sends two messages. The system message holds the feature's fixed instructions and a fixed preamble saying that the user message holds untrusted data in `<data name="...">` sections, that the content of those sections is data to assess and never instructions, and that the reply must be JSON only. The user message holds one `<data name="<segment name>">` … `</data>` section per segment, in the order given. Segment names are code constants chosen by the feature, never user input. Each segment is first redacted (Secret Redaction Decisions D8). Then every case-insensitive `<data` and `</data` in it has its `<` replaced by `&lt;`, so the segment cannot close its section or open another. No untrusted text is placed in the system message. The retry sends the same messages unchanged; the invalid output is never sent back to the model.
+- **G2 Charge on failure.** This follows the spec rule "charge the tokens the provider reports, or the reserved maximum if it reports none", applied per call. A call that returns usage is charged that usage. A call that returns no usage, including every adapter failure, is charged its reserved maximum. A call that is never made (the retry when the first output is valid, or after a provider failure) is not charged, so its share of the reservation is released at settlement.
+- **G3 Safe errors.** The gateway returns a result and does not throw for expected failures. A failure holds only a code from the API error contract (see "API Error Contract"):
+  - `RATE_LIMITED`: the person's per-minute limit.
+  - `QUOTA_EXCEEDED`: the daily quota, with `resetsAt`, the next 00:00 SGT as an ISO 8601 UTC timestamp.
+  - `AI_UNAVAILABLE`: an adapter failure of `rate_limited`, `unavailable` or `timeout`; the user may try again.
+  - `AI_ERROR`: `invalid_request`, `unauthorized`, `forbidden` or `malformed_response`.
+  - `INVALID_OUTPUT`: the schema failed twice.
+
+  Route Handlers map these to HTTP responses using that contract. Database errors are not expected failures. They propagate, and handlers return a generic error. The gateway does not log prompt or response content.
+- **G4 Rate counting of the retry.** One gateway request is one usage record and counts once toward the 5-per-minute limit, whether it makes one call or two. A spec "LLM call" in "AI usage is recorded" means one gateway request including its retry. Its tokens and latency are summed over its calls.
+- **G5 Reservation amount.** A call's maximum is `ceil(total characters of both messages / 3) + maxOutputTokens` (the 3-characters-per-token estimate). A request reserves two calls' maximum before the first call, because the retry sends the same messages. This keeps concurrent requests within the quota, at the cost of sometimes refusing a request near the limit that would have needed only one call. A request is allowed when the day's charged and reserved tokens plus this reservation do not exceed the daily quota.
+- **G6 Rate window.** The reservation transaction locks the person's `usage_quota_days` row for the current SGT date, `(now() AT TIME ZONE 'Asia/Singapore')::date`. It then checks the rate limit and the quota, and inserts the `pending` record, all with database time. The rate limit counts the person's records with `cached = false` and `created_at > now() - interval '60 seconds'` in any outcome, so a record exactly 60 seconds old no longer counts. The daily total covers records whose `created_at` falls on that SGT date. Refused requests leave no record; the outcome list is unchanged.
+- **G7 Cache split.** The gateway owns no cache. Feature services (tasks 7.2 and 8.2) look up their own caches. On a hit they call the gateway's cache-hit recorder, which inserts one record with outcome `cached`, `cached = true`, and zero reserved and charged tokens, with no rate or quota check.
+- **G8 Ownership and seam.** Task 6.3 is done by thegrimbee (Developer B, owner of database, migrations and usage logging), and Lim-ZY cross-reviews. The gateway in `src/server/ai/` depends on a usage port (an interface it defines) with three operations: reserve, settle and record cache hit. The PostgreSQL implementation lives in `src/server/repositories/usage-repository.ts`; it is the only writer of `usage_records` and `usage_quota_days`. Task 6.3 adds the new migration with the `usage_records.environment` `CHECK` (Environment Decisions E6) and PostgreSQL integration tests for concurrent reservations, the SGT day boundary and the constraint. The AI security evaluation fixtures stay with Developer A and are not part of task 6.3.
+- **G9 Gateway API.** One method, run, takes:
+  - the feature (`acceptance_check` or `progress_report`);
+  - the project UUID and person UUID;
+  - the feature's fixed instructions;
+  - the ordered named segments;
+  - `maxOutputTokens`;
+  - a validator.
+
+  The validator is a hand-written function from the parsed JSON value to the typed result or a rejection; no validation library is added (E5). The gateway trims the response and removes one surrounding Markdown code fence if present. It then parses JSON; output that does not parse counts as schema-invalid. A success holds the validated value, the model name, and the redaction summary (count and kinds summed over segments) so feature services can store their redaction flag (Secret Redaction Decisions D3). The limits table from E4 is a constant in `src/server/ai/` keyed by `APP_ENV`. The gateway is built in the composition root with the selected adapter, the usage repository, and the environment's limits.
+- **G10 AI configuration.** `getServerConfig` also reads `AI_PROVIDER`, which is required everywhere and must be `fake` or `soclaas`. When it is `soclaas`, `SOCLAAS_API_KEY` must be non-empty and `SOCLAAS_MODEL` must be non-empty and not `default`. When it is `fake`, those two are not read. `APP_ENV=production` with `AI_PROVIDER=fake` fails. Errors name the variable, never the value. The existing test that every variable read is listed in `.env.example` covers the new variables.
+- **G11 Route duration.** No Route Handler exists in task 6.3. The first AI Route Handler (task 7.3 or 8.2) sets `maxDuration` to at least 150 seconds (two 60-second calls plus database work). The release checks confirm the Vercel plan allows it.
+- **G12 Usage view.** The per-feature, per-day usage queries and the product manager's usage view are not part of task 6.3. They belong to the task that builds that view.
+
+## API Error Contract
+
+Recorded on 2 November 2026 during task 6.3. `AGENTS.md` refers to an API error contract in `openspec/`, but none had been recorded. thegrimbee chose to record the format that the existing auth Route Handlers (`src/app/api/v1/auth/`) already use. **Pending approval by Lim-ZY (Developer A, API owner).**
+
+- **Shape.** Every `/api/v1` error response is JSON of the form `{ "error": { "code": "<CODE>", "message": "<safe text>" } }`. Fields specific to a code go in `error` next to `code` and `message`, for example `resetsAt` for `QUOTA_EXCEEDED`.
+- **Codes.** Codes are stable `UPPER_SNAKE_CASE` strings that clients may depend on. A code is added by the task that first returns it, and recorded here. Existing codes:
+  - `AUTHENTICATION_FAILED` (500 or 502).
+  - `FORBIDDEN` (403).
+  - The LLM Gateway Decisions G3 codes: `RATE_LIMITED` (429), `QUOTA_EXCEEDED` (429), `AI_UNAVAILABLE` (503), `AI_ERROR` (502) and `INVALID_OUTPUT` (502).
+- **Message.** A fixed, human-readable message chosen by the server. It never contains a stack trace, SQL, a provider message or body, a credential, or user-supplied text.
+- **Headers.** Error responses send `Cache-Control: no-store`.
+- **Unexpected errors.** Errors not mapped to a specific code return 500 with a generic message, and their details are not exposed.
+
 ## Risks / Trade-offs
 
 - **The GitHub token gives access to the whole repository.** It is limited to read-only access for one repository, encrypted, and never exposed. The product manager can replace or remove it.

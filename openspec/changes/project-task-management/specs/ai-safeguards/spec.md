@@ -17,6 +17,14 @@ The system SHALL treat task text, acceptance criteria, progress updates, review 
 - **WHEN** the AI security evaluation runs
 - **THEN** it includes adversarial fixtures for both AI features and records whether each fixture's expected safe outcome held
 
+#### Scenario: Prompt keeps untrusted content out of instructions
+- **WHEN** the gateway builds a prompt
+- **THEN** the fixed instructions are in the system message only, every piece of task text, criteria, commit messages, diffs and feedback is redacted and placed in a named data section of the user message, and no untrusted text appears in the system message
+
+#### Scenario: Untrusted content cannot close its data section
+- **WHEN** an untrusted segment contains the data-section opening or closing tag
+- **THEN** the tag is neutralized before the segment is placed in the prompt, so the segment stays inside its own section
+
 ### Requirement: Secrets are redacted before LLM calls
 The system SHALL detect and redact likely secrets, such as API keys, tokens, private keys, and connection strings, in any content before it is sent to the LLM.
 
@@ -58,6 +66,18 @@ The system SHALL validate every model response against the feature's output sche
 - **WHEN** the LLM provider returns an error or times out
 - **THEN** the user sees a safe error message without raw provider details, and no result is stored
 
+#### Scenario: Invalid output is retried once
+- **WHEN** the first response fails the schema and the second passes
+- **THEN** the second result is returned, both calls are charged, and nothing from the first response is stored
+
+#### Scenario: Provider failures are not retried
+- **WHEN** a call fails with a provider error, rate limit, or timeout
+- **THEN** no further call is made for that request
+
+#### Scenario: Failures carry only a safe code
+- **WHEN** the gateway reports a failure
+- **THEN** it holds only an application error code (and, for a quota refusal, the reset time), never a provider message, response body, stack trace, or credential
+
 ### Requirement: AI usage is limited per person
 The system SHALL enforce a per-person rate limit and a per-person daily token quota for AI features, with separate limits for each environment. The daily quota SHALL reset at 00:00 SGT. Requests answered from a cached result SHALL NOT count toward either limit. Before each LLM call, the system SHALL reserve the request's maximum possible tokens against the quota, and afterwards SHALL charge the tokens the provider reports, or the reserved maximum if it reports none.
 
@@ -77,6 +97,26 @@ The system SHALL enforce a per-person rate limit and a per-person daily token qu
 - **WHEN** an LLM response has no token usage
 - **THEN** the person is charged the maximum tokens reserved for the request
 
+#### Scenario: Rate limit reached
+- **WHEN** a person has 5 non-cached AI requests started in the last 60 seconds
+- **THEN** their next non-cached request is refused without calling the LLM
+
+#### Scenario: Quota day boundary
+- **WHEN** a person makes one request at 23:59:59 SGT and another at 00:00:00 SGT
+- **THEN** the two requests count against different daily quotas
+
+#### Scenario: Unused reservation is released
+- **WHEN** a request settles and the provider reports fewer tokens than were reserved, or the retry call is not needed
+- **THEN** only the tokens charged for the calls made count against the quota, and the rest is available for later requests that SGT day
+
+#### Scenario: Failed call is charged
+- **WHEN** a call fails or its output is invalid
+- **THEN** that call is charged the usage the provider reports, or its reserved maximum if none is reported, and calls that were never made are not charged
+
+#### Scenario: Limits per environment
+- **WHEN** the limits are read for `development` or `production`
+- **THEN** both allow 5 requests per minute, and the daily quota is 1,000,000 tokens in development and 400,000 in production
+
 ### Requirement: AI usage is recorded
 The system SHALL record, for every LLM call, the feature, project, person, environment, input tokens, output tokens, latency, outcome, and whether a cached result was used instead. The record SHALL NOT contain prompt or response content.
 
@@ -87,6 +127,18 @@ The system SHALL record, for every LLM call, the feature, project, person, envir
 #### Scenario: Cached result is used
 - **WHEN** a stored result is returned instead of calling the LLM
 - **THEN** a usage record is stored marking the request as served from cache, with zero tokens
+
+#### Scenario: Usage is reserved before the call and settled after it
+- **WHEN** a request is allowed
+- **THEN** a pending usage record exists before the LLM call, and afterwards it is settled as succeeded, invalid output, or provider error, with tokens and latency summed over the request's calls including any retry
+
+#### Scenario: Interrupted request keeps its reservation
+- **WHEN** the process stops between reserving and settling
+- **THEN** the usage record stays pending and keeps its full reservation
+
+#### Scenario: Environment is constrained
+- **WHEN** a usage record is written
+- **THEN** the database accepts only `development` or `production` as its environment
 
 #### Scenario: Product manager views AI usage
 - **WHEN** the product manager opens the project's AI usage view
