@@ -16,7 +16,8 @@ The application runs in two separate environments, development and production. T
 | Vercel scope | Preview, restricted to the `dev` branch | Production |
 | Supabase project | development project | production project |
 | GitHub OAuth app | development app | production app |
-| OAuth callback URL | `https://<dev-project-ref>.supabase.co/auth/v1/callback` | `https://<prod-project-ref>.supabase.co/auth/v1/callback` |
+| GitHub-to-Supabase provider callback (GitHub OAuth app) | `https://<dev-project-ref>.supabase.co/auth/v1/callback` | `https://<prod-project-ref>.supabase.co/auth/v1/callback` |
+| Supabase-to-app callback (Supabase Redirect URLs) | `<development APP_ORIGIN>/api/v1/auth/callback`; local: `http://localhost:3000/api/v1/auth/callback` | `<production APP_ORIGIN>/api/v1/auth/callback` |
 | SoC LLM key | from thegrimbee's SoC account | from Lim-ZY's SoC account |
 | `APP_ENV` | `development` | `production` |
 | `APP_ORIGIN` | the stable Vercel URL of the `dev` branch | the production domain |
@@ -57,7 +58,7 @@ These are not variables, so they are not in `.env.example`, Vercel, or the repos
 - AI quotas and rate limits. They are code constants selected by `APP_ENV`; changing one is a reviewed code change (E4).
 - The SoC LLM gateway base URL, `https://soclaas-api.comp.nus.edu.sg`. It is a code constant (E3).
 
-No application code reads these variables yet. The first of tasks 3.1, 5.1, and 6.3 adds one server-only configuration module in `src/server/config/`, which validates the variables when it is first called and reports a missing or invalid variable by name, never by value (E5).
+Task 3.1 adds the server-only configuration module in `src/server/config/`. It validates the runtime database, Supabase Auth, app-origin, and environment values when first called, not at import or build time, and reports a missing or invalid variable by name, never by value (E5). The three authentication routes and the database people repository are now implemented; private-route membership and role enforcement remains task 3.2.
 
 ### Setting up the environments
 
@@ -207,9 +208,11 @@ In each Supabase project:
    - Turn **Enable Sign in with GitHub** on.
    - Paste that environment's **Client ID** and **Client Secret**, then **Save**.
 2. **Site URL.** Open **Authentication → URL Configuration**. Set **Site URL** to that environment's `APP_ORIGIN`: the `dev` branch URL for development, the production URL for production. Do not use `http://localhost:3000` here, even in development.
-3. **Redirect URLs.** These are the app pages that Supabase may send people back to after sign-in. The list holds only exact URLs, with no wildcards. Task 3.1 defines the callback path, so the entries are added once that task is done. They will be:
-   - Development project: `<development APP_ORIGIN><callback path>` and `http://localhost:3000<callback path>`.
-   - Production project: `<production APP_ORIGIN><callback path>` only.
+3. **Redirect URLs.** These are the app URLs that Supabase may send people back to after sign-in. The callback route is `GET /api/v1/auth/callback`; add only these exact URLs, with no wildcards:
+   - Development project: `https://<dev-stable-vercel-domain>/api/v1/auth/callback` and `http://localhost:3000/api/v1/auth/callback`.
+   - Production project: `https://<production-domain>/api/v1/auth/callback`.
+
+   Replace each host placeholder with the exact `APP_ORIGIN` from step 6, without a trailing slash. Do not add the Supabase provider callback (`https://<project-ref>.supabase.co/auth/v1/callback`) here; that URL belongs only in the GitHub OAuth app's **Authorization callback URL** in step 7.
 4. **Other sign-in providers.** The Email provider is on by default in new Supabase projects. The specs only define GitHub sign-in, but whether to turn the others off is not recorded. Ask the team, and record the decision.
 5. **API key.** Open **Project Settings → API Keys**. Under **Publishable key**, copy the key that starts with `sb_publishable_`. If the page has only legacy `anon` and `service_role` keys, create the new keys there first. This is `SUPABASE_PUBLISHABLE_KEY`. Do not copy the secret or `service_role` keys anywhere (E1).
 

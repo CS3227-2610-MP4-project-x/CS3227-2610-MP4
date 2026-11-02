@@ -1,4 +1,7 @@
 import { defineConfig } from "vitest/config";
+import { fileURLToPath } from "node:url";
+
+const sourceDirectory = fileURLToPath(new URL("./src", import.meta.url));
 
 // Two separate configurations selected by Vitest's mode:
 // - `npm test` (default mode): unit tests only; needs no database.
@@ -7,6 +10,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig(({ mode }) =>
   mode === "integration"
     ? {
+        resolve: { alias: { "@": sourceDirectory } },
         test: {
           name: "integration",
           environment: "node",
@@ -19,6 +23,7 @@ export default defineConfig(({ mode }) =>
         },
       }
     : {
+        resolve: { alias: { "@": sourceDirectory } },
         test: {
           name: "unit",
           environment: "node",
