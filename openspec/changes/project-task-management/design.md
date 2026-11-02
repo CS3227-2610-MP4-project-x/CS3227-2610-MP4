@@ -197,6 +197,28 @@ Approved by thegrimbee on 2 November 2026 for task 6.3. The human approved the `
 - **G10 AI configuration.** `getServerConfig` also reads `AI_PROVIDER`, which is required everywhere and must be `fake` or `soclaas`. When it is `soclaas`, `SOCLAAS_API_KEY` must be non-empty and `SOCLAAS_MODEL` must be non-empty and not `default`. When it is `fake`, those two are not read. `APP_ENV=production` with `AI_PROVIDER=fake` fails. Errors name the variable, never the value. The existing test that every variable read is listed in `.env.example` covers the new variables.
 - **G11 Route duration.** No Route Handler exists in task 6.3. The first AI Route Handler (task 7.3 or 8.2) sets `maxDuration` to at least 150 seconds (two 60-second calls plus database work). The release checks confirm the Vercel plan allows it.
 - **G12 Usage view.** The per-feature, per-day usage queries and the product manager's usage view are not part of task 6.3. They belong to the task that builds that view.
+- **Task 6.3 handoff decisions.** Approved by thegrimbee on 2 November 2026, answering the orchestrator's questions Q1–Q6 in `workflow/handoffs/llm-gateway-core.md`.
+  - *Q1 Charged tokens.* The 6.3 migration also adds a nullable `usage_records.charged_tokens` integer column (non-negative), set at settlement and for cache hits (0). It amends D-G's quota sum: the daily total is `charged_tokens` for settled records plus `reserved_tokens` for `pending` records. `input_tokens` and `output_tokens` hold only provider-reported usage, summed over the calls that reported it.
+  - *Q2 Cache hits.* `LlmGateway` has a second method, `recordCacheHit`, in addition to `run`. This amends G9's "one method".
+  - *Q3 Retry fails.* If the first output is invalid and the retry call fails at the adapter, the record settles as `provider_error`, and the result code follows the retry's failure (`AI_UNAVAILABLE` or `AI_ERROR`).
+  - *Q4 Both limits refuse.* The rate limit is checked first; when both would refuse, the result is `RATE_LIMITED`.
+  - *Q5 Feature values.* The features are `acceptance_check` and `progress_report`. The 6.3 migration adds a `CHECK` limiting `usage_records.feature` to these values, and test fixtures use them.
+  - *Q6 Applying the constraints.* The new constraints are added with a plain `ADD CONSTRAINT`, not `NOT VALID`, after the D-L backup, because no other values are ever written.
+  - *Handoff assumptions.* Approved by thegrimbee on 2 November 2026.
+    - A1: the gateway computes the G5 reservation, and the repository decides refusal with database time.
+    - A2: the repository computes `resetsAt` from database time.
+    - A3: `latency_ms` is the sum of the calls' latencies.
+    - A5: `input_tokens` and `output_tokens` are null when no call reported usage. Otherwise they hold the sum over the calls that reported it.
+- **Task 6.3 review decisions.** Approved by thegrimbee on 2 November 2026, who asked the agent to resolve the task 6.3 reviewer's findings S1–S4 as it recommended.
+  - *S1 Throwing adapter or validator.*
+    - If the adapter or the feature's validator throws during `run`, the gateway settles the record as `provider_error` and returns `AI_ERROR`; it does not rethrow.
+    - The call is charged by the G2 rule: reported usage if the adapter returned a response, otherwise the call's maximum.
+    - Errors thrown by the usage port are not caught (G3).
+  - *S2 Settlement failure.* A usage-port error at settlement propagates, including `settle` finding no `pending` record. The result of that request is not returned, and the record stays `pending` with its full reservation (D-G). This is accepted: hiding a database error could under-count usage.
+  - *S3 Segment names.* A segment name must match `^[a-z][a-z0-9_-]{0,63}$`. An invalid name is a programming error. The gateway throws before reserving, so no record is created and no adapter call is made.
+  - *S4 Numeric inputs.*
+    - `maxOutputTokens` must be a positive integer. Otherwise the gateway throws a programming error before reserving.
+    - Each call's latency is rounded to a whole number of milliseconds and is never below 0.
 
 ## API Error Contract
 
