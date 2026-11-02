@@ -4,9 +4,14 @@ import { Pool } from "pg";
 import { getServerConfig } from "@/server/config";
 import { AuthService } from "@/server/auth/auth-service";
 import { PeopleRepository } from "@/server/repositories/people-repository";
+import { ProjectAccessRepository } from "@/server/repositories/project-access-repository";
+import { TaskAccessRepository } from "@/server/repositories/task-access-repository";
 
 export type ServerComposition = Readonly<{
   authService: AuthService;
+  peopleRepository: PeopleRepository;
+  projectAccessRepository: ProjectAccessRepository;
+  taskAccessRepository: TaskAccessRepository;
   config: ReturnType<typeof getServerConfig>;
 }>;
 
@@ -25,6 +30,14 @@ export function getServerComposition(): ServerComposition {
     ssl: { ca: config.databaseCaCert, rejectUnauthorized: true },
   });
   const peopleRepository = new PeopleRepository(pool);
-  composition = Object.freeze({ authService: new AuthService(config.appOrigin, peopleRepository), config });
+  const projectAccessRepository = new ProjectAccessRepository(pool);
+  const taskAccessRepository = new TaskAccessRepository(pool);
+  composition = Object.freeze({
+    authService: new AuthService(config.appOrigin, peopleRepository),
+    peopleRepository,
+    projectAccessRepository,
+    taskAccessRepository,
+    config,
+  });
   return composition;
 }
