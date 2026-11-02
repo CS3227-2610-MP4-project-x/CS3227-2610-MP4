@@ -52,7 +52,7 @@
   - `npm test`: 381/381 passed.
   - build: passed (`next-env.d.ts` restored).
   - Integration tests: not run, because Docker was not running.
-- No dependencies added. Not committed. No secrets recorded. Human verification of this section is pending.
+- No dependencies added. Not committed. No secrets recorded. Human has approved the new S1–S4. The main session recorded the final AC1–AC28 in `workflow/handoffs/llm-gateway-core.md` and the final S1–S4 in `design.md`.
 - Human request: Docker started; rerun the relevant tests, record approval of A1–A3 and A5, update the documents, then split the commits as recommended.
   - Integration tests: `npm run test:integration` against a disposable `postgres:17` container (developer guide) passed 225/225, including `usage-repository.test.ts` 33/33. The container was stopped afterwards.
   - The main session recorded the assumptions in `design.md`, updated the handoff (sessions, outcome, status), and checked task 6.3 in `tasks.md`.
