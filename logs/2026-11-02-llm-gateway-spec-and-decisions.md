@@ -9,9 +9,10 @@
 - Main-session finding: no API error contract is recorded in `openspec/`, although `AGENTS.md` refers to one. G3 therefore defines only gateway result codes and leaves the HTTP mapping to Route Handler tasks.
 - Files changed:
   - `openspec/changes/project-task-management/specs/ai-safeguards/spec.md`: 13 added scenarios under five existing requirements. The requirement text is unchanged.
-  - `openspec/changes/project-task-management/design.md`: new section "LLM Gateway Decisions" (G1–G12).
+  - `openspec/changes/project-task-management/design.md`: new sections "LLM Gateway Decisions" (G1–G12) and "API Error Contract".
   - `logs/2026-11-02-llm-gateway-spec-and-decisions.md`: this summary.
 - Checks: `openspec validate project-task-management --strict` passed. No code, tests, handoff, or dependencies were added.
 - Branch: `feat/llm-gateway-core`. Not committed. No secrets recorded. Human has approved the new G1–G12.
-- Follow-up: the human reviews G1–G12, then runs the orchestrator, test-writer, implementer, and reviewer for task 6.3.
 - Human request: resolve the missing API error contract. The main session found that the existing auth Route Handlers already use `{ error: { code, message } }` with UPPER_SNAKE codes and `Cache-Control: no-store`, which conflicted with G3's lowercase codes. Human decision: record the existing format. The main session added an "API Error Contract" section to `design.md`, marked as pending approval by Lim-ZY (API owner), and changed G3's codes to UPPER_SNAKE with HTTP statuses. `openspec validate --strict` passed.
+- Approvals: the human approved this summary. Lim-ZY approved the API Error Contract on 2 November 2026; the main session replaced the pending marker in `design.md` with that approval.
+- Follow-up: run the orchestrator, test-writer, implementer, and reviewer for task 6.3. Commit the spec work first if desired.

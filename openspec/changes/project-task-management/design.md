@@ -200,7 +200,7 @@ Approved by thegrimbee on 2 November 2026 for task 6.3. The human approved the `
 
 ## API Error Contract
 
-Recorded on 2 November 2026 during task 6.3. `AGENTS.md` refers to an API error contract in `openspec/`, but none had been recorded. thegrimbee chose to record the format that the existing auth Route Handlers (`src/app/api/v1/auth/`) already use. **Pending approval by Lim-ZY (Developer A, API owner).**
+Recorded on 2 November 2026 during task 6.3. `AGENTS.md` refers to an API error contract in `openspec/`, but none had been recorded. thegrimbee chose to record the format that the existing auth Route Handlers (`src/app/api/v1/auth/`) already use. Approved by Lim-ZY (Developer A, API owner) on 2 November 2026.
 
 - **Shape.** Every `/api/v1` error response is JSON of the form `{ "error": { "code": "<CODE>", "message": "<safe text>" } }`. Fields specific to a code go in `error` next to `code` and `message`, for example `resetsAt` for `QUOTA_EXCEEDED`.
 - **Codes.** Codes are stable `UPPER_SNAKE_CASE` strings that clients may depend on. A code is added by the task that first returns it, and recorded here. Existing codes:
