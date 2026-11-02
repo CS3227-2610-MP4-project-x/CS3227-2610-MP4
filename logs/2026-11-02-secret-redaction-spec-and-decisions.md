@@ -50,4 +50,7 @@
   - `npx tsc --noEmit`: passed.
   - `npm run build`: passed (`next-env.d.ts` restored).
   - gitleaks: unverified until CI.
-- No dependencies added. Not committed. Task 6.2 stays unchecked until the human decides. No secrets recorded. Human has approved these changes.- Human request after the run: relax the S1 timing limit in `tests/unit/ai/redaction.test.ts` from 250 ms to 1000 ms (main session edit), then commit the suggested commits on `feat/llm-gateway-secret-redaction` (commit/PR agent).
+- No dependencies added. Not committed. Task 6.2 stays unchecked until the human decides. No secrets recorded. Human has approved these changes.
+- Human request after the run: relax the S1 timing limit in `tests/unit/ai/redaction.test.ts` from 250 ms to 1000 ms (main session edit), then commit the suggested commits on `feat/llm-gateway-secret-redaction` (commit/PR agent).
+- Commits: the commit/PR agent created `9361b8a`, `39ab2c3`, `1ec7e4b`, and `33c41b7` on `feat/llm-gateway-secret-redaction` as authorized. No push or pull request.
+- Human request: mark task 6.2 complete and update the relevant documents. The main session checked 6.2 in `tasks.md`, set the handoff status to complete with the commit references, and fixed a merged line in this log. Human verification of these last entries is pending.
