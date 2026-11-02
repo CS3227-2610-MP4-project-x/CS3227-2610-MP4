@@ -1,5 +1,5 @@
-// Public entry point of the AI adapter module. Exports only the application interface,
-// its types, the two adapters, and secret redaction with its result type.
+// Public entry point of the AI module. Exports the adapter interface and adapters, secret
+// redaction, the prompt builder, the limits table, the usage port, and the gateway.
 
 export type {
   LlmAdapter,
@@ -14,3 +14,24 @@ export type {
 export { FakeAdapter, type FakeOutcome } from "./fake-adapter";
 export { redactSecrets, type RedactionResult } from "./redaction";
 export { SoclaasAdapter, type SoclaasAdapterOptions } from "./soclaas-adapter";
+export { AI_LIMITS, type AiEnvironment, type AiLimits } from "./limits";
+export { buildPrompt, type PromptSegment, type RedactionSummary } from "./prompt";
+export type { OutputValidation, OutputValidator } from "./output";
+export type {
+  AiFeature,
+  UsageCacheHit,
+  UsagePort,
+  UsageReservation,
+  UsageReservationResult,
+  UsageSettlement,
+} from "./usage-port";
+export {
+  LlmGateway,
+  type CacheHitInput,
+  type GatewayErrorCode,
+  type GatewayFailure,
+  type GatewayRequest,
+  type GatewayResult,
+  type GatewaySuccess,
+  type LlmGatewayOptions,
+} from "./gateway";
