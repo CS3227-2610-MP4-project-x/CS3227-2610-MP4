@@ -31,11 +31,15 @@ const fixtures = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("@/server/config", () => ({
   getServerConfig: () => ({
+    appEnvironment: "development",
     appOrigin: "https://synthetic-app.example",
     databaseUrl: "postgresql://synthetic:synthetic@localhost/synthetic?sslmode=require",
     databaseCaCert: "synthetic-test-ca",
     supabaseUrl: "https://synthetic.supabase.co",
     supabasePublishableKey: "synthetic-publishable-key",
+    githubAppClientId: "synthetic-app-client",
+    githubAppClientSecret: "synthetic-app-secret",
+    ai: { provider: "fake" },
   }),
 }));
 vi.mock("@/server/auth/supabase-auth", () => ({
