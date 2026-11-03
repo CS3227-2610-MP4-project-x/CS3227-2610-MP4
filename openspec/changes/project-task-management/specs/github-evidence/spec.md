@@ -9,6 +9,24 @@ Defines how a product manager links one GitHub repository to a project and how a
 ### Requirement: Product manager links one repository through a GitHub App
 The system SHALL let a project's product manager link one repository that is available to a GitHub App installation. The system SHALL verify the product manager's GitHub identity and access to the selected installation and repository before saving the link.
 
+The App installation entry point SHALL be provided by task 5.3 through a product-manager-only setup URL route. The repository authorization API SHALL complete the link after installation and repository selection.
+
+#### Scenario: Product manager starts App installation or configuration
+- **WHEN** the product manager sends `GET /api/v1/projects/{projectId}/github-repository/setup-url`
+- **THEN** the route returns HTTP 200 with `{ "setupUrl": "..." }` built from the configured GitHub App slug
+
+#### Scenario: Product manager starts repository authorization after installation
+- **WHEN** the product manager sends `POST /api/v1/projects/{projectId}/github-repository/authorization` with `installationId` as a positive decimal string plus `repositoryOwner` and `repositoryName`
+- **THEN** the route returns HTTP 200 with `{ "authorizationUrl": "..." }` and binds signed OAuth state to a ten-minute HttpOnly, SameSite=Lax cookie
+
+#### Scenario: GitHub App OAuth callback completes repository linking
+- **WHEN** GitHub returns `code` and session-bound `state` to `GET /api/v1/auth/github-app/callback`
+- **THEN** the callback consumes the state cookie, exchanges the code, rechecks the current PM role and identity, verifies the selected repository is available to that user and installation, saves the binding, and responds with HTTP 303 to `/projects/{projectId}` under configured `APP_ORIGIN`
+
+#### Scenario: PM authorization changes during OAuth
+- **WHEN** the PM's project role or verified GitHub identity changes before the callback completes
+- **THEN** the callback refuses the link, leaves the existing binding unchanged, and does not persist or return the OAuth user access token
+
 #### Scenario: Product manager links a repository
 - **WHEN** the project's product manager selects a repository available to a GitHub App installation
 - **THEN** the system verifies the separate GitHub App authorization matches the product manager's verified GitHub identity, confirms the repository is available to that installation, and links that repository to the project

@@ -68,6 +68,8 @@ The database SHALL store at most one check result per task for a given commit se
 ### Requirement: Stored records exclude secrets and AI content
 The database SHALL NOT store GitHub App private keys or GitHub user or installation access tokens. A project MAY store the GitHub App installation ID and the linked repository's stable ID, owner, and name. Usage records SHALL NOT contain prompt or response content.
 
+When the GitHub App binding migration retires legacy encrypted PAT fields, it SHALL clear any legacy repository owner/name and PAT ciphertext fields so affected projects become unlinked and can be relinked through the GitHub App.
+
 #### Scenario: Repository binding at rest
 - **WHEN** a project's repository is linked
 - **THEN** the database stores its installation and repository identifiers and display coordinates, but no access token or App private key
