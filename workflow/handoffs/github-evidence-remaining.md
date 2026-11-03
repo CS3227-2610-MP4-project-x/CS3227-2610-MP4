@@ -341,3 +341,36 @@
 | 2026-11-03 | orchestrator / github-evidence-final-outcome | Consolidated implementation, validation results, reviewer fixes, commit outcome, remaining runtime gaps, unchecked tasks, and no-push/PR status. |
 | 2026-11-03 | orchestrator / github-evidence-db-ci-repair-scope | Recorded four PostgreSQL CI root causes and disjoint migration/test ownership; no commit/push/PR. |
 | 2026-11-03 | orchestrator / github-evidence-db-ci-repair-result | Recorded four fixes for all nine pasted failures, reviewer outcome, root checks, and skipped DB suite; CI rerun remains required. |
+| 2026-11-03 | orchestrator / github-evidence-unit-ci-result | Recorded the two fixture fixes, focused 87/87 result, reviewer outcome, and remaining full-suite/hosted-CI verification. |
+
+## Unit-test CI failure follow-up `[ORCH]`
+
+- Summary: The attached unit-test run reported 39 failures (585 passed). The Vite `configLoader: 'native'` notice was informational. Five configuration tests failed because their shared synthetic environment omitted required GitHub App settings; 34 GitHub evidence route tests returned 500 because their mocked `ServerConfig` omitted the required `ai` property consumed by composition.
+- Analyst: Confirmed both causes against `src/server/config/index.ts`, `src/server/composition.ts`, and the named unit tests. No production-code or specification conflict was found.
+- Test-writer scope and result: Changed only `tests/unit/environment-configuration.test.ts` and `tests/unit/github-evidence-routes.test.ts`. Added synthetic GitHub App ID/slug/private-key values to the base environment fixture and a synthetic production-compatible SoC AI config to the route mock. Assertions and production code were not changed.
+- Reviewer: No findings. The fixtures satisfy the current config contract; no credentials, provider calls, or extra abstractions were introduced. Full suite and hosted CI remain unverified.
+- Checks: `npx vitest run tests/unit/environment-configuration.test.ts tests/unit/github-evidence-routes.test.ts` passed both files, 87/87, exit 0 in the permitted escalated run. The default restricted run passed 82/87; its five failures were `spawnSync git EPERM` in `.gitignore` checks, an execution restriction also recorded in the earlier session. `git diff --check` passed. The Vite notice remains informational.
+- Files changed: two unit-test fixture files, this handoff, and `logs/2026-11-03-github-evidence-remaining.md`. No dependencies added. No commit, push, or PR was made.
+- Next action: Human review and a hosted unit-test CI rerun. The focused result confirms the previously failing cases locally; the full unit suite was not run in this follow-up.
+
+### Session `analyst / github-evidence-unit-ci-diagnosis`
+
+- Role: Analyst; source-linked read-only diagnosis.
+- Work completed / findings: Identified the two stale fixture omissions from the attached run and mapped them to current required config fields. No files changed; no tests run. Resource metrics: not available.
+
+### Session `test-writer / github-evidence-unit-ci-fixtures`
+
+- Role: Test-writer; owned only the two unit-test paths above.
+- Work completed / findings: Updated synthetic config fixtures so tests reach the intended config, authorization, and evidence assertions. Resource metrics: not available.
+- Checks: Default run 82/87 due five subprocess EPERM restrictions; permitted escalated focused run 87/87, exit 0.
+
+### Session `reviewer / github-evidence-unit-ci-review`
+
+- Role: Reviewer; read-only review of diff, configuration/composition, adapters, and affected routes.
+- Findings: None. Acceptance met for fixture completeness and synthetic test setup; full suite and hosted CI unverified. `git diff --check` passed. Resource metrics: not available.
+
+### Session `orchestrator / github-evidence-unit-ci-result`
+
+- Role: Orchestrator; confirmed scoped paths, consolidated worker/reviewer evidence, and updated handoff.
+- Work completed / findings: Kept the repair test-only and uncommitted. Resource metrics: not available.
+- Checks: Focused affected tests 87/87 in the permitted run; `git diff --check` passed. No full-suite or hosted CI run.

@@ -11,6 +11,7 @@ const boundary = vi.hoisted(() => ({
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/server/config", () => ({ getServerConfig: () => ({
+  ai: { provider: "soclaas", apiKey: "synthetic-soclaas-key", model: "synthetic-model:1b" },
   appOrigin: "https://synthetic-app.example", appEnvironment: "production",
   databaseUrl: "postgresql://synthetic:synthetic@localhost/synthetic?sslmode=require",
   databaseCaCert: "synthetic-ca", supabaseUrl: "https://synthetic.supabase.co",

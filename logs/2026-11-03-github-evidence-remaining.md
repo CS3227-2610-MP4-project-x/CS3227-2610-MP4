@@ -44,3 +44,24 @@ The human owner should review the three commits, OpenSpec decisions, product-man
 - Independent reviewer found no remaining issues and mapped all nine pasted failures to those fixes.
 - Checks after the fix: lint, type-check, strict OpenSpec validation, and `git diff --check` passed. The focused integration suite was discovered but all 8 tests skipped because `TEST_DATABASE_URL` is unset; `psql` is unavailable. Therefore the repaired integration suite still needs confirmation against disposable PostgreSQL 17 or by a fresh CI run.
 - No commit, push, or PR was made for this follow-up. Existing Section 5 commits were preserved; the migration and test corrections remain uncommitted for review.
+
+## Follow-up: unit-test CI failure
+
+### Human verification
+
+Pending human review. This entry records the requested CI repair and observed checks; it is not marked human-verified.
+
+### Request and diagnosis
+
+- The user supplied a unit-test CI log and requested the failure be resolved.
+- The leading Vite `configLoader: 'native'` notice is a warning. The attached run reports 39 failed and 585 passed.
+- Five failures in `tests/unit/environment-configuration.test.ts` occurred because its shared synthetic environment did not include the required GitHub App ID, slug, and private key.
+- Thirty-four failures in `tests/unit/github-evidence-routes.test.ts` occurred because the mocked server config omitted `ai`, which composition now reads to initialize the configured adapter.
+
+### Work and verification
+
+- Updated only those two test fixtures with synthetic values. Production code, assertions, and specifications were unchanged; no dependencies were added.
+- Focused command: `npx vitest run tests/unit/environment-configuration.test.ts tests/unit/github-evidence-routes.test.ts` — both files passed, 87/87, exit 0 in the permitted run. The Vite warning remained informational.
+- The default restricted run passed 82/87; five `.gitignore` checks could not spawn Git (`spawnSync git EPERM`). The full suite and a hosted CI rerun were not performed.
+- Independent reviewer found no issues; reviewer also passed `git diff --check`. Root confirmed `git diff --check` passed.
+- No commit, push, or PR was made. Changes remain uncommitted on `feat/github-evidence-remaining` for human review.
