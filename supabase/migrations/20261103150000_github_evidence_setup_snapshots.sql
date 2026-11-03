@@ -41,6 +41,7 @@ CREATE INDEX github_repository_snapshot_scope_idx
   ON app.github_repository_snapshots (project_id, person_id, expires_at);
 
 CREATE TABLE app.github_repository_snapshot_repositories (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   snapshot_id uuid NOT NULL REFERENCES app.github_repository_snapshots (id) ON DELETE CASCADE,
   repository_id bigint NOT NULL CHECK (repository_id > 0),
   owner text NOT NULL CHECK (owner <> ''),
@@ -48,10 +49,33 @@ CREATE TABLE app.github_repository_snapshot_repositories (
   is_private boolean NOT NULL,
   default_branch text,
   position integer NOT NULL CHECK (position >= 0),
-  PRIMARY KEY (snapshot_id, repository_id),
+  UNIQUE (snapshot_id, repository_id),
   UNIQUE (snapshot_id, position)
 );
 
-GRANT SELECT, INSERT, UPDATE ON app.github_repository_setup_attempts TO app_runtime;
-GRANT SELECT, INSERT ON app.github_repository_snapshots TO app_runtime;
-GRANT SELECT, INSERT ON app.github_repository_snapshot_repositories TO app_runtime;
+-- Match the application-table privilege boundary from the base schema migration.
+-- Revoke object-level grants explicitly so permissive default privileges cannot expose
+-- these newly-created tables through Supabase roles.
+REVOKE ALL ON TABLE
+  app.github_repository_setup_attempts,
+  app.github_repository_snapshots,
+  app.github_repository_snapshot_repositories
+FROM PUBLIC, anon, authenticated;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'service_role') THEN
+    REVOKE ALL ON TABLE
+      app.github_repository_setup_attempts,
+      app.github_repository_snapshots,
+      app.github_repository_snapshot_repositories
+    FROM service_role;
+  END IF;
+END
+$$;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
+  app.github_repository_setup_attempts,
+  app.github_repository_snapshots,
+  app.github_repository_snapshot_repositories
+TO app_runtime;

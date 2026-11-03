@@ -298,4 +298,46 @@
 | 2026-11-03 | orchestrator / github-evidence-final-approval-and-test-assignment | Recorded final route approval, confirmed OpenSpec pending language was removed, and noted active test-writer assignment. |
 | 2026-11-03 | orchestrator / github-evidence-minimal-task-host | Added the human-approved minimal task-detail host page path for the picker, excluding full task detail, board behavior, and lifecycle owned by Section 4.4. |
 | 2026-11-03 | commit-pr / github-evidence-section5-commits | Created three scoped commits; diff-check passed; PR draft prepared; no push or PR created. |
+
+## Database integration CI repair follow-up `[ORCH]`
+
+- Summary: Repair the PostgreSQL integration suite failures caused by the new GitHub setup/snapshot migration and its test fixture. Four fixes addressed all nine pasted failures: (1) explicitly revoke Data API role privileges on each new table; (2) align `app_runtime` grants with active decision D-J; (3) add the required single-column UUID `id` primary key to `snapshot_repositories`, retaining the snapshot/repository uniqueness constraint; and (4) pass the project ID from `createProject(...).id` in the attempt fixture.
+- Source of findings: Analyst inspected the active requirements and exact migration/test sources. Align repairs with active D-J and D-D. Do not edit the shipped migration.
+- Implementer ownership and result: Only `supabase/migrations/20261103150000_github_evidence_setup_snapshots.sql`. Added per-table revokes for Data API roles, corrected `app_runtime` grants to D-J, and added the required UUID single-column primary key on `snapshot_repositories` while preserving uniqueness. No other migration file was changed.
+- Test-writer ownership and result: Only `tests/integration/db/github-repository-binding-migration.test.ts`. Corrected the attempt fixture to pass `createProject(...).id` and aligned integrity/grant assertions with the approved schema. No other test file was changed.
+- Reviewer result: No issues found in the repair.
+- Checks and results: Root reports `npm run lint`, `npx tsc --noEmit`, strict OpenSpec validation, and `git diff --check` passed. The focused migration integration suite discovered eight tests and skipped all eight because `TEST_DATABASE_URL` was unset; `psql` is unavailable in the environment. A current CI rerun remains required to confirm the fixes against PostgreSQL.
+- Dependencies and sequence: The implementer and test-writer scopes were disjoint. The migration/test updates are present in the working tree; focused PostgreSQL runtime verification remains pending CI.
+- Commit/push/PR: No commit was created in this follow-up. Preserve the prior four commits as existing branch history; no push or PR was created.
+
+### Session `analyst / github-evidence-db-ci-root-causes`
+
+- Role: Analyst; read-only source/spec/test inspection.
+- Work completed / findings: Identified the four database integration failure causes listed above and the exact source files; no files changed.
+- Files changed: none.
+- Checks run and results: Source inspection only; no tests run.
+- Resource usage: not available.
+
+### Session `orchestrator / github-evidence-db-ci-repair-scope`
+
+- Role: Orchestrator; recorded two non-overlapping worker scopes and database verification dependency.
+- Files changed: `workflow/handoffs/github-evidence-remaining.md` only.
+- Checks run and results: No tests run.
+- Resource usage: not available.
+- Next action at assignment time: Assign implementer to the new migration only and test-writer to the named integration test only. This assignment was completed; see the repair-result session below.
+
+### Session `orchestrator / github-evidence-db-ci-repair-result`
+
+- Role: Orchestrator; consolidated implementation, review, and verification results for the database CI repair.
+- Files changed: `workflow/handoffs/github-evidence-remaining.md` only.
+- Checks run and results: Recorded root-reported lint, typecheck, strict OpenSpec, and diff-check passes; focused migration integration suite discovered 8 and skipped 8 because `TEST_DATABASE_URL` was unset and `psql` unavailable. No local database tests were executed by this session.
+- Resource usage: not available.
+- Gaps / blockers: Current CI rerun against PostgreSQL remains required. No commit was created in this follow-up.
+
+## Change log addendum `[ORCH]`
+
+| Date/time (SGT) | Role/session | Update |
+|---|---|---|
 | 2026-11-03 | orchestrator / github-evidence-final-outcome | Consolidated implementation, validation results, reviewer fixes, commit outcome, remaining runtime gaps, unchecked tasks, and no-push/PR status. |
+| 2026-11-03 | orchestrator / github-evidence-db-ci-repair-scope | Recorded four PostgreSQL CI root causes and disjoint migration/test ownership; no commit/push/PR. |
+| 2026-11-03 | orchestrator / github-evidence-db-ci-repair-result | Recorded four fixes for all nine pasted failures, reviewer outcome, root checks, and skipped DB suite; CI rerun remains required. |

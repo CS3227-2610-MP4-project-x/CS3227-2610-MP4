@@ -35,3 +35,12 @@ Pending review by the human owner. This summary records the approved requirement
 ## Review needed
 
 The human owner should review the three commits, OpenSpec decisions, product-manager mockup implementation, and known verification gaps before deciding whether to provide a disposable PostgreSQL test database and browser/runtime validation environment. A PR title/description draft is available in the commit-agent handoff; no push or pull request was authorized or performed.
+
+## Follow-up: db-integration CI failure
+
+- The user supplied a CI log and requested the database integration failure be fixed. The leading Vite `configLoader: 'native'` text is a warning; the log reports nine actual database-test failures.
+- Read-only analyst diagnosis identified four causes: the setup-test fixture passed a `{ id, key }` project object instead of its UUID; the new snapshot-repository table lacked the schema-wide UUID `id` primary key; its app_runtime grants and its missing default-role revocations contradicted the active D-D/D-J decisions and CI access tests.
+- The migration and integration test were updated in the working tree. The snapshot repository keeps the `(snapshot_id, repository_id)` and `(snapshot_id, position)` uniqueness constraints while adding its UUID primary key. The migration revokes new-table privileges from PUBLIC, anon, authenticated, and optional `service_role`, then grants app_runtime CRUD as D-J requires. Test fixtures now pass project UUIDs and assert the correct runtime and Data API access.
+- Independent reviewer found no remaining issues and mapped all nine pasted failures to those fixes.
+- Checks after the fix: lint, type-check, strict OpenSpec validation, and `git diff --check` passed. The focused integration suite was discovered but all 8 tests skipped because `TEST_DATABASE_URL` is unset; `psql` is unavailable. Therefore the repaired integration suite still needs confirmation against disposable PostgreSQL 17 or by a fresh CI run.
+- No commit, push, or PR was made for this follow-up. Existing Section 5 commits were preserved; the migration and test corrections remain uncommitted for review.

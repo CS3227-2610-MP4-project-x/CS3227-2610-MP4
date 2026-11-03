@@ -84,7 +84,7 @@ dbDescribe("GitHub setup attempt and repository snapshot integrity (task 5.3)", 
   const db = useMigratedDatabase();
   async function attempt(overrides: Record<string, unknown> = {}) {
     return insertRow(db().admin, "github_repository_setup_attempts", {
-      project_id: await createProject(db().admin), person_id: await createPerson(db().admin),
+      project_id: (await createProject(db().admin)).id, person_id: await createPerson(db().admin),
       expected_github_user_id: 424242, state_hash: randomBytes(32),
       status: "setup_pending", created_at: "2026-11-03T00:00:00Z", expires_at: "2026-11-03T00:10:00Z", ...overrides,
     });
@@ -133,13 +133,13 @@ dbDescribe("GitHub setup attempt and repository snapshot integrity (task 5.3)", 
   it("grants app_runtime row access without table administration privileges", async () => {
     const runtime = await db().connectAsRuntime();
     for (const table of ["github_repository_setup_attempts", "github_repository_snapshots", "github_repository_snapshot_repositories"]) {
-      for (const privilege of table === "github_repository_setup_attempts" ? ["SELECT", "INSERT", "UPDATE"] : ["SELECT", "INSERT"]) {
+      for (const privilege of ["SELECT", "INSERT", "UPDATE", "DELETE"]) {
         const { rows } = await runtime.query<{ allowed: boolean }>(
           "SELECT has_table_privilege(current_user, $1, $2) AS allowed", [`app.${table}`, privilege],
         );
         expect(rows[0].allowed, `app_runtime ${privilege} on app.${table}`).toBe(true);
       }
-      for (const privilege of table === "github_repository_setup_attempts" ? ["DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"] : ["UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"]) {
+      for (const privilege of ["TRUNCATE", "REFERENCES", "TRIGGER"]) {
         const { rows } = await runtime.query<{ allowed: boolean }>(
           "SELECT has_table_privilege(current_user, $1, $2) AS allowed", [`app.${table}`, privilege],
         );
@@ -151,7 +151,11 @@ dbDescribe("GitHub setup attempt and repository snapshot integrity (task 5.3)", 
   it("denies Supabase Data API roles access to setup and snapshot data", async () => {
     for (const role of ["anon", "authenticated", "service_role"]) {
       await db().admin.query(`SET ROLE ${role}`);
-      try { await expectPrivilegeRejection(db().admin.query("SELECT * FROM app.github_repository_setup_attempts")); }
+      try {
+        for (const table of ["github_repository_setup_attempts", "github_repository_snapshots", "github_repository_snapshot_repositories"]) {
+          await expectPrivilegeRejection(db().admin.query(`SELECT * FROM app.${table}`));
+        }
+      }
       finally { await db().admin.query("RESET ROLE"); }
     }
   });
