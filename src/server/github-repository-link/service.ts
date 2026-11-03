@@ -85,4 +85,3 @@ export class GitHubRepositoryLinkService {
     catch { return linkFailure(500); }
   }
 }
-
