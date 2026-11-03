@@ -30,8 +30,8 @@ Pending review by the human owner. This summary records the approved requirement
 - Frontend QA was source-only. The workspace had no running app/browser surface, and private UI flows, responsive behavior, pagination interaction, and accessibility were not exercised in a rendered browser.
 - Tasks 5.1 and 5.3 remain unchecked in `tasks.md` pending database and rendered-flow verification; task 5.2 was already complete. Section 4.4 remains out of scope and unchecked.
 - The generated PM mockup is stored outside the repository at `/home/klzy/.codex/generated_images/01a1a000-db97-7983-b4fb-d16538b162b7/exec-8d8ae46b-1c78-4454-8dde-b3ea13c6f679.png`.
-- No dependencies were added. No commits, pushes, pull requests, or deployments were made.
+- No dependencies were added. After the user explicitly authorized scoped commits on `feat/github-evidence-remaining`, the commit agent created three local commits: `3a017e0` (approved OpenSpec/handoff/log), `e1ce9bd` (GitHub setup and evidence API implementation/tests), and `4f03e8a` (PM repository settings and developer commit picker UI). The worktree is clean and `git diff --check dev...HEAD` passed. No push, pull request, or deployment was made.
 
 ## Review needed
 
-The human owner should review the current branch delta, OpenSpec decisions, product-manager mockup implementation, and known verification gaps before deciding whether to provide a disposable PostgreSQL test database and browser/runtime validation environment. No commit, push, pull request, or deployment was authorized.
+The human owner should review the three commits, OpenSpec decisions, product-manager mockup implementation, and known verification gaps before deciding whether to provide a disposable PostgreSQL test database and browser/runtime validation environment. A PR title/description draft is available in the commit-agent handoff; no push or pull request was authorized or performed.

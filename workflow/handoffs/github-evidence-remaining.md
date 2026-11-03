@@ -6,16 +6,16 @@
 - Summary: Coordinate the remaining Section 5 GitHub evidence work on `feat/github-evidence-remaining`. Scope is the outstanding 5.1 verification/integration and task 5.3 setup, developer evidence routes, and UI. Task 5.2 is already complete.
 - Human owner (Developer A / Developer B): Developer A (Lim-ZY), GitHub evidence ownership.
 - Requirement IDs: OpenSpec Section 5 tasks 5.1 and 5.3; task 5.2 is complete. No formal requirement IDs are recorded.
-- Status: Section 5.1/5.3 implementation and test-writing are complete in the working tree, and reviewer follow-up reports no remaining P0/P1/P2 findings. Tasks 5.1 and 5.3 remain unchecked because PostgreSQL/runtime/browser/build evidence is incomplete. No commit, push, or PR was made.
-- Next human action: Developer A completes the missing disposable-PostgreSQL, live GitHub setup/link, rendered browser/accessibility, and successful build verification; then records evidence and updates task checkboxes as appropriate.
+- Status: Section 5.1/5.3 implementation and test-writing are committed in three scoped commits; reviewer follow-up reports no remaining P0/P1/P2 findings. Tasks 5.1 and 5.3 remain unchecked because PostgreSQL/runtime/browser/build evidence is incomplete. No push or PR was made. The commit agent reported a clean worktree immediately after committing; this later handoff/log update leaves local modifications.
+- Next human action: Developer A completes the missing disposable-PostgreSQL, live GitHub setup/link, rendered browser/accessibility, and successful build verification; then records evidence and updates task checkboxes as appropriate. Push and PR creation remain separate actions requiring explicit authorization.
 
 ## Source and scope `[ORCH]`
 
 - Repository / branch / worktree: `CS3227-2610-MP4` / `feat/github-evidence-remaining` / shared worktree.
 - Source revision: `06c416d4fd77dd8ef65f3e9dc1c985898d48b179` (`dev` tip when this handoff was written).
-- Permitted paths and actions: This handoff is the only orchestrator write in this session. Test-writer and implementer assignments are complete within the disjoint paths listed below. OpenSpec requirements are approved. No commit, push, PR, or deployment is authorized.
-- Prohibited paths and actions: Orchestrator must not edit product code, tests, OpenSpec requirements, or logs. Analyst must not edit `src/`, `tests/`, `logs/`, environment files, or migrations. No implementation, commit, push, PR, or deploy is authorized by this handoff.
-- Dependencies and parallel work: Requirements approval, implementation, test-writing, and reviewer follow-up are complete. Remaining work is release evidence: PostgreSQL tests require a disposable database; browser/accessibility and live GitHub setup require an appropriate configured runtime. No commit/PR agent is assigned.
+- Permitted paths and actions: This handoff is the only orchestrator write in this session. Test-writer and implementer assignments are complete within the disjoint paths listed below. OpenSpec requirements are approved. Scoped commits have been authorized and created; no push, PR, or deployment is authorized.
+- Prohibited paths and actions: Orchestrator must not edit product code, tests, OpenSpec requirements, or logs. No additional commit, history rewrite, push, PR, or deployment is authorized by this handoff.
+- Dependencies and parallel work: Requirements approval, implementation, test-writing, review, and scoped commits are complete. Remaining work is release evidence: PostgreSQL tests require a disposable database; browser/accessibility and live GitHub setup require an appropriate configured runtime. No push/PR agent is assigned.
 
 ## Context references `[ALL, when relevant]`
 
@@ -38,7 +38,7 @@
 
 ## Decisions and open questions `[ORCH]`
 
-- Current state: On `feat/github-evidence-remaining`, the worktree now contains the analyst's approved OpenSpec updates, Section 5 implementation and tests, required interaction log, and this handoff. The 5.1 setup-attempt/snapshot/link flow, 5.3 setup and evidence routes, GitHub App config/composition, commit picker, PM repository settings, and minimal task host page are implemented in the working tree; 5.2 adapter remains present. Tasks 5.1 and 5.3 remain unchecked pending runtime/release evidence. Migration execution, live GitHub setup, and rendered browser/accessibility verification are not complete.
+- Current state: On `feat/github-evidence-remaining`, scoped commits `3a017e0`, `e1ce9bd`, and `4f03e8a` contain the approved Section 5 changes. The commit agent reported a clean worktree after commit creation and `git diff --check dev...HEAD` passed. Since then, this handoff and `logs/2026-11-03-github-evidence-remaining.md` have local post-commit updates. The 5.1 setup-attempt/snapshot/link flow, 5.3 setup/evidence routes, GitHub App config/composition, commit picker, PM repository settings, and minimal task host page are implemented. Tasks 5.1 and 5.3 remain unchecked pending runtime/release evidence. Migration execution, live GitHub setup, and rendered browser/accessibility verification are not complete.
 - Human-approved decisions: Use an in-app repository list after installation. The flow uses a PM/project-bound, one-use setup attempt and repository snapshot, each with a 10-minute TTL; separate GitHub OAuth verifies the user identity and installation before repositories are listed; OAuth tokens are never persisted; failures preserve any existing project binding; and current App access is rechecked before final linking. Attempt, snapshot, and snapshot-repository data use normalized persistence. Developer A owns all Section 5 migrations by explicit human-approved exception to the general Developer B migration ownership in `AGENTS.md`. Task-scoped branch/commit/attachment API contracts are approved. Commit listing uses `page` default 1, `perPage` default 50 bounded 1–100, and `nextPage` as the next integer or `null`. Duplicate SHAs in an attachment request are deduplicated in first-seen order; already-attached SHAs succeed idempotently and appear once. Approved setup contracts as drafted: `GET /api/v1/auth/github-app/setup-callback?installation_id=…&state=…`; `GET /api/v1/projects/{projectId}/github-repository/snapshots/{snapshotId}` returning `{ "repositories": [{ "repositoryId": 123, "owner": "…", "name": "…", "private": true, "defaultBranch": "…" }] }`; and `POST /api/v1/projects/{projectId}/github-repository` with `{ "snapshotId": "…", "repositoryId": 123 }`. The developer commit picker and PM Project Settings mockups are visual references, not additional behavior requirements.
 - Assumptions (identify unapproved assumptions): None.
 - Open questions / conflicts: No human product or architecture decision remains. Exact column names, indexes, and check constraints are implementation details consistent with the approved normalized model, not blockers. Preserve approved decisions above. Fetch all provider pages for repository snapshots and retain provider ordering for repository, branch, and commit results; do not invent additional sorting or arbitrary limits.
@@ -61,6 +61,57 @@
 - Remaining verification: Eight PostgreSQL migration/integrity cases are skipped because `TEST_DATABASE_URL` is unset; no live GitHub setup/link was run; no rendered browser, responsive, or accessibility QA is recorded. The production build attempt did not complete because of sandbox/toolchain environment failures. These gaps keep tasks 5.1 and 5.3 unchecked.
 
 ## Worker session reports
+
+### Session `commit-pr / github-evidence-section5-commits`
+
+#### Shared fields `[ALL]`
+
+- Provider: `codex`
+- Provider session ID: not available
+- Work ID: `github-evidence-remaining`
+- Agent: commit/PR
+- Phase: scoped local commits and PR draft
+- Platform and model (if surfaced): not available
+- Role: commit/PR
+- Human owner and assigned task scope: Developer A; inventory and commit the authorized Section 5 changes on `feat/github-evidence-remaining`, with no push or PR creation.
+- Source revision: `06c416d4fd77dd8ef65f3e9dc1c985898d48b179` (`dev` base).
+- Resource usage (provider-reported): tokens in / out / total: not available; cache read / write: not available; cost: not available; tool calls or other surfaced metrics: not available.
+- Unavailable resource metrics: exact provider session ID and provider resource metrics.
+- Work completed / findings: Created three scoped commits: `3a017e0` (`docs(github-evidence): record approved Section 5 contracts`), `e1ce9bd` (`feat(github-evidence): add repository setup and commit APIs`), and `4f03e8a` (`feat(github-ui): add repository settings and commit picker`). The commit agent reported the worktree clean after these commits and `git diff --check dev...HEAD` passed. No push or PR was made. PR title and description were drafted below.
+- Files changed: 36 files across the three commits, grouped as OpenSpec/workflow records, repository setup and task evidence APIs/services/config/migration/tests, and PM settings/developer picker/minimal task host UI.
+- Checks run and exact results: `git diff --check dev...HEAD` passed. Commit agent's inventory reported a clean worktree after commit creation.
+- Gaps / blockers: No push or PR creation authorized. PostgreSQL/runtime/browser/build evidence remains outstanding.
+
+#### Commit/PR fields `[COMMIT-PR]`
+
+- Base branch and comparison used: `dev` at `06c416d4fd77dd8ef65f3e9dc1c985898d48b179`; comparison `dev...HEAD`.
+- Complete branch-change inventory: 36 files in the three commit groups described above.
+- Existing commits and proposed scoped commit groups: `3a017e0` documentation/OpenSpec/workflow; `e1ce9bd` repository setup and commit APIs; `4f03e8a` PM settings, developer picker, and minimal task host.
+- Commit hashes, or why commits were not authorized/safe: `3a017e0`, `e1ce9bd`, `4f03e8a`; commits were explicitly authorized.
+- Draft PR title: Complete Section 5 GitHub evidence flows
+- Draft PR description:
+
+  ## Summary
+
+  - Add the approved GitHub App setup flow with project- and PM-bound single-use state, installation verification, short-lived repository snapshots, and a final App-access check before linking.
+  - Add task-scoped branch and commit listing with pagination, plus idempotent commit attachment with authorship verification.
+  - Add Project Settings repository setup UI and a developer commit picker, mounted on a minimal task-detail host.
+  - Record approved contracts, scope limits, and verification gaps in OpenSpec and the workflow handoff.
+
+  ## Validation
+
+  - Passed `npm run lint`, `npm run typecheck`, `git diff --check`, and strict OpenSpec validation.
+  - Focused GitHub evidence/auth route tests: 96 passed.
+  - Full unit suite: 500 passed, 5 failed. The failures are existing Git-ignore checks blocked by `spawnSync git EPERM` in the sandbox.
+  - PostgreSQL integration tests: 8 skipped because `TEST_DATABASE_URL` is unavailable.
+  - The production build did not complete in the sandbox due to process-spawn/toolchain errors.
+
+  ## Follow-up
+
+  Tasks 5.1 and 5.3 remain unchecked pending PostgreSQL migration/integrity verification, live GitHub setup/link verification, rendered browser and accessibility checks, and a successful build. Section 4.4 task-management work remains outside this change.
+- Push / PR creation status: Not pushed; PR not created. Draft only.
+
+### Session `orchestrator / github-evidence-final-outcome`
 
 ### Session `orchestrator / github-evidence-final-approval-and-test-assignment`
 
