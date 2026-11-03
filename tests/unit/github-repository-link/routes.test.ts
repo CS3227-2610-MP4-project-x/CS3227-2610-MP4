@@ -30,6 +30,7 @@ vi.mock("@/server/config", () => ({ getServerConfig: () => ({
   supabasePublishableKey: "synthetic-publishable-key",
   githubAppClientId: "synthetic-app-client", githubAppClientSecret: "synthetic-app-secret",
   githubAppId: "123", githubAppSlug: "synthetic-app", githubAppPrivateKey: testPrivateKey,
+  ai: { provider: "soclaas", apiKey: "synthetic-soclaas-key", model: "synthetic-model:1b" },
 }) }));
 vi.mock("@/server/auth/supabase-auth", () => ({
   createRequestSupabaseClient: async () => ({ auth: { getUser: boundary.getUser } }),

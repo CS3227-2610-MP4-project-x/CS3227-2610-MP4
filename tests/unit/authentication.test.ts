@@ -119,6 +119,7 @@ beforeEach(() => {
   vi.stubEnv("GITHUB_APP_CLIENT_SECRET", "synthetic-github-app-client-secret");
   vi.stubEnv("APP_ORIGIN", appOrigin);
   vi.stubEnv("APP_ENV", "development");
+  vi.stubEnv("AI_PROVIDER", "fake");
   vi.stubEnv("DATABASE_URL", "postgresql://synthetic:synthetic@localhost:5432/synthetic?sslmode=verify-full");
   vi.stubEnv("DATABASE_CA_CERT", "-----BEGIN CERTIFICATE-----\nSYNTHETIC\n-----END CERTIFICATE-----");
 

@@ -1,7 +1,9 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("server-only", () => ({}));
 
 // Task 2.3 (environment-configuration). Requirements are referenced by name from
 // openspec/changes/project-task-management/specs/environment-configuration/spec.md
@@ -9,6 +11,10 @@ import { describe, expect, it } from "vitest";
 // exist for these, so none are used.
 //
 // These tests read repository files only. They make no network or database calls.
+//
+// Task 6.3 (llm-gateway-core) adds the G10 AI configuration cases (AC22 in
+// workflow/handoffs/llm-gateway-core.md; design.md G10, E3, E5, E6). They call
+// getServerConfig with synthetic values stubbed into process.env.
 
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 const envExamplePath = fileURLToPath(new URL("../../.env.example", import.meta.url));
@@ -319,5 +325,185 @@ describe(".gitignore keeps real environment files out of the repository", () => 
 
   it("does not ignore .env.example", () => {
     expect(isIgnoredByGit(".env.example")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 6.3: AI configuration (AC22, G10, E3, E5, E6)
+// ---------------------------------------------------------------------------
+
+const SYNTHETIC_SOCLAAS_KEY = "synthetic-soclaas-key-value-for-tests";
+const SYNTHETIC_MODEL = "synthetic-model:1b";
+
+function stubBaseEnvironment(appEnvironment: "development" | "production"): void {
+  vi.stubEnv("APP_ENV", appEnvironment);
+  vi.stubEnv("APP_ORIGIN", appEnvironment === "production" ? "https://synthetic-app.example" : "http://localhost:3000");
+  vi.stubEnv("SUPABASE_URL", "https://synthetic.supabase.co");
+  vi.stubEnv("SUPABASE_PUBLISHABLE_KEY", "sb_publishable_synthetic_test_key");
+  vi.stubEnv("DATABASE_URL", "postgresql://synthetic:synthetic@localhost:5432/synthetic?sslmode=verify-full");
+  vi.stubEnv("DATABASE_CA_CERT", "-----BEGIN CERTIFICATE-----\nSYNTHETIC\n-----END CERTIFICATE-----");
+  vi.stubEnv("GITHUB_APP_CLIENT_ID", "synthetic-app-client");
+  vi.stubEnv("GITHUB_APP_CLIENT_SECRET", "synthetic-app-secret");
+}
+
+async function loadGetServerConfig() {
+  const configModule = await import("../../src/server/config");
+  return configModule.getServerConfig;
+}
+
+function thrownMessage(action: () => unknown): string {
+  try {
+    action();
+  } catch (error) {
+    return (error as Error).message;
+  }
+  throw new Error("expected getServerConfig to throw");
+}
+
+describe("getServerConfig AI configuration (AC22, G10)", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    stubBaseEnvironment("development");
+    vi.stubEnv("SOCLAAS_API_KEY", undefined);
+    vi.stubEnv("SOCLAAS_MODEL", undefined);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("requires AI_PROVIDER, with no implicit default (E3)", async () => {
+    vi.stubEnv("AI_PROVIDER", undefined);
+    const getServerConfig = await loadGetServerConfig();
+    expect(() => getServerConfig()).toThrow("AI_PROVIDER");
+  });
+
+  it("rejects a blank AI_PROVIDER", async () => {
+    vi.stubEnv("AI_PROVIDER", "  ");
+    const getServerConfig = await loadGetServerConfig();
+    expect(() => getServerConfig()).toThrow("AI_PROVIDER");
+  });
+
+  it.each(["openai", "FAKE", "soc", "synthetic-provider"])(
+    "rejects AI_PROVIDER=%s and does not echo the value",
+    async (value) => {
+      vi.stubEnv("AI_PROVIDER", value);
+      const getServerConfig = await loadGetServerConfig();
+      const message = thrownMessage(() => getServerConfig());
+      expect(message).toContain("AI_PROVIDER");
+      expect(message).not.toContain(`: ${value}`);
+      expect(message).not.toContain(`=${value}`);
+      expect(message).not.toContain(`"${value}"`);
+    },
+  );
+
+  it("selects the fake provider without SoC LLM settings", async () => {
+    vi.stubEnv("AI_PROVIDER", "fake");
+    const getServerConfig = await loadGetServerConfig();
+    expect(getServerConfig().ai).toEqual({ provider: "fake" });
+  });
+
+  it("does not read SOCLAAS_API_KEY or SOCLAAS_MODEL when the provider is fake", async () => {
+    vi.stubEnv("AI_PROVIDER", "fake");
+    // Values that would be invalid for soclaas: they must be ignored, not validated.
+    vi.stubEnv("SOCLAAS_API_KEY", "");
+    vi.stubEnv("SOCLAAS_MODEL", "default");
+    const getServerConfig = await loadGetServerConfig();
+
+    const read = new Set<string>();
+    const original = process.env;
+    process.env = new Proxy(original, {
+      get(target, property, receiver) {
+        if (typeof property === "string") {
+          read.add(property);
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    let config: ReturnType<typeof getServerConfig>;
+    try {
+      config = getServerConfig();
+    } finally {
+      process.env = original;
+    }
+
+    expect(config.ai).toEqual({ provider: "fake" });
+    expect(read.has("AI_PROVIDER")).toBe(true);
+    expect(read.has("SOCLAAS_API_KEY")).toBe(false);
+    expect(read.has("SOCLAAS_MODEL")).toBe(false);
+  });
+
+  it("selects the soclaas provider with its key and pinned model", async () => {
+    vi.stubEnv("AI_PROVIDER", "soclaas");
+    vi.stubEnv("SOCLAAS_API_KEY", SYNTHETIC_SOCLAAS_KEY);
+    vi.stubEnv("SOCLAAS_MODEL", SYNTHETIC_MODEL);
+    const getServerConfig = await loadGetServerConfig();
+    expect(getServerConfig().ai).toEqual({ provider: "soclaas", apiKey: SYNTHETIC_SOCLAAS_KEY, model: SYNTHETIC_MODEL });
+  });
+
+  it.each([
+    ["missing", undefined],
+    ["empty", ""],
+    ["blank", "   "],
+  ])("rejects a %s SOCLAAS_API_KEY for soclaas", async (_label, value) => {
+    vi.stubEnv("AI_PROVIDER", "soclaas");
+    vi.stubEnv("SOCLAAS_API_KEY", value);
+    vi.stubEnv("SOCLAAS_MODEL", SYNTHETIC_MODEL);
+    const getServerConfig = await loadGetServerConfig();
+    expect(() => getServerConfig()).toThrow("SOCLAAS_API_KEY");
+  });
+
+  it.each([
+    ["missing", undefined],
+    ["empty", ""],
+    ["the default alias", "default"],
+  ])("rejects a %s SOCLAAS_MODEL for soclaas", async (_label, value) => {
+    vi.stubEnv("AI_PROVIDER", "soclaas");
+    vi.stubEnv("SOCLAAS_API_KEY", SYNTHETIC_SOCLAAS_KEY);
+    vi.stubEnv("SOCLAAS_MODEL", value);
+    const getServerConfig = await loadGetServerConfig();
+    const message = thrownMessage(() => getServerConfig());
+    expect(message).toContain("SOCLAAS_MODEL");
+    expect(message).not.toContain(SYNTHETIC_SOCLAAS_KEY);
+  });
+
+  it("refuses the fake provider in production (E3, E6)", async () => {
+    stubBaseEnvironment("production");
+    vi.stubEnv("AI_PROVIDER", "fake");
+    const getServerConfig = await loadGetServerConfig();
+    // G10 does not record which variable the error names; either is a safe name.
+    expect(() => getServerConfig()).toThrow(/AI_PROVIDER|APP_ENV/);
+  });
+
+  it("accepts the soclaas provider in production", async () => {
+    stubBaseEnvironment("production");
+    vi.stubEnv("AI_PROVIDER", "soclaas");
+    vi.stubEnv("SOCLAAS_API_KEY", SYNTHETIC_SOCLAAS_KEY);
+    vi.stubEnv("SOCLAAS_MODEL", SYNTHETIC_MODEL);
+    const getServerConfig = await loadGetServerConfig();
+    const config = getServerConfig();
+    expect(config.appEnvironment).toBe("production");
+    expect(config.ai).toEqual({ provider: "soclaas", apiKey: SYNTHETIC_SOCLAAS_KEY, model: SYNTHETIC_MODEL });
+  });
+
+  it("returns a frozen configuration", async () => {
+    vi.stubEnv("AI_PROVIDER", "fake");
+    const getServerConfig = await loadGetServerConfig();
+    expect(Object.isFrozen(getServerConfig())).toBe(true);
+  });
+});
+
+describe("every variable the configuration module reads is in .env.example (E5, G10)", () => {
+  it("lists each process.env name read in src/server/config as an active assignment", () => {
+    const configSource = readFileSync(fileURLToPath(new URL("../../src/server/config/index.ts", import.meta.url)), "utf8");
+    const read = new Set([...configSource.matchAll(/process\.env\.([A-Z_][A-Z0-9_]*)/g)].map((match) => match[1]));
+    const listed = new Set(
+      readEnvExample()
+        .assignments.filter((assignment) => !assignment.commented)
+        .map((assignment) => assignment.name),
+    );
+
+    expect(read.has("AI_PROVIDER")).toBe(true);
+    expect([...read].filter((name) => !listed.has(name))).toEqual([]);
   });
 });

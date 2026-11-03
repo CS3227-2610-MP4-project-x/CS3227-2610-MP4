@@ -2,7 +2,10 @@ import "server-only";
 
 export type AppEnvironment = "development" | "production";
 
+export type AiConfig = Readonly<{ provider: "fake" } | { provider: "soclaas"; apiKey: string; model: string }>;
+
 export type ServerConfig = Readonly<{
+  ai: AiConfig;
   appEnvironment: AppEnvironment;
   appOrigin: string;
   databaseCaCert: string;
@@ -98,6 +101,26 @@ function parseGitHubAppSlug(value: string): string {
   return value;
 }
 
+// G10, E3: AI_PROVIDER is required; SOCLAAS_* are read only for soclaas; production refuses fake.
+function readAiConfig(appEnvironment: AppEnvironment): AiConfig {
+  const provider = required("AI_PROVIDER", { AI_PROVIDER: process.env.AI_PROVIDER });
+  if (provider === "fake") {
+    if (appEnvironment === "production") {
+      throw new Error("Missing or invalid environment variable: AI_PROVIDER");
+    }
+    return Object.freeze({ provider: "fake" });
+  }
+  if (provider !== "soclaas") {
+    throw new Error("Missing or invalid environment variable: AI_PROVIDER");
+  }
+  const apiKey = required("SOCLAAS_API_KEY", { SOCLAAS_API_KEY: process.env.SOCLAAS_API_KEY });
+  const model = required("SOCLAAS_MODEL", { SOCLAAS_MODEL: process.env.SOCLAAS_MODEL });
+  if (model === "default") {
+    throw new Error("Missing or invalid environment variable: SOCLAAS_MODEL");
+  }
+  return Object.freeze({ provider: "soclaas", apiKey, model });
+}
+
 export function getServerConfig(): ServerConfig {
   const environment = {
     APP_ENV: process.env.APP_ENV,
@@ -123,6 +146,7 @@ export function getServerConfig(): ServerConfig {
   }
 
   return Object.freeze({
+    ai: readAiConfig(appEnvironment),
     appEnvironment,
     appOrigin,
     databaseCaCert: parseCaCertificate(required("DATABASE_CA_CERT", environment)),

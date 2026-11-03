@@ -1,0 +1,59 @@
+# AI interaction summary — 2026-11-02 (LLM gateway, task 6.3)
+
+- Human request: run the agent workflow for OpenSpec task 6.3 (LLM gateway) in `project-task-management`. The task ID and extra-file placeholders in the pasted prompt were unfilled. The main session asked, and the human chose task 6.3 with the existing `src/server/ai` code as extra files. The analyst was to produce a context brief, candidate edit paths, draft scenarios, and open decisions, then stop for approval without writing code, tests, or the handoff.
+- Analyst (Claude Code subagent, read-only):
+  - It read `tasks.md`, `design.md`, the `ai-safeguards` spec, `src/server/ai/*.ts`, `src/server/composition.ts`, `src/server/config/index.ts`, the schema migration, and `tests/unit/ai/source-boundaries.test.ts`.
+  - It drafted scenarios for prompt separation, the retry, safe errors, the rate limit, the SGT day boundary, settlement, the limits table, and usage recording.
+  - It listed 12 unrecorded decisions, D1–D12, and changed no files.
+- Human decision: approved the spec delta and asked the agent to resolve D1–D12 as it recommended. The main session recorded them as G1–G12 in `design.md` and filled the THEN clauses that had depended on them (charge on failure per G2; one record per request per G4).
+- Main-session finding: no API error contract is recorded in `openspec/`, although `AGENTS.md` refers to one. G3 therefore defines only gateway result codes and leaves the HTTP mapping to Route Handler tasks.
+- Files changed:
+  - `openspec/changes/project-task-management/specs/ai-safeguards/spec.md`: 13 added scenarios under five existing requirements. The requirement text is unchanged.
+  - `openspec/changes/project-task-management/design.md`: new sections "LLM Gateway Decisions" (G1–G12) and "API Error Contract".
+  - `logs/2026-11-02-llm-gateway-spec-and-decisions.md`: this summary.
+- Checks: `openspec validate project-task-management --strict` passed. No code, tests, handoff, or dependencies were added.
+- Branch: `feat/llm-gateway-core`. Not committed. No secrets recorded. Human has approved the new G1–G12.
+- Human request: resolve the missing API error contract. The main session found that the existing auth Route Handlers already use `{ error: { code, message } }` with UPPER_SNAKE codes and `Cache-Control: no-store`, which conflicted with G3's lowercase codes. Human decision: record the existing format. The main session added an "API Error Contract" section to `design.md`, marked as pending approval by Lim-ZY (API owner), and changed G3's codes to UPPER_SNAKE with HTTP statuses. `openspec validate --strict` passed.
+- Approvals: the human approved this summary. Lim-ZY approved the API Error Contract on 2 November 2026; the main session replaced the pending marker in `design.md` with that approval.
+- Follow-up: run the orchestrator, test-writer, implementer, and reviewer for task 6.3. Commit the spec work first if desired.
+
+## Implementation run (same session)
+
+- Human request: run the orchestrator, test-writer, implementer, and reviewer for task 6.3, with at most 2 fix rounds, then run lint, type-check, tests, and build. Do not commit. The prompt's placeholders were unfilled. The main session filled them from the approved records: slug `llm-gateway-core`, owner Developer B, write paths from G8 and the analyst brief. Frontend was skipped because there is no UI.
+- Orchestrator: wrote `workflow/handoffs/llm-gateway-core.md` with AC1–AC24 and questions Q1–Q6.
+  - Human decisions: Q1, add `charged_tokens`; Q2, `recordCacheHit` as a second method; Q3, Q4 and Q6, the recommended rules; Q5, `acceptance_check`/`progress_report` with a `CHECK`.
+  - The main session recorded these in `design.md` ("Task 6.3 handoff decisions"). The orchestrator added AC25–AC28.
+  - Assumptions A1–A3 and A5 remain unapproved.
+- Test-writer: added gateway, prompt, limits, and usage-repository tests, and updated source-boundaries, the soclaas export list, environment-configuration, and the integration fixtures.
+  - It reported vitest as broken. The main session found the cause: vitest fails only when run from a lowercase `d:` path.
+  - The main session extended scope to one stub line in `tests/unit/authentication.test.ts`.
+- Implementer: added `src/server/ai/{gateway,prompt,output,limits,usage-port}.ts` and `src/server/repositories/usage-repository.ts`, plus the migration `20261102120000_usage_environment_check.sql`. Updated `src/server/ai/index.ts`, `src/server/config/index.ts`, and `src/server/composition.ts`.
+- Reviewer (static only): no must-fix findings.
+  - Fix round 1 resolved S5 (release a failed client with its error) and N3 (module-level `Set` replaced by `switch`).
+  - S1–S4 were escalated to the human because they need unrecorded behaviour.
+- Checks at `9685edf` plus the working tree, on Windows locally, run from `D:`:
+  - `npm run lint`: passed.
+  - `npx tsc --noEmit`: passed.
+  - `npm test`: 354/354 passed.
+  - `npm run build`: passed (`next-env.d.ts` restored).
+  - `npm run test:integration`: not run, because Docker was not running.
+- Human request: resolve S1–S4 as recommended. The main session recorded "Task 6.3 review decisions" in `design.md`:
+  - S1: a throwing adapter or validator settles `provider_error` and returns `AI_ERROR`.
+  - S2: settle errors propagate (accepted).
+  - S3: segment-name pattern, checked before reserving.
+  - S4: `maxOutputTokens` must be a positive integer, and latency is rounded and clamped at 0.
+- Fix round 2:
+  - The test-writer added 26 tests to `tests/unit/ai/gateway.test.ts`.
+  - The implementer changed `src/server/ai/gateway.ts` only.
+  - No second reviewer pass was run.
+- Checks after fix round 2, at `9685edf` plus the working tree, run from `D:`:
+  - lint: passed.
+  - `tsc`: passed.
+  - `npm test`: 381/381 passed.
+  - build: passed (`next-env.d.ts` restored).
+  - Integration tests: not run, because Docker was not running.
+- No dependencies added. Not committed. No secrets recorded. Human has approved the new S1–S4. The main session recorded the final AC1–AC28 in `workflow/handoffs/llm-gateway-core.md` and the final S1–S4 in `design.md`.
+- Human request: Docker started; rerun the relevant tests, record approval of A1–A3 and A5, update the documents, then split the commits as recommended.
+  - Integration tests: `npm run test:integration` against a disposable `postgres:17` container (developer guide) passed 225/225, including `usage-repository.test.ts` 33/33. The container was stopped afterwards.
+  - The main session recorded the assumptions in `design.md`, updated the handoff (sessions, outcome, status), and checked task 6.3 in `tasks.md`.
+  - The commit/PR agent then made the scoped commits on `feat/llm-gateway-core`. No push or pull request.

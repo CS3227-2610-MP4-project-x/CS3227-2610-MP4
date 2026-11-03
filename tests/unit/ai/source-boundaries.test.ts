@@ -12,6 +12,10 @@ import { describe, expect, it } from "vitest";
 // Task 6.2 (llm-gateway-secret-redaction) adds redaction.ts to the expected files; the same
 // checks apply to it (AC18 in workflow/handoffs/llm-gateway-secret-redaction.md, decision D7
 // "Secret Redaction Decisions" in design.md).
+// Task 6.3 (llm-gateway-core) adds the gateway, prompt builder, output parsing, limits table
+// and usage port (the handoff's suggested file names); the same checks apply to them (AC9,
+// AC23 in workflow/handoffs/llm-gateway-core.md; G3, G8). It also checks that the AI module
+// opens no database transaction and that only the usage repository writes the usage tables.
 
 const repositoryRoot = fileURLToPath(new URL("../../../", import.meta.url));
 const aiDirectory = join(repositoryRoot, "src", "server", "ai");
@@ -41,8 +45,19 @@ function importSpecifiers(text: string): string[] {
 }
 
 describe("src/server/ai source boundaries", () => {
-  it("contains the public entry point, the adapter modules, and the redaction module", () => {
-    for (const name of ["index.ts", "llm-adapter.ts", "soclaas-adapter.ts", "fake-adapter.ts", "redaction.ts"]) {
+  it("contains the public entry point, the adapter, redaction, and task 6.3 gateway modules", () => {
+    for (const name of [
+      "index.ts",
+      "llm-adapter.ts",
+      "soclaas-adapter.ts",
+      "fake-adapter.ts",
+      "redaction.ts",
+      "gateway.ts",
+      "prompt.ts",
+      "output.ts",
+      "limits.ts",
+      "usage-port.ts",
+    ]) {
       expect(existsSync(join(aiDirectory, name)), name).toBe(true);
     }
   });
@@ -76,5 +91,32 @@ describe("src/server/ai source boundaries", () => {
         expect(specifier.startsWith("./") || specifier.startsWith("node:"), `${file.path} imports ${specifier}`).toBe(true);
       }
     }
+  });
+
+  it("opens no database transaction (AC23, D-G)", () => {
+    for (const file of sourceFiles()) {
+      // A string literal that starts with a transaction statement, e.g. query("BEGIN").
+      expect(withoutComments(file.text), file.path).not.toMatch(
+        /["'`]\s*(BEGIN|COMMIT|ROLLBACK|START\s+TRANSACTION)\s*;?\s*["'`]/i,
+      );
+    }
+  });
+});
+
+describe("usage table ownership (AC23, G8)", () => {
+  const sourceDirectory = join(repositoryRoot, "src");
+  const usageRepositoryPath = join(sourceDirectory, "server", "repositories", "usage-repository.ts");
+
+  it("has the usage repository", () => {
+    expect(existsSync(usageRepositoryPath)).toBe(true);
+  });
+
+  it("names usage_records and usage_quota_days only in the usage repository", () => {
+    const entries = readdirSync(sourceDirectory, { recursive: true, withFileTypes: true });
+    const mentioning = entries
+      .filter((entry) => entry.isFile() && /\.(ts|tsx|js|mjs|cjs)$/.test(entry.name))
+      .map((entry) => join(entry.parentPath, entry.name))
+      .filter((path) => /\busage_(records|quota_days)\b/.test(withoutComments(readFileSync(path, "utf8"))));
+    expect(mentioning).toEqual([usageRepositoryPath]);
   });
 });
