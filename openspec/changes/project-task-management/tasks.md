@@ -37,9 +37,9 @@ Depends on: 3.
 
 Depends on: 3. Can run alongside group 4.
 
-- [ ] 5.1 **[P]** Implement repository linking with an encrypted read-only token; add product-manager route authorization tests and tests that the token is never returned or logged and that unreadable repositories are refused.
-- [ ] 5.2 **[P]** Implement the GitHub adapter (list commits by author, date range, and branch; fetch diffs) with a fake for tests.
-- [ ] 5.3 Implement the commit picker and commit attachment with the authorship check; add assigned-developer route authorization tests and tests for pre-selection by task ID, no commits found, unavailable evidence, and commits by other authors.
+- [ ] 5.1 **[P]** Implement product-manager repository linking through the GitHub App installation flow and separate App OAuth identity verification; verify the installation and selected repository against the PM's verified GitHub identity, store the installation/repository binding, and add product-manager authorization and failed-link tests.
+- [ ] 5.2 **[P]** Implement the server-side GitHub App adapter and deterministic fake. Mint short-lived installation tokens restricted to one linked repository with read-only permissions; list branches and commits by verified author, date range, and branch; fetch diffs; and test safe provider-error handling and token scoping.
+- [ ] 5.3 Wire the App environment configuration and composition, build the PM repository-link API and developer commit picker, and implement commit attachment with the authorship check. Update `.env.example`. Developer B owns a new migration replacing the shipped PAT ciphertext columns with installation and repository IDs; do not edit the shipped migration. Add assigned-developer route authorization tests and tests for branch choices, pre-selection by task ID, no commits found, unavailable evidence, and commits by other authors.
 
 ## 6. LLM Gateway and Safeguards
 

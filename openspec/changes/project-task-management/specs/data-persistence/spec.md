@@ -66,11 +66,15 @@ The database SHALL store at most one check result per task for a given commit se
 - **THEN** the database rejects the duplicate
 
 ### Requirement: Stored records exclude secrets and AI content
-The database SHALL store the GitHub credential only in encrypted form. Usage records SHALL NOT contain prompt or response content.
+The database SHALL NOT store GitHub App private keys or GitHub user or installation access tokens. A project MAY store the GitHub App installation ID and the linked repository's stable ID, owner, and name. Usage records SHALL NOT contain prompt or response content.
 
-#### Scenario: Credential at rest
-- **WHEN** a project's repository credential is stored
-- **THEN** no column holds it in plaintext
+#### Scenario: Repository binding at rest
+- **WHEN** a project's repository is linked
+- **THEN** the database stores its installation and repository identifiers and display coordinates, but no access token or App private key
+
+#### Scenario: Project has at most one repository binding
+- **WHEN** a project repository link is inserted or replaced
+- **THEN** its owner/name, installation ID, and stable repository ID are either all present or all absent, and the project has at most one linked repository
 
 ### Requirement: Runtime access is least-privilege and server-only
 The application SHALL access the database through a role that cannot change the schema, over the transaction-pooler connection. Application tables SHALL NOT be readable or writable through Supabase Data APIs.
