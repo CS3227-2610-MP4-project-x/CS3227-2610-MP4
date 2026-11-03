@@ -162,6 +162,8 @@ export interface TestDatabase {
 export interface MigratedDatabaseOptions {
   /** Runs as the superuser on the fresh, empty database before any migration is applied. */
   beforeMigrations?: (admin: pg.Client) => Promise<void>;
+  /** Runs after each successful migration, allowing upgrade fixtures before the next one. */
+  afterMigration?: (file: string, admin: pg.Client) => Promise<void>;
 }
 
 /**
@@ -205,6 +207,7 @@ export function useMigratedDatabase(options: MigratedDatabaseOptions = {}): () =
       } catch (error) {
         throw new Error(`Migration ${file} failed: ${(error as Error).message}`);
       }
+      await options.afterMigration?.(file, adminClient);
     }
 
     const role = await adminClient.query<{ has_password: boolean }>(

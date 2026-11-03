@@ -35,7 +35,7 @@ None.
 ## Impact
 
 - Requirements for the whole initial product, including authentication, GitHub integration, both AI features, and AI security.
-- A read-only GitHub credential per project, stored encrypted on the server.
+- A per-environment GitHub App installation, with one repository binding per project and short-lived, repository-scoped read tokens.
 - SoC LLM usage, limited by per-person quotas and the school's own limits.
 - Separate development and production environments (database, deployment, credentials).
 - A GitHub Actions workflow that runs without repository secrets, plus branch protection on `master` configured by a human.

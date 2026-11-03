@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 // Task 2.3 (environment-configuration). Requirements are referenced by name from
 // openspec/changes/project-task-management/specs/environment-configuration/spec.md
-// and by decision from design.md "Environment Decisions" (E1-E9). No requirement IDs
+// and by decision from design.md "Environment Decisions" (E1-E10). No requirement IDs
 // exist for these, so none are used.
 //
 // These tests read repository files only. They make no network or database calls.
@@ -101,12 +101,13 @@ const SET_IN_LINE = /^#\s*Set in:\s*\S/;
 const PLACEHOLDER = /<[^<>\s][^<>]*>/;
 
 // Spec "Every environment variable is documented in .env.example", design E1, E3, E6,
-// E7, and the task 2.4 variables (D-A, D-H, D-J, D-K).
+// E7, E10, and the task 2.4 variables (D-A, D-H, D-J, D-K).
 const REQUIRED_ACTIVE_VARIABLES = [
   "DATABASE_URL",
   "DATABASE_CA_CERT",
   "TEST_DATABASE_URL",
-  "GITHUB_TOKEN_ENCRYPTION_KEY",
+  "GITHUB_APP_CLIENT_ID",
+  "GITHUB_APP_CLIENT_SECRET",
   "SUPABASE_URL",
   "SUPABASE_PUBLISHABLE_KEY",
   "APP_ORIGIN",
@@ -202,15 +203,35 @@ describe(".env.example keeps secrets server-only", () => {
     expect(publicNames).toEqual([]);
   });
 
-  it("has no GitHub OAuth client ID or secret variable (E2)", () => {
+  it.each(["GITHUB_APP_CLIENT_ID", "GITHUB_APP_CLIENT_SECRET"])(
+    "documents %s with an active placeholder for repository linking (E10)",
+    (name) => {
+      const { assignments } = readEnvExample();
+      const entries = assignments.filter((assignment) => assignment.name === name);
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0].commented).toBe(false);
+      expect(entries[0].value).toMatch(PLACEHOLDER);
+    },
+  );
+
+  it("has no Supabase GitHub provider OAuth client ID or secret variable (E2, E10)", () => {
     const { assignments } = readEnvExample();
+    const appOAuthNames = new Set(["GITHUB_APP_CLIENT_ID", "GITHUB_APP_CLIENT_SECRET"]);
     const oauthPatterns = [/OAUTH/i, /CLIENT_ID/i, /CLIENT_SECRET/i, /^GITHUB_\w*SECRET/i, /^GITHUB_ID$/i];
 
     const oauthNames = assignments
       .map((assignment) => assignment.name)
+      .filter((name) => !appOAuthNames.has(name))
       .filter((name) => oauthPatterns.some((pattern) => pattern.test(name)));
 
     expect(oauthNames).toEqual([]);
+  });
+
+  it("omits the retired PAT encryption key, active or commented (D-H, E10)", () => {
+    const { assignments } = readEnvExample();
+
+    expect(assignments.map((assignment) => assignment.name)).not.toContain("GITHUB_TOKEN_ENCRYPTION_KEY");
   });
 
   it("has no Supabase secret or service_role key variable (E1)", () => {

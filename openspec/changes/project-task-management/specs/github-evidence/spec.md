@@ -2,38 +2,91 @@
 
 ## Purpose
 
-Defines how a project is linked to a GitHub repository and how developers attach their own commits to tasks without copying links, so the commits can be used for the acceptance criteria check and for project reporting.
+Defines how a product manager links one GitHub repository to a project and how assigned developers select and attach their own commits for assessment and reporting.
 
 ## ADDED Requirements
 
-### Requirement: Product manager links a repository to the project
-The system SHALL allow the project's product manager to link one GitHub repository to the project using a read-only access credential. The credential SHALL be stored encrypted on the server and SHALL NOT be returned to any client or written to logs.
+### Requirement: Product manager links one repository through a GitHub App
+The system SHALL let a project's product manager link one repository that is available to a GitHub App installation. The system SHALL verify the product manager's GitHub identity and access to the selected installation and repository before saving the link.
+
+The App installation entry point SHALL be provided by task 5.3 through a product-manager-only setup URL route. The repository authorization API SHALL complete the link after installation and repository selection.
+
+#### Scenario: Product manager starts App installation or configuration
+- **WHEN** the product manager sends `GET /api/v1/projects/{projectId}/github-repository/setup-url`
+- **THEN** the route returns HTTP 200 with `{ "setupUrl": "..." }` built from the configured GitHub App slug
+
+#### Scenario: Product manager starts repository authorization after installation
+- **WHEN** the product manager sends `POST /api/v1/projects/{projectId}/github-repository/authorization` with `installationId` as a positive decimal string plus `repositoryOwner` and `repositoryName`
+- **THEN** the route returns HTTP 200 with `{ "authorizationUrl": "..." }` and binds signed OAuth state to a ten-minute HttpOnly, SameSite=Lax cookie
+
+#### Scenario: GitHub App OAuth callback completes repository linking
+- **WHEN** GitHub returns `code` and session-bound `state` to `GET /api/v1/auth/github-app/callback`
+- **THEN** the callback consumes the state cookie, exchanges the code, rechecks the current PM role and identity, verifies the selected repository is available to that user and installation, saves the binding, and responds with HTTP 303 to `/projects/{projectId}` under configured `APP_ORIGIN`
+
+#### Scenario: PM authorization changes during OAuth
+- **WHEN** the PM's project role or verified GitHub identity changes before the callback completes
+- **THEN** the callback refuses the link, leaves the existing binding unchanged, and does not persist or return the OAuth user access token
 
 #### Scenario: Product manager links a repository
-- **WHEN** the product manager provides a repository owner/name and a credential that can read it
-- **THEN** the repository is linked to the project and the credential is stored encrypted
+- **WHEN** the project's product manager selects a repository available to a GitHub App installation
+- **THEN** the system verifies the separate GitHub App authorization matches the product manager's verified GitHub identity, confirms the repository is available to that installation, and links that repository to the project
 
-#### Scenario: Credential cannot read the repository
-- **WHEN** the product manager provides a credential that cannot read the repository
-- **THEN** the system refuses the link and explains that the repository is not accessible
+#### Scenario: Product manager adds a repository to an existing installation
+- **WHEN** the product manager needs to link a repository that is not yet available to an existing GitHub App installation
+- **THEN** the system provides a flow to install or configure the App for the relevant GitHub account or organization and select the repository before linking it
 
-#### Scenario: Credential is never exposed
-- **WHEN** any client requests project or repository details
-- **THEN** the response does not contain the credential or any part of it
+#### Scenario: One repository per project
+- **WHEN** a project already has a linked repository and its product manager links a different repository
+- **THEN** the new repository replaces the existing link, and the project still has only one linked repository
 
-### Requirement: Developer lists their own commits
-The system SHALL allow an assigned developer to list the commits in the linked repository that were authored by their verified GitHub identity, filtered by a date range and a branch. The date range SHALL default to the current day in Singapore Time (SGT, UTC+08:00), and the branch SHALL default to the task's branch, or to the repository's default branch when the task has none. Commits whose message contains the task's ID SHALL be pre-selected.
+#### Scenario: Installation or repository is not accessible
+- **WHEN** the selected installation or repository is not accessible to the verified product manager or the App lacks access
+- **THEN** the system refuses the link, reports a safe reason category, and leaves the existing project link unchanged
+
+#### Scenario: Installation ID is untrusted
+- **WHEN** GitHub returns an installation ID during App setup
+- **THEN** the system treats it as untrusted input and verifies it against the separately authorized GitHub user and selected repository before saving or using it
+
+#### Scenario: Only a product manager may manage the link
+- **WHEN** a project developer or a person who is not a project member tries to add, replace, or remove the repository link
+- **THEN** the system refuses the request and leaves the project unchanged
+
+### Requirement: GitHub access tokens are not exposed or persisted
+The system SHALL keep GitHub App credentials and access tokens on the server, SHALL NOT log or return them, and SHALL NOT persist user or installation access tokens.
+
+#### Scenario: Link authorization token is temporary
+- **WHEN** the system completes the separate GitHub App authorization used to verify a product manager during linking
+- **THEN** it uses the user access token only for identity and installation/repository verification and does not store or return it
+
+#### Scenario: Repository read token is temporary and scoped
+- **WHEN** the system reads repository evidence
+- **THEN** it uses a short-lived installation token restricted to the linked repository and read-only repository permissions, without storing or returning the token
+
+#### Scenario: No access token is logged
+- **WHEN** an application or provider error occurs during GitHub authorization or repository access
+- **THEN** logs and responses contain neither access tokens nor raw provider error details
+
+### Requirement: Assigned developers can choose branches and list their own commits
+The system SHALL let an assigned developer list available branches and commits in the project's linked repository, filtered to the developer's verified GitHub identity, a date range, and a branch.
 
 #### Scenario: Developer opens the commit picker
 - **WHEN** an assigned developer opens the commit picker for a task
-- **THEN** the system lists that developer's commits for the default date range and branch, with commits that mention the task ID pre-selected
+- **THEN** the system lists available branches and the developer's commits for the default date range and branch, with commits that mention the task ID pre-selected
+
+#### Scenario: Default branch and date range
+- **WHEN** the developer opens the commit picker without choosing a date range or branch
+- **THEN** the date range defaults to the current day in Singapore Time (SGT, UTC+08:00), and the branch defaults to the task's branch or to the repository's default branch when the task has none
 
 #### Scenario: No commits in range
 - **WHEN** the developer has no commits in the selected date range and branch
 - **THEN** the system states that no commits were found, distinct from evidence being unavailable
 
-### Requirement: Developer attaches commits to a task
-The system SHALL allow an assigned developer to attach selected commits to a task. The system SHALL only attach commits authored by the developer's verified GitHub identity.
+#### Scenario: Only assigned developers may list commits
+- **WHEN** a project member who is not the task's assigned developer requests the task's commit list
+- **THEN** the system refuses the request without returning repository evidence
+
+### Requirement: Developer attaches only their own commits
+The system SHALL allow an assigned developer to attach selected commits to a task only when each commit is authored by that developer's verified GitHub identity.
 
 #### Scenario: Developer attaches commits
 - **WHEN** an assigned developer confirms a selection of their own commits
@@ -44,8 +97,12 @@ The system SHALL allow an assigned developer to attach selected commits to a tas
 - **THEN** the system refuses the request and attaches nothing
 
 ### Requirement: Unavailable evidence is reported distinctly
-The system SHALL report GitHub evidence as unavailable when the repository cannot be reached, the credential is revoked or expired, or GitHub rate limits are hit, and SHALL NOT represent unavailable evidence as an absence of commits.
+The system SHALL report GitHub evidence as unavailable when the linked installation or repository cannot be reached, access has been revoked or suspended, or GitHub rate limits are hit, and SHALL NOT represent unavailable evidence as an absence of commits.
 
 #### Scenario: GitHub evidence cannot be retrieved
-- **WHEN** the system cannot access the linked repository
-- **THEN** the system reports that the evidence is unavailable and the reason category, without exposing the credential or raw provider errors
+- **WHEN** the system cannot access the linked repository or installation
+- **THEN** it reports that evidence is unavailable with a safe reason category, without exposing credentials or raw provider errors
+
+#### Scenario: Branch listing is unavailable
+- **WHEN** the system cannot retrieve branches from the linked repository
+- **THEN** it reports unavailable evidence rather than presenting the branch list as empty

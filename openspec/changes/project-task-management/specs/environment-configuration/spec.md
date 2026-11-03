@@ -7,15 +7,15 @@ Defines the separate development and production environments, how their configur
 ## ADDED Requirements
 
 ### Requirement: Development and production are separate environments
-The system SHALL run in separate development and production environments. Each SHALL have its own Supabase project, Vercel environment, GitHub OAuth app with its own callback URL, SoC LLM credential, and quota settings. The Vercel `dev` branch preview SHALL use the development environment and the `master` production deployment SHALL use the production environment.
+The system SHALL run separate development and production environments. Each SHALL use its own Supabase project, Vercel environment, GitHub sign-in app, GitHub App registration, SoC LLM credential, and quota settings. Each GitHub App SHALL use credentials and callback URLs specific to its environment. The Vercel `dev` preview SHALL use development settings, and the `master` deployment SHALL use production settings.
 
 #### Scenario: Environments do not share credentials
 - **WHEN** the development and production configurations are compared
-- **THEN** no database credential, encryption key, OAuth client secret, or SoC LLM key is the same in both
+- **THEN** no database credential, encryption key, GitHub App private key, OAuth client secret, or SoC LLM key is the same in both
 
 #### Scenario: Callback URL per environment
-- **WHEN** a person signs in on one environment
-- **THEN** the sign-in uses that environment's own GitHub OAuth app and returns to that environment's own URL
+- **WHEN** a person signs in or authorizes repository linking on one environment
+- **THEN** the flow uses that environment's GitHub application callback and returns only to that environment's configured URL
 
 ### Requirement: Every environment variable is documented in .env.example
 The repository SHALL include `.env.example` listing every environment variable the application, its tests, or its operators read, each with a placeholder value and a comment stating its purpose and which environments set it. `.env.example` SHALL contain no real value.
@@ -29,7 +29,7 @@ The repository SHALL include `.env.example` listing every environment variable t
 - **THEN** it reports no finding
 
 ### Requirement: Secrets are server-only
-Database, encryption, OAuth client, and SoC LLM credentials SHALL be server-side environment variables only. No such variable SHALL have a `NEXT_PUBLIC_` prefix, appear in a Client Component prop, be committed, or be logged.
+Database, encryption, GitHub App private key, OAuth client, and SoC LLM credentials SHALL be server-side environment variables only. No such variable SHALL have a `NEXT_PUBLIC_` prefix, appear in a Client Component prop, be committed, or be logged.
 
 #### Scenario: Secret named with NEXT_PUBLIC_
 - **WHEN** a variable that holds a credential is named with a `NEXT_PUBLIC_` prefix
