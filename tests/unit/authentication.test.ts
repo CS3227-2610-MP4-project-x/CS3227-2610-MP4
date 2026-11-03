@@ -112,6 +112,8 @@ beforeEach(() => {
   boundary.identity.username = "synthetic-developer";
   vi.stubEnv("SUPABASE_URL", "https://synthetic.supabase.co");
   vi.stubEnv("SUPABASE_PUBLISHABLE_KEY", "sb_publishable_synthetic_test_key");
+  vi.stubEnv("GITHUB_APP_CLIENT_ID", "synthetic-github-app-client-id");
+  vi.stubEnv("GITHUB_APP_CLIENT_SECRET", "synthetic-github-app-client-secret");
   vi.stubEnv("APP_ORIGIN", appOrigin);
   vi.stubEnv("APP_ENV", "development");
   vi.stubEnv("DATABASE_URL", "postgresql://synthetic:synthetic@localhost:5432/synthetic?sslmode=verify-full");
