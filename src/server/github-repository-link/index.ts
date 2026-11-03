@@ -8,10 +8,12 @@ export { GitHubRepositoryLinkRepository } from "@/server/repositories/github-rep
 export { isRepositorySelection, isValidProjectId } from "./state";
 export { verifiedGitHubIdentity } from "./auth-identity";
 export type {
+  AvailableRepository,
   AccessCheck,
   GitHubOAuthVerificationPort,
   GitHubRepositoryLinkRepositoryPort,
   ProjectLinkAccess,
+  SetupAttempt,
   RepositoryBinding,
   RepositorySelection,
   VerifiedGitHubIdentity,

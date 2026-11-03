@@ -48,6 +48,8 @@ export type CommitQuery = Readonly<{
 }>;
 
 export interface GitHubEvidenceAdapter {
+  getRepositoryDefaultBranch(repository: GitHubRepository): Promise<GitHubResult<string>>;
+  getCommitAuthor(repository: GitHubRepository, sha: string): Promise<GitHubResult<GitHubUser>>;
   listBranches(repository: GitHubRepository): Promise<GitHubResult<readonly GitHubBranch[]>>;
   listCommits(repository: GitHubRepository, query: CommitQuery): Promise<GitHubResult<readonly GitHubCommit[]>>;
   fetchDiff(repository: GitHubRepository, sha: string): Promise<GitHubResult<string>>;
@@ -268,6 +270,26 @@ export class GitHubAppAdapter implements GitHubEvidenceAdapter {
     });
   }
 
+  async getRepositoryDefaultBranch(repository: GitHubRepository): Promise<GitHubResult<string>> {
+    return this.#singleRead(repository, `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.name)}`,
+      "application/vnd.github+json", async (response) => {
+        const body: unknown = await response.json();
+        if (!isObject(body) || typeof body.default_branch !== "string" || !body.default_branch) throw new Error("invalid response");
+        return body.default_branch;
+      });
+  }
+
+  async getCommitAuthor(repository: GitHubRepository, sha: string): Promise<GitHubResult<GitHubUser>> {
+    if (!/^[0-9a-f]{7,64}$/i.test(sha)) return failed("invalid_request");
+    return this.#singleRead(repository, `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.name)}/commits/${encodeURIComponent(sha)}`,
+      "application/vnd.github+json", async (response) => {
+        const body: unknown = await response.json();
+        if (!isObject(body) || typeof body.sha !== "string" || body.sha.toLowerCase() !== sha.toLowerCase() ||
+            !isObject(body.author) || !Number.isSafeInteger(body.author.id) || typeof body.author.login !== "string") throw new Error("invalid response");
+        return { id: body.author.id as number, login: body.author.login };
+      });
+  }
+
   async listCommits(repository: GitHubRepository, query: CommitQuery): Promise<GitHubResult<readonly GitHubCommit[]>> {
     if (!query.author.login || !Number.isSafeInteger(query.author.id) || !isIsoDate(query.since) || !isIsoDate(query.until) || query.since > query.until || !query.branch) {
       return failed("invalid_request");
@@ -311,6 +333,13 @@ export class FakeGitHubAdapter implements GitHubEvidenceAdapter {
 
   constructor(script: FakeGitHubScript = {}) {
     this.#script = script;
+  }
+
+  async getRepositoryDefaultBranch(): Promise<GitHubResult<string>> { return { ok: true, value: "main" }; }
+
+  async getCommitAuthor(_repository: GitHubRepository, sha: string): Promise<GitHubResult<GitHubUser>> {
+    const commit = this.#script.commits?.ok ? this.#script.commits.value.find((item) => item.sha === sha) : undefined;
+    return commit ? { ok: true, value: { id: commit.authorId, login: commit.authorLogin } } : failed("not_found");
   }
 
   async listBranches(): Promise<GitHubResult<readonly GitHubBranch[]>> {

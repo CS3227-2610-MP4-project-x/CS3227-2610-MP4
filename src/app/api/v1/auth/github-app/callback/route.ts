@@ -37,7 +37,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     const { data, error } = await client.auth.getUser();
     if (error || !data.user) return githubRepositoryLinkErrorResponse(new GitHubRepositoryLinkError(401));
     const identity = verifiedGitHubIdentity(data.user);
-    const location = await composition.githubRepositoryLinkService.completeAuthorization(identity, stateCookie, state, code);
+    const location = await composition.githubRepositoryLinkService.completeSetupAuthorization(identity, stateCookie, state, code);
     const response = NextResponse.redirect(location, 303);
     response.headers.set("Cache-Control", "no-store");
     return response;
