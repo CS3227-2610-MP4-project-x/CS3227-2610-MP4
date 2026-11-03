@@ -16,6 +16,16 @@ export type VerifiedGitHubIdentity = Readonly<{
 export class PeopleRepository {
   constructor(private readonly database: PeopleQuery) {}
 
+  async findPersonIdByAuthUserId(authUserId: string): Promise<string | null> {
+    const result = await this.database.query<{ id: string }>(
+      `SELECT id::text AS id
+         FROM app.people
+        WHERE auth_user_id = $1::uuid`,
+      [authUserId],
+    );
+    return result.rows[0]?.id ?? null;
+  }
+
   async upsertVerifiedGitHubIdentity(identity: VerifiedGitHubIdentity): Promise<{ id: string }> {
     const result = await this.database.query<{ id: string }>(
       `INSERT INTO app.people (auth_user_id, github_user_id, github_username)

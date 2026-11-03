@@ -16,8 +16,8 @@
  *
  * people            (auth_user_id UNIQUE, github_user_id UNIQUE, github_username)
  * projects          (key UNIQUE + CHECK, name, last_task_number integer NOT NULL DEFAULT 0,
- *                    github_token_key_version, github_token_iv, github_token_ciphertext,
- *                    github_token_auth_tag — all nullable until a repository is linked)
+ *                    github_installation_id, github_repository_id, github_repository_owner,
+ *                    github_repository_name — all nullable until a repository is linked)
  * memberships       (project_id, person_id, role IN ('product_manager','developer'))
  * tasks             (project_id, number, title, description, assignee_id -> people.id,
  *                    due_date, status IN ('to_do','in_progress','in_review','done'),
@@ -132,11 +132,20 @@ export const TASK_EVENT_TYPES = ["state_change", "submission", "assignment_chang
 
 export const USAGE_OUTCOMES = ["pending", "succeeded", "invalid_output", "provider_error", "cached"] as const;
 
-export const ENCRYPTED_TOKEN_COLUMNS = [
+/** Retired PAT fields, removed by the new task 5.1 migration (D-H). */
+export const RETIRED_GITHUB_TOKEN_COLUMNS = [
   "github_token_key_version",
   "github_token_iv",
   "github_token_ciphertext",
   "github_token_auth_tag",
+] as const;
+
+/** Internal SQL names coordinated for task 5.1; all fields form one binding. */
+export const GITHUB_BINDING_COLUMNS = [
+  "github_installation_id",
+  "github_repository_id",
+  "github_repository_owner",
+  "github_repository_name",
 ] as const;
 
 export const USAGE_RECORD_COLUMNS = [

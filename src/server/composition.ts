@@ -5,10 +5,21 @@ import { AI_LIMITS, FakeAdapter, LlmGateway, SoclaasAdapter, type LlmAdapter } f
 import { getServerConfig, type AiConfig } from "@/server/config";
 import { AuthService } from "@/server/auth/auth-service";
 import { PeopleRepository } from "@/server/repositories/people-repository";
+import { ProjectAccessRepository } from "@/server/repositories/project-access-repository";
+import { TaskAccessRepository } from "@/server/repositories/task-access-repository";
+import {
+  GitHubOAuthVerificationAdapter,
+  GitHubRepositoryLinkRepository,
+  GitHubRepositoryLinkService,
+} from "@/server/github-repository-link";
 import { UsageRepository } from "@/server/repositories/usage-repository";
 
 export type ServerComposition = Readonly<{
   authService: AuthService;
+  peopleRepository: PeopleRepository;
+  projectAccessRepository: ProjectAccessRepository;
+  taskAccessRepository: TaskAccessRepository;
+  githubRepositoryLinkService: GitHubRepositoryLinkService;
   config: ReturnType<typeof getServerConfig>;
   llmGateway: LlmGateway;
 }>;
@@ -33,6 +44,18 @@ export function getServerComposition(): ServerComposition {
     ssl: { ca: config.databaseCaCert, rejectUnauthorized: true },
   });
   const peopleRepository = new PeopleRepository(pool);
+  const projectAccessRepository = new ProjectAccessRepository(pool);
+  const taskAccessRepository = new TaskAccessRepository(pool);
+  const githubRepositoryLinkRepository = new GitHubRepositoryLinkRepository(pool);
+  const githubOAuthVerificationAdapter = new GitHubOAuthVerificationAdapter({
+    clientId: config.githubAppClientId,
+    clientSecret: config.githubAppClientSecret,
+  });
+  const githubRepositoryLinkService = new GitHubRepositoryLinkService(
+    githubRepositoryLinkRepository,
+    githubOAuthVerificationAdapter,
+    config,
+  );
   const llmGateway = new LlmGateway({
     adapter: createLlmAdapter(config.ai),
     usage: new UsageRepository(pool),
@@ -41,6 +64,10 @@ export function getServerComposition(): ServerComposition {
   });
   composition = Object.freeze({
     authService: new AuthService(config.appOrigin, peopleRepository),
+    peopleRepository,
+    projectAccessRepository,
+    taskAccessRepository,
+    githubRepositoryLinkService,
     config,
     llmGateway,
   });

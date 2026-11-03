@@ -10,6 +10,8 @@ export type ServerConfig = Readonly<{
   appOrigin: string;
   databaseCaCert: string;
   databaseUrl: string;
+  githubAppClientId: string;
+  githubAppClientSecret: string;
   supabasePublishableKey: string;
   supabaseUrl: string;
 }>;
@@ -112,6 +114,8 @@ export function getServerConfig(): ServerConfig {
     APP_ORIGIN: process.env.APP_ORIGIN,
     DATABASE_CA_CERT: process.env.DATABASE_CA_CERT,
     DATABASE_URL: process.env.DATABASE_URL,
+    GITHUB_APP_CLIENT_ID: process.env.GITHUB_APP_CLIENT_ID,
+    GITHUB_APP_CLIENT_SECRET: process.env.GITHUB_APP_CLIENT_SECRET,
     SUPABASE_PUBLISHABLE_KEY: process.env.SUPABASE_PUBLISHABLE_KEY,
     SUPABASE_URL: process.env.SUPABASE_URL,
   };
@@ -131,6 +135,8 @@ export function getServerConfig(): ServerConfig {
     appOrigin,
     databaseCaCert: parseCaCertificate(required("DATABASE_CA_CERT", environment)),
     databaseUrl: parseDatabaseUrl(required("DATABASE_URL", environment)),
+    githubAppClientId: required("GITHUB_APP_CLIENT_ID", environment),
+    githubAppClientSecret: required("GITHUB_APP_CLIENT_SECRET", environment),
     supabasePublishableKey: required("SUPABASE_PUBLISHABLE_KEY", environment),
     supabaseUrl: parseSupabaseUrl(required("SUPABASE_URL", environment)),
   });
