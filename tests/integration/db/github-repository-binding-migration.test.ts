@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 /** Task 5.1 / D-H: upgrading populated PAT-era projects leaves them unlinked. */
 import { expect, it } from "vitest";
 
@@ -7,9 +8,10 @@ import {
   RETIRED_GITHUB_TOKEN_COLUMNS,
   SCHEMA,
   columnNames,
+  createPerson, createProject,
   insertRow,
 } from "./support/fixtures";
-import { dbDescribe, useMigratedDatabase } from "./support/harness";
+import { dbDescribe, expectIntegrityRejection, expectPrivilegeRejection, useMigratedDatabase } from "./support/harness";
 
 const LEGACY_SCHEMA_MIGRATION = "20261030144500_create_app_schema.sql";
 const PROJECTS = `${SCHEMA}.${ENTITY_TABLES.projects}`;
@@ -72,6 +74,89 @@ dbDescribe("GitHub App binding migration upgrades populated legacy projects (D-H
     const columns = await columnNames(db().admin, ENTITY_TABLES.projects);
     for (const column of RETIRED_GITHUB_TOKEN_COLUMNS) {
       expect(columns, `retired projects.${column}`).not.toContain(column);
+    }
+  });
+});
+
+// Concrete setup/snapshot migration constraints. These run only against the
+// harness's isolated disposable PostgreSQL database, never a Supabase instance.
+dbDescribe("GitHub setup attempt and repository snapshot integrity (task 5.3)", () => {
+  const db = useMigratedDatabase();
+  async function attempt(overrides: Record<string, unknown> = {}) {
+    return insertRow(db().admin, "github_repository_setup_attempts", {
+      project_id: (await createProject(db().admin)).id, person_id: await createPerson(db().admin),
+      expected_github_user_id: 424242, state_hash: randomBytes(32),
+      status: "setup_pending", created_at: "2026-11-03T00:00:00Z", expires_at: "2026-11-03T00:10:00Z", ...overrides,
+    });
+  }
+  async function snapshot() {
+    const a = await attempt({ status: "verified", installation_id: 123 });
+    return insertRow(db().admin, "github_repository_snapshots", {
+      attempt_id: a.id, project_id: a.project_id, person_id: a.person_id, installation_id: 123,
+      created_at: "2026-11-03T00:00:00Z", expires_at: "2026-11-03T00:10:00Z",
+    });
+  }
+  it("stores state hashes and safe repository metadata without credential columns", async () => {
+    for (const table of ["github_repository_setup_attempts", "github_repository_snapshots", "github_repository_snapshot_repositories"]) {
+      const columns = await columnNames(db().admin, table);
+      expect(columns.length).toBeGreaterThan(0);
+      expect(columns.filter((column) => /token|secret|private_key/i.test(column))).toEqual([]);
+    }
+    expect((await attempt()).state_hash).toHaveLength(32);
+  });
+  it("rejects duplicate states, nonpositive identities, malformed hashes and invalid expiries", async () => {
+    const a = await attempt();
+    await expectIntegrityRejection(attempt({ state_hash: a.state_hash }));
+    await expectIntegrityRejection(attempt({ expected_github_user_id: 0 }));
+    await expectIntegrityRejection(attempt({ state_hash: Buffer.alloc(31) }));
+    await expectIntegrityRejection(attempt({ status: "unknown" }));
+    await expectIntegrityRejection(attempt({ installation_id: -1 }));
+    await expectIntegrityRejection(attempt({ expires_at: "2026-11-03T00:00:00Z" }));
+  });
+  it("allows one snapshot per attempt and requires positive installation IDs and expiry", async () => {
+    const s = await snapshot();
+    const base = { attempt_id: s.attempt_id, project_id: s.project_id, person_id: s.person_id,
+      installation_id: 123, created_at: s.created_at, expires_at: s.expires_at };
+    await expectIntegrityRejection(insertRow(db().admin, "github_repository_snapshots", base));
+    await expectIntegrityRejection(insertRow(db().admin, "github_repository_snapshots", { ...base, attempt_id: (await attempt()).id, installation_id: 0 }));
+    await expectIntegrityRejection(insertRow(db().admin, "github_repository_snapshots", { ...base, attempt_id: (await attempt()).id, expires_at: s.created_at }));
+  });
+  it("requires unique repository IDs and positions, valid IDs and nonempty coordinates", async () => {
+    const s = await snapshot();
+    const base = { snapshot_id: s.id, repository_id: 456, owner: "synthetic-owner", name: "synthetic-repository", is_private: true, default_branch: "main", position: 0 };
+    await insertRow(db().admin, "github_repository_snapshot_repositories", base);
+    for (const patch of [{ position: 1 }, { repository_id: 457 }, { repository_id: 0, position: 1 },
+      { repository_id: 458, position: -1 }, { repository_id: 459, position: 2, owner: "" }, { repository_id: 460, position: 3, name: "" }]) {
+      await expectIntegrityRejection(insertRow(db().admin, "github_repository_snapshot_repositories", { ...base, ...patch }));
+    }
+  });
+  it("grants app_runtime row access without table administration privileges", async () => {
+    const runtime = await db().connectAsRuntime();
+    for (const table of ["github_repository_setup_attempts", "github_repository_snapshots", "github_repository_snapshot_repositories"]) {
+      for (const privilege of ["SELECT", "INSERT", "UPDATE", "DELETE"]) {
+        const { rows } = await runtime.query<{ allowed: boolean }>(
+          "SELECT has_table_privilege(current_user, $1, $2) AS allowed", [`app.${table}`, privilege],
+        );
+        expect(rows[0].allowed, `app_runtime ${privilege} on app.${table}`).toBe(true);
+      }
+      for (const privilege of ["TRUNCATE", "REFERENCES", "TRIGGER"]) {
+        const { rows } = await runtime.query<{ allowed: boolean }>(
+          "SELECT has_table_privilege(current_user, $1, $2) AS allowed", [`app.${table}`, privilege],
+        );
+        expect(rows[0].allowed, `app_runtime must lack ${privilege} on app.${table}`).toBe(false);
+      }
+      await expect(runtime.query(`SELECT * FROM app.${table} LIMIT 1`)).resolves.toHaveProperty("rows");
+    }
+  });
+  it("denies Supabase Data API roles access to setup and snapshot data", async () => {
+    for (const role of ["anon", "authenticated", "service_role"]) {
+      await db().admin.query(`SET ROLE ${role}`);
+      try {
+        for (const table of ["github_repository_setup_attempts", "github_repository_snapshots", "github_repository_snapshot_repositories"]) {
+          await expectPrivilegeRejection(db().admin.query(`SELECT * FROM app.${table}`));
+        }
+      }
+      finally { await db().admin.query("RESET ROLE"); }
     }
   });
 });

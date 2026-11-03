@@ -12,6 +12,9 @@ export type ServerConfig = Readonly<{
   databaseUrl: string;
   githubAppClientId: string;
   githubAppClientSecret: string;
+  githubAppId: string;
+  githubAppSlug: string;
+  githubAppPrivateKey: string;
   supabasePublishableKey: string;
   supabaseUrl: string;
 }>;
@@ -88,6 +91,16 @@ function parseCaCertificate(value: string): string {
   return value;
 }
 
+function parseGitHubAppId(value: string): string {
+  if (!/^[1-9]\d{0,18}$/.test(value)) throw new Error("Missing or invalid environment variable: GITHUB_APP_ID");
+  return value;
+}
+
+function parseGitHubAppSlug(value: string): string {
+  if (!/^[A-Za-z0-9-]{1,100}$/.test(value)) throw new Error("Missing or invalid environment variable: GITHUB_APP_SLUG");
+  return value;
+}
+
 // G10, E3: AI_PROVIDER is required; SOCLAAS_* are read only for soclaas; production refuses fake.
 function readAiConfig(appEnvironment: AppEnvironment): AiConfig {
   const provider = required("AI_PROVIDER", { AI_PROVIDER: process.env.AI_PROVIDER });
@@ -116,6 +129,9 @@ export function getServerConfig(): ServerConfig {
     DATABASE_URL: process.env.DATABASE_URL,
     GITHUB_APP_CLIENT_ID: process.env.GITHUB_APP_CLIENT_ID,
     GITHUB_APP_CLIENT_SECRET: process.env.GITHUB_APP_CLIENT_SECRET,
+    GITHUB_APP_ID: process.env.GITHUB_APP_ID,
+    GITHUB_APP_SLUG: process.env.GITHUB_APP_SLUG,
+    GITHUB_APP_PRIVATE_KEY: process.env.GITHUB_APP_PRIVATE_KEY,
     SUPABASE_PUBLISHABLE_KEY: process.env.SUPABASE_PUBLISHABLE_KEY,
     SUPABASE_URL: process.env.SUPABASE_URL,
   };
@@ -137,6 +153,9 @@ export function getServerConfig(): ServerConfig {
     databaseUrl: parseDatabaseUrl(required("DATABASE_URL", environment)),
     githubAppClientId: required("GITHUB_APP_CLIENT_ID", environment),
     githubAppClientSecret: required("GITHUB_APP_CLIENT_SECRET", environment),
+    githubAppId: parseGitHubAppId(required("GITHUB_APP_ID", environment)),
+    githubAppSlug: parseGitHubAppSlug(required("GITHUB_APP_SLUG", environment)),
+    githubAppPrivateKey: required("GITHUB_APP_PRIVATE_KEY", environment).replace(/\\n/g, "\n"),
     supabasePublishableKey: required("SUPABASE_PUBLISHABLE_KEY", environment),
     supabaseUrl: parseSupabaseUrl(required("SUPABASE_URL", environment)),
   });

@@ -1,3 +1,4 @@
+import { generateKeyPairSync } from "node:crypto";
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -16,6 +17,8 @@ const boundary = vi.hoisted(() => ({
   installationAvailable: true, repositoryAvailable: true,
   repositoryInstallationId: 123,
   providerFailure: "", databaseFailure: false, inTransaction: false,
+  attempt: null as null | { id: string; project_id: string; person_id: string; expected_github_user_id: string; github_user_id: string; state_hash: Buffer; status: string; installation_id: string | null; expires: number },
+  snapshot: false, snapshotExpires: 0,
   writes: [] as { sql: string; parameters: readonly unknown[] }[],
 }));
 
@@ -26,6 +29,7 @@ vi.mock("@/server/config", () => ({ getServerConfig: () => ({
   databaseCaCert: "synthetic-test-ca", supabaseUrl: "https://synthetic.supabase.co",
   supabasePublishableKey: "synthetic-publishable-key",
   githubAppClientId: "synthetic-app-client", githubAppClientSecret: "synthetic-app-secret",
+  githubAppId: "123", githubAppSlug: "synthetic-app", githubAppPrivateKey: testPrivateKey,
   ai: { provider: "soclaas", apiKey: "synthetic-soclaas-key", model: "synthetic-model:1b" },
 }) }));
 vi.mock("@/server/auth/supabase-auth", () => ({
@@ -53,11 +57,12 @@ vi.mock("next/headers", () => ({ cookies: async () => ({
   delete: (name: string) => boundary.cookies.delete(name),
 }) }));
 
+const testPrivateKey = generateKeyPairSync("rsa", { modulusLength: 2048 }).privateKey.export({ type: "pkcs8", format: "pem" }).toString();
 const origin = "https://synthetic-app.example";
 const projectId = "33333333-3333-4333-8333-333333333333";
 const personId = "22222222-2222-4222-8222-222222222222";
 const authId = "11111111-1111-4111-8111-111111111111";
-const selected = { installationId: "123", repositoryOwner: "synthetic-owner", repositoryName: "synthetic-repository" };
+const snapshotId = "77777777-7777-4777-8777-777777777777";
 const token = "synthetic-callback-only-token";
 const privateDetail = "synthetic-private-provider-detail";
 const errors = {
@@ -66,91 +71,29 @@ const errors = {
   403: { code: "FORBIDDEN", message: "Insufficient permissions" },
   404: { code: "NOT_FOUND", message: "Resource not found" },
 } as const;
-
-async function start(body: unknown = selected, options: { raw?: string; projectId?: string; origin?: string } = {}) {
-  const id = options.projectId ?? projectId;
-  const { POST } = await import("../../../src/app/api/v1/projects/[projectId]/github-repository/authorization/route");
-  return POST(new NextRequest(`${origin}/api/v1/projects/${id}/github-repository/authorization`, {
-    method: "POST", headers: { "content-type": "application/json", origin: options.origin ?? origin },
-    body: options.raw ?? JSON.stringify(body),
-  }), { params: Promise.resolve({ projectId: id }) });
-}
-
-type Authorization = { state: string; cookie: string; cookieName: string; startResponse: Response };
-
-async function authorize(): Promise<Authorization> {
-  const response = await start();
-  expect(response.status).toBe(200);
-  const data = await response.json();
-  expect(Object.keys(data)).toEqual(["authorizationUrl"]);
-  const url = new URL(data.authorizationUrl);
-  expect(url.origin).toBe("https://github.com");
-  expect(url.pathname).toBe("/login/oauth/authorize");
-  const state = url.searchParams.get("state");
-  expect(state).toBeTruthy();
-  const setCookie = response.headers.get("set-cookie");
-  const cookie = setCookie?.split(";")[0] ?? [...boundary.cookies].map(([name, value]) => `${name}=${value}`)[0];
-  expect(cookie).toBeTruthy();
-  const cookieName = cookie.slice(0, cookie.indexOf("="));
-  boundary.cookies.set(cookieName, decodeURIComponent(cookie.slice(cookie.indexOf("=") + 1)));
-  return { state: state!, cookie, cookieName, startResponse: response };
-}
-
-async function callback(authorization: Authorization, options: {
-  state?: string; cookie?: string; query?: string; requestOrigin?: string;
-} = {}) {
-  const { GET } = await import("../../../src/app/api/v1/auth/github-app/callback/route");
-  const query = options.query ?? new URLSearchParams({ code: "synthetic-code", state: options.state ?? authorization.state }).toString();
-  return GET(new NextRequest(`${options.requestOrigin ?? origin}/api/v1/auth/github-app/callback?${query}`, {
-    headers: { cookie: options.cookie ?? authorization.cookie, host: "untrusted.example", "x-forwarded-host": "untrusted.example" },
-  }));
-}
-
 async function expectError(response: Response, status?: keyof typeof errors) {
   if (status) expect(response.status).toBe(status);
   else expect(response.status).toBeGreaterThanOrEqual(400);
   expect(response.headers.get("cache-control")).toContain("no-store");
-  const text = await response.text();
-  expect(text).not.toContain(token);
-  expect(text).not.toContain(privateDetail);
-  expect(text).not.toContain("synthetic-app-secret");
-  const data = JSON.parse(text);
+  const body = await response.text();
+  for (const sensitive of [token, privateDetail, "synthetic-app-secret"]) expect(body).not.toContain(sensitive);
+  const data = JSON.parse(body);
   expect(data).toEqual({ error: { code: expect.any(String), message: expect.any(String) } });
   if (status) expect(data.error).toEqual(errors[status]);
 }
-
-function expectConsumed(response: Response, authorization: Authorization) {
-  const header = response.headers.get("set-cookie") ?? "";
-  const expiredInResponse = header.includes(`${authorization.cookieName}=`) &&
-    (/max-age=0/i.test(header) || /expires=Thu, 01 Jan 1970/i.test(header));
-  const options = boundary.cookieOptions.get(authorization.cookieName);
-  const expiredInStore = !boundary.cookies.get(authorization.cookieName) || options?.maxAge === 0;
-  expect(expiredInResponse || expiredInStore).toBe(true);
-}
-
-function putSelectionOnSecondPage(resource: "installation" | "repository", failSecondPage = false) {
-  const originalFetch = boundary.fetch.getMockImplementation()!;
-  const path = resource === "installation" ? "/user/installations" : "/user/installations/123/repositories";
-  const secondPageVisited = vi.fn();
-  boundary.fetch.mockImplementation(async (input: RequestInfo | URL) => {
-    const url = new URL(input instanceof Request ? input.url : String(input));
-    if (url.pathname !== path) return originalFetch(input);
-    if (url.searchParams.get("page") === "2") {
-      secondPageVisited();
-      if (failSecondPage) return Response.json({ message: `${privateDetail}: ${token}` }, { status: 503 });
-      return originalFetch(input);
-    }
-    const next = new URL(url);
-    next.searchParams.set("page", "2");
-    const firstPage = resource === "installation"
-      ? { total_count: 2, installations: [{ id: 999, account: { login: "another-synthetic-owner" } }] }
-      : { total_count: 2, repositories: [{ id: 999, name: "another-synthetic-repository",
-        full_name: `${selected.repositoryOwner}/another-synthetic-repository`, owner: { login: selected.repositoryOwner } }] };
-    return Response.json(firstPage, { headers: { Link: `<${next}>; rel="next"` } });
+type Endpoint = "setup" | "snapshot" | "link";
+async function request(endpoint: Endpoint, body: unknown = { snapshotId, repositoryId: 456 }, requestOrigin = origin) {
+  const root = `${origin}/api/v1/projects/${projectId}/github-repository`;
+  const path = endpoint === "setup" ? `${root}/setup-url` : endpoint === "snapshot" ? `${root}/snapshots/${snapshotId}` : root;
+  const req = new NextRequest(path, { method: endpoint === "link" ? "POST" : "GET",
+    headers: { origin: requestOrigin, "content-type": "application/json" },
+    ...(endpoint === "link" ? { body: JSON.stringify(body) } : {}),
   });
-  return secondPageVisited;
+  const context = { params: Promise.resolve({ projectId, snapshotId }) };
+  if (endpoint === "setup") return (await import("../../../src/app/api/v1/projects/[projectId]/github-repository/setup-url/route")).GET(req, context);
+  if (endpoint === "snapshot") return (await import("../../../src/app/api/v1/projects/[projectId]/github-repository/snapshots/[snapshotId]/route")).GET(req, context);
+  return (await import("../../../src/app/api/v1/projects/[projectId]/github-repository/route")).POST(req, context);
 }
-
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-11-03T03:00:00Z"));
@@ -160,7 +103,7 @@ beforeEach(() => {
   boundary.githubId = "424242"; boundary.sessionGithubId = "424242"; boundary.oauthGithubId = 424242;
   boundary.installationAvailable = true; boundary.repositoryAvailable = true;
   boundary.repositoryInstallationId = 123; boundary.providerFailure = ""; boundary.databaseFailure = false;
-  boundary.inTransaction = false;
+  boundary.inTransaction = false; boundary.attempt = null; boundary.snapshot = false;
   boundary.getUser.mockImplementation(async () => ({ data: { user: {
     id: authId, identities: [{ provider: "github", provider_id: boundary.sessionGithubId,
       identity_data: { user_name: "synthetic-pm" } }],
@@ -171,6 +114,30 @@ beforeEach(() => {
     if (/^\s*begin\b/i.test(sql)) { boundary.inTransaction = true; return { rows: [], rowCount: 0 }; }
     if (/^\s*(commit|rollback)\b/i.test(sql)) { boundary.inTransaction = false; return { rows: [], rowCount: 0 }; }
     if (/^\s*set\b/i.test(sql)) return { rows: [], rowCount: 0 };
+    if (/INSERT INTO app.github_repository_setup_attempts/i.test(sql)) {
+      boundary.attempt = { id: "88888888-8888-4888-8888-888888888888", project_id: projectId, person_id: personId,
+        expected_github_user_id: boundary.githubId, github_user_id: boundary.githubId, state_hash: parameters[3] as Buffer,
+        status: "setup_pending", installation_id: null, expires: Date.now() + 600000 };
+      return { rows: [boundary.attempt], rowCount: 1 };
+    }
+    if (/UPDATE app.github_repository_setup_attempts/i.test(sql)) {
+      const a = boundary.attempt;
+      const expectedStatus = /SET status = 'verified'/.test(sql) ? "oauth_pending" : "setup_pending";
+      if (!a || !a.state_hash.equals(parameters[0] as Buffer) || a.status !== expectedStatus || a.expires <= Date.now() ||
+          boundary.role !== "product_manager" || boundary.githubId !== a.expected_github_user_id || boundary.sessionGithubId !== a.expected_github_user_id) return { rows: [], rowCount: 0 };
+      if (expectedStatus === "setup_pending") { a.state_hash = parameters[1] as Buffer; a.installation_id = String(parameters[2]); a.status = "oauth_pending"; }
+      else a.status = "verified";
+      return { rows: [a], rowCount: 1 };
+    }
+    if (/INSERT INTO app.github_repository_snapshots\b/i.test(sql)) {
+      boundary.snapshot = true; boundary.snapshotExpires = Date.now() + 600000;
+      return { rows: [{ id: snapshotId }], rowCount: 1 };
+    }
+    if (/FROM app.github_repository_snapshots s/i.test(sql)) {
+      if (!boundary.snapshot || parameters[0] !== snapshotId || parameters[1] !== projectId || boundary.snapshotExpires <= Date.now()) return { rows: [], rowCount: 0 };
+      return { rows: [{ repository_id: "456", owner: "synthetic-owner", name: "synthetic-repository", is_private: true,
+        default_branch: "main", attempt_id: boundary.attempt!.id, installation_id: "123", person_id: personId, github_user_id: boundary.githubId }], rowCount: 1 };
+    }
     if (/\b(insert|update|delete)\b/i.test(sql)) {
       boundary.writes.push({ sql, parameters });
       if (boundary.databaseFailure) throw new Error(privateDetail);
@@ -203,226 +170,158 @@ beforeEach(() => {
     if (url.pathname === "/user/installations") return Response.json({ total_count: boundary.installationAvailable ? 1 : 0,
       installations: boundary.installationAvailable ? [{ id: 123, account: { login: "synthetic-owner" } }] : [] });
     if (url.pathname === "/user/installations/123/repositories") return Response.json({ total_count: boundary.repositoryAvailable ? 1 : 0,
-      repositories: boundary.repositoryAvailable ? [{ id: 456, name: selected.repositoryName,
-        full_name: `${selected.repositoryOwner}/${selected.repositoryName}`, owner: { login: selected.repositoryOwner },
-        installation: { id: boundary.repositoryInstallationId } }] : [] });
+      repositories: boundary.repositoryAvailable ? [{ id: 456, name: "synthetic-repository",
+        full_name: `${"synthetic-owner"}/${"synthetic-repository"}`, owner: { login: "synthetic-owner" },
+        private: true, default_branch: "main", installation: { id: boundary.repositoryInstallationId } }] : [] });
+    if (url.pathname === "/app/installations/123/access_tokens") return Response.json({ token: "synthetic-installation-token" });
+    if (url.pathname === "/repos/synthetic-owner/synthetic-repository") return Response.json({ id: 456 });
     throw new Error(`Unexpected provider path: ${url.pathname}`);
   });
 });
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
-describe("repository authorization initiation", () => {
-  it("returns a separate GitHub App OAuth URL with cookie-bound state and no mutation", async () => {
-    const authorization = await authorize();
-    const url = new URL((await start().then((response) => response.json())).authorizationUrl);
-    expect(url.searchParams.get("client_id")).toBe("synthetic-app-client");
-    expect(url.searchParams.get("redirect_uri")).toBe(`${origin}/api/v1/auth/github-app/callback`);
-    expect(authorization.startResponse.headers.get("cache-control")).toContain("no-store");
-    const header = authorization.startResponse.headers.get("set-cookie");
-    if (header) {
-      expect(header).toMatch(/httponly/i); expect(header).toMatch(/samesite=lax/i);
-      expect(/max-age=600/i.test(header) || /expires=Tue, 03 Nov 2026 03:10:00 GMT/i.test(header)).toBe(true);
-    } else {
-      const options = boundary.cookieOptions.get(authorization.cookieName);
-      expect(options).toMatchObject({ httpOnly: true, sameSite: "lax" });
-      expect(options?.maxAge === 600 || (options?.expires instanceof Date &&
-        options.expires.getTime() === new Date("2026-11-03T03:10:00Z").getTime())).toBe(true);
-    }
-    expect(boundary.writes).toEqual([]);
-  });
-
-  it("rejects an anonymous request before database access", async () => {
+describe("approved PM setup, snapshot and final-link authorization", () => {
+  it.each<Endpoint>(["setup", "snapshot", "link"])("rejects anonymous %s before provider access", async (endpoint) => {
     boundary.getUser.mockResolvedValue({ data: { user: null }, error: null });
-    await expectError(await start(), 401);
-    expect(boundary.query).not.toHaveBeenCalled(); expect(boundary.writes).toEqual([]);
+    await expectError(await request(endpoint), 401);
+    expect(boundary.fetch).not.toHaveBeenCalled(); expect(boundary.writes).toEqual([]);
   });
-
-  it("refuses a developer", async () => {
+  it.each<Endpoint>(["setup", "snapshot", "link"])("refuses a developer calling %s", async (endpoint) => {
     boundary.role = "developer";
-    await expectError(await start(), 403); expect(boundary.writes).toEqual([]);
+    await expectError(await request(endpoint), 403);
+    expect(boundary.fetch).not.toHaveBeenCalled(); expect(boundary.writes).toEqual([]);
   });
-
-  it.each(["non-member", "missing-project", "unmapped-person"])("conceals a %s", async (scenario) => {
-    if (scenario === "non-member") boundary.role = null;
-    if (scenario === "missing-project") boundary.projectExists = false;
-    if (scenario === "unmapped-person") boundary.personExists = false;
-    await expectError(await start(), 404); expect(boundary.writes).toEqual([]);
+  it.each<Endpoint>(["setup", "snapshot", "link"])("conceals project data from nonmembers on %s", async (endpoint) => {
+    boundary.role = null;
+    await expectError(await request(endpoint), 404);
+    expect(boundary.fetch).not.toHaveBeenCalled(); expect(boundary.writes).toEqual([]);
   });
-
-  it.each([
-    null, [], {}, { ...selected, installationId: 123 }, { ...selected, installationId: "0" },
-    { ...selected, installationId: "-1" }, { ...selected, installationId: "1.5" },
-    { ...selected, installationId: "1e3" }, { ...selected, installationId: "" },
-    { ...selected, installationId: null }, { ...selected, installationId: {} },
-    { ...selected, repositoryOwner: "" }, { ...selected, repositoryName: "" },
-    { ...selected, repositoryOwner: "owner/other" }, { ...selected, repositoryName: "../other" },
-    { ...selected, repositoryId: 987 }, { ...selected, githubUserId: 999999 },
-  ])("rejects an invalid or surplus mutation field in %j", async (body) => {
-    await expectError(await start(body), 400); expect(boundary.writes).toEqual([]);
+  it("refuses a cross-origin final link without changing the prior binding", async () => {
+    await expectError(await request("link", undefined, "https://untrusted.example"), 400);
+    expect(boundary.writes).toEqual([]); expect(boundary.fetch).not.toHaveBeenCalled();
   });
-
-  it("rejects malformed JSON", async () => {
-    await expectError(await start(undefined, { raw: "{broken" }), 400); expect(boundary.writes).toEqual([]);
+  it.each([{}, { snapshotId }, { snapshotId, repositoryId: "456" }, { snapshotId, repositoryId: 0 },
+    { snapshotId, repositoryId: 456, installationId: "123" },
+    { snapshotId, repositoryId: 456, repositoryOwner: "untrusted-owner" },
+  ])("rejects invalid final selection and fields outside the approved schema: %j", async (body) => {
+    await expectError(await request("link", body), 400);
+    expect(boundary.writes).toEqual([]); expect(boundary.fetch).not.toHaveBeenCalled();
   });
-
-  it("rejects a malformed project UUID", async () => {
-    await expectError(await start(selected, { projectId: "not-a-uuid" }), 400); expect(boundary.writes).toEqual([]);
+});
+describe("untrusted App setup return", () => {
+  it.each(["", "state=synthetic", "installation_id=123", "installation_id=-1&state=synthetic", "installation_id=abc&state=synthetic"])("rejects malformed return %s without linking", async (query) => {
+    const { GET } = await import("../../../src/app/api/v1/auth/github-app/setup-callback/route");
+    await expectError(await GET(new NextRequest(`${origin}/api/v1/auth/github-app/setup-callback?${query}`)));
+    expect(boundary.fetch).not.toHaveBeenCalled();
+    expect(boundary.writes.filter(({ sql }) => /update\s+app\.projects/i.test(sql))).toEqual([]);
   });
 });
 
-describe("repository authorization callback", () => {
-  it("verifies the selection, replaces only the binding, consumes state, and uses APP_ORIGIN for its redirect", async () => {
-    const authorization = await authorize();
-    const response = await callback(authorization, { requestOrigin: "https://untrusted.example" });
-    expect(response.status).toBe(303);
-    expect(response.headers.get("location")).toBe(`${origin}/projects/${projectId}`);
-    expect(response.headers.get("cache-control")).toContain("no-store");
-    expectConsumed(response, authorization);
-    expect(boundary.writes).toHaveLength(1);
-    const write = boundary.writes[0];
-    expect(write.sql).toMatch(/\bupdate\s+app\.projects\b/i);
-    for (const column of ["github_installation_id", "github_repository_id", "github_repository_owner", "github_repository_name"]) {
-      expect(write.sql).toContain(column);
-    }
-    expect(write.parameters.map(String)).toEqual(expect.arrayContaining([projectId, "123", "456", selected.repositoryOwner, selected.repositoryName]));
+async function setupReturn(state: string) {
+  const { GET } = await import("../../../src/app/api/v1/auth/github-app/setup-callback/route");
+  return GET(new NextRequest(`${origin}/api/v1/auth/github-app/setup-callback?installation_id=123&state=${state}`));
+}
+async function startOAuth() {
+  const start = await request("setup"); expect(start.status).toBe(200);
+  const { setupUrl } = await start.json();
+  const setup = new URL(setupUrl); expect(setup.pathname).toBe("/apps/synthetic-app/installations/new");
+  const setupState = setup.searchParams.get("state")!;
+  const returned = await setupReturn(setupState); expect(returned.status).toBe(303);
+  const state = new URL(returned.headers.get("location")!).searchParams.get("state")!;
+  return { state, setupState };
+}
+async function oauthReturn(state: string, query?: string) {
+  const { GET } = await import("../../../src/app/api/v1/auth/github-app/callback/route");
+  return GET(new NextRequest(`${origin}/api/v1/auth/github-app/callback?${query ?? new URLSearchParams({ code: "synthetic-code", state })}`));
+}
+describe("verified setup and repository snapshot lifecycle", () => {
+  it("verifies identity and installation before showing a snapshot and linking", async () => {
+    const { state } = await startOAuth();
+    expect(boundary.fetch).not.toHaveBeenCalled();
+    const response = await oauthReturn(state); expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(`${origin}/projects/${projectId}/settings?githubSnapshot=${snapshotId}`);
+    const snapshot = await request("snapshot"); expect(snapshot.status).toBe(200);
+    expect(await snapshot.json()).toEqual({ repositories: [{ repositoryId: 456, owner: "synthetic-owner", name: "synthetic-repository", private: true, defaultBranch: "main" }] });
+    const link = await request("link"); expect(link.status).toBeLessThan(300);
+    expect(boundary.writes.filter(({ sql }) => /UPDATE app.projects/i.test(sql))).toHaveLength(1);
     expect(JSON.stringify(boundary.writes)).not.toContain(token);
-    expect(JSON.stringify(boundary.writes)).not.toContain("synthetic-app-secret");
-    expect(await response.text()).not.toContain(token);
-    const readCalls = boundary.fetch.mock.calls.filter(([input]) =>
-      (input instanceof Request ? input.url : String(input)).startsWith("https://api.github.com"));
-    expect(readCalls.length).toBeGreaterThan(0);
-    for (const [input, init] of readCalls) {
-      const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
-      expect(headers.get("authorization")).toBe(`Bearer ${token}`);
-      expect(headers.get("X-GitHub-Api-Version")).toBe("2026-03-10");
-    }
+    expect(JSON.stringify(boundary.attempt)).not.toContain(token);
   });
-
-  it.each(["missing-cookie", "mismatched-state", "tampered-cookie", "expired-state"])("rejects %s before provider access", async (scenario) => {
-    const authorization = await authorize();
-    const options: { state?: string; cookie?: string } = {};
-    if (scenario === "missing-cookie") { boundary.cookies.clear(); options.cookie = ""; }
-    if (scenario === "mismatched-state") options.state = `${authorization.state}-different`;
-    if (scenario === "tampered-cookie") {
-      options.cookie = `${authorization.cookie}tampered`;
-      boundary.cookies.set(authorization.cookieName, `${boundary.cookies.get(authorization.cookieName)}tampered`);
-    }
-    if (scenario === "expired-state") vi.setSystemTime(new Date("2026-11-03T03:10:01Z"));
-    boundary.fetch.mockClear();
-    await expectError(await callback(authorization, options));
-    expect(boundary.fetch).not.toHaveBeenCalled(); expect(boundary.writes).toEqual([]);
-  });
-
-  it.each(["", "state=only-state", "code=only-code", "error=access_denied&error_description=synthetic-private-provider-detail"])("rejects incomplete/denied callback %s", async (query) => {
-    const authorization = await authorize();
-    boundary.fetch.mockClear();
-    const response = await callback(authorization, { query });
-    await expectError(response);
-    expectConsumed(response, authorization);
-    expect(boundary.fetch).not.toHaveBeenCalled(); expect(boundary.writes).toEqual([]);
-  });
-
-  it.each(["signed-out", "developer", "non-member", "changed-verified-identity", "changed-session-identity"])("preserves the old link for a %s PM", async (scenario) => {
-    const authorization = await authorize();
-    if (scenario === "signed-out") boundary.getUser.mockResolvedValue({ data: { user: null }, error: null });
-    if (scenario === "developer") boundary.role = "developer";
-    if (scenario === "non-member") boundary.role = null;
-    if (scenario === "changed-verified-identity") boundary.githubId = "515151";
-    if (scenario === "changed-session-identity") boundary.sessionGithubId = "515151";
-    const response = await callback(authorization);
-    await expectError(response); expectConsumed(response, authorization); expect(boundary.writes).toEqual([]);
-  });
-
-  it.each(["role", "verified-identity"])("preserves the old binding if the PM %s changes during the last GitHub read", async (change) => {
-    const authorization = await authorize();
+  it("accepts installation-scoped repository metadata without a nested installation object", async () => {
     const originalFetch = boundary.fetch.getMockImplementation()!;
-    const changedDuringProviderCall = vi.fn();
     boundary.fetch.mockImplementation(async (input: RequestInfo | URL) => {
-      const response = await originalFetch(input);
       const url = new URL(input instanceof Request ? input.url : String(input));
-      if (url.pathname === "/user/installations/123/repositories") {
-        if (change === "role") boundary.role = "developer";
-        else boundary.githubId = "515151";
-        changedDuringProviderCall();
-      }
-      return response;
+      if (url.pathname === "/user/installations/123/repositories") return Response.json({ total_count: 1,
+        repositories: [{ id: 456, name: "synthetic-repository", full_name: "synthetic-owner/synthetic-repository",
+          owner: { login: "synthetic-owner" }, private: true, default_branch: "main" }] });
+      return originalFetch(input);
     });
-
-    const response = await callback(authorization);
-
-    expect(changedDuringProviderCall).toHaveBeenCalledOnce();
-    await expectError(response);
-    expectConsumed(response, authorization);
-    // No persistence operation can replace any of the previous four binding
-    // values returned by the database fixture when authorization changes.
-    expect(boundary.writes).toEqual([]);
+    const { state } = await startOAuth(); expect((await oauthReturn(state)).status).toBe(303);
+    const writes = boundary.writes.filter(({ sql }) => /INSERT INTO app.github_repository_snapshot_repositories/.test(sql));
+    expect(writes).toHaveLength(1);
+    expect(writes[0].parameters).toEqual([snapshotId, 456, "synthetic-owner", "synthetic-repository", true, "main", 0]);
+    const paths = boundary.fetch.mock.calls.map(([input]) => new URL(input instanceof Request ? input.url : String(input)).pathname);
+    expect(paths.indexOf("/user/installations")).toBeLessThan(paths.indexOf("/user/installations/123/repositories"));
+    const snapshot = await request("snapshot"); expect(snapshot.status).toBe(200);
+    expect(await snapshot.json()).toEqual({ repositories: [{ repositoryId: 456, owner: "synthetic-owner", name: "synthetic-repository", private: true, defaultBranch: "main" }] });
   });
-
-  it.each(["installation", "repository"] as const)("links the selected %s when it is on the next GitHub page", async (resource) => {
-    const authorization = await authorize();
-    const secondPageVisited = putSelectionOnSecondPage(resource);
-
-    const response = await callback(authorization);
-
-    expect(secondPageVisited).toHaveBeenCalledOnce();
-    expect(response.status).toBe(303);
-    expect(response.headers.get("location")).toBe(`${origin}/projects/${projectId}`);
-    expectConsumed(response, authorization);
-    expect(boundary.writes).toHaveLength(1);
-    expect(boundary.writes[0].parameters.map(String)).toEqual(expect.arrayContaining([
-      projectId, "123", "456", selected.repositoryOwner, selected.repositoryName,
-    ]));
+  it("does not query installation-scoped repositories before verifying user installation access", async () => {
+    const { state } = await startOAuth(); boundary.installationAvailable = false;
+    await expectError(await oauthReturn(state), 403);
+    const paths = boundary.fetch.mock.calls.map(([input]) => new URL(input instanceof Request ? input.url : String(input)).pathname);
+    expect(paths).not.toContain("/user/installations/123/repositories");
+    expect(boundary.snapshot).toBe(false);
   });
-
-  it.each(["installation", "repository"] as const)("safely refuses linking when the next %s page fails", async (resource) => {
-    const authorization = await authorize();
-    const secondPageVisited = putSelectionOnSecondPage(resource, true);
-
-    const response = await callback(authorization);
-
-    expect(secondPageVisited).toHaveBeenCalledOnce();
-    await expectError(response);
-    expectConsumed(response, authorization);
-    expect(boundary.writes).toEqual([]);
+  it("consumes setup state once", async () => {
+    const { setupState } = await startOAuth();
+    await expectError(await setupReturn(setupState), 403);
+    expect(boundary.fetch).not.toHaveBeenCalled();
   });
-
-  it.each(["wrong-oauth-user", "inaccessible-installation", "inaccessible-repository"])("preserves the old link for %s", async (scenario) => {
-    const authorization = await authorize();
-    if (scenario === "wrong-oauth-user") boundary.oauthGithubId = 999999;
-    if (scenario === "inaccessible-installation") boundary.installationAvailable = false;
-    if (scenario === "inaccessible-repository") boundary.repositoryAvailable = false;
-    const response = await callback(authorization);
-    await expectError(response); expectConsumed(response, authorization); expect(boundary.writes).toEqual([]);
+  it("rejects an expired setup attempt", async () => {
+    const start = await request("setup"); const { setupUrl } = await start.json();
+    vi.advanceTimersByTime(600001);
+    await expectError(await setupReturn(new URL(setupUrl).searchParams.get("state")!), 403);
+    expect(boundary.fetch).not.toHaveBeenCalled();
   });
-
-  it.each(["network", "/login/oauth/access_token", "/user", "/user/installations", "/user/installations/123/repositories"])("contains provider failure at %s without mutating or leaking details", async (failure) => {
-    const authorization = await authorize();
-    boundary.providerFailure = failure;
-    const log = vi.spyOn(console, "error").mockImplementation(() => {});
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    try {
-      const response = await callback(authorization);
-      await expectError(response); expectConsumed(response, authorization); expect(boundary.writes).toEqual([]);
-      expect(JSON.stringify([...log.mock.calls, ...warn.mock.calls])).not.toContain(token);
-      expect(JSON.stringify([...log.mock.calls, ...warn.mock.calls])).not.toContain(privateDetail);
-    } finally { log.mockRestore(); warn.mockRestore(); }
+  it.each(["identity", "installation", "provider"])("preserves prior link when OAuth verification fails: %s", async (reason) => {
+    const { state } = await startOAuth();
+    if (reason === "identity") boundary.oauthGithubId = 999;
+    if (reason === "installation") boundary.installationAvailable = false;
+    if (reason === "provider") boundary.providerFailure = "network";
+    await expectError(await oauthReturn(state));
+    expect(boundary.snapshot).toBe(false);
+    expect(boundary.writes.filter(({ sql }) => /UPDATE app.projects/i.test(sql))).toEqual([]);
   });
-
-  it("contains a binding-write failure and still consumes state", async () => {
-    const authorization = await authorize();
-    boundary.databaseFailure = true;
-    const response = await callback(authorization);
-    await expectError(response); expectConsumed(response, authorization);
-    expect(JSON.stringify(boundary.writes)).not.toContain(token);
+  it("consumes OAuth state even after provider failure", async () => {
+    const { state } = await startOAuth(); boundary.providerFailure = "network";
+    await expectError(await oauthReturn(state)); boundary.providerFailure = "";
+    boundary.cookies.set("github_app_link_state", state); boundary.fetch.mockClear();
+    await expectError(await oauthReturn(state), 403); expect(boundary.fetch).not.toHaveBeenCalled();
   });
-
-  it("does not accept a replay after the browser consumes the state cookie", async () => {
-    const authorization = await authorize();
-    const response = await callback(authorization);
-    expect(response.status).toBe(303); expectConsumed(response, authorization);
-    boundary.cookies.clear(); boundary.fetch.mockClear(); boundary.writes.length = 0;
-    await expectError(await callback(authorization, { cookie: "" }));
-    expect(boundary.fetch).not.toHaveBeenCalled(); expect(boundary.writes).toEqual([]);
+  it("rejects OAuth state mismatch before provider calls", async () => {
+    const { state } = await startOAuth();
+    await expectError(await oauthReturn(`${state}-mismatch`), 400);
+    expect(boundary.fetch).not.toHaveBeenCalled();
+  });
+  it("refuses an expired snapshot without replacing the prior binding", async () => {
+    const { state } = await startOAuth(); expect((await oauthReturn(state)).status).toBe(303);
+    vi.advanceTimersByTime(600001);
+    await expectError(await request("snapshot"), 404);
+    await expectError(await request("link"), 404);
+    expect(boundary.writes.filter(({ sql }) => /UPDATE app.projects/i.test(sql))).toEqual([]);
+  });
+  it("does not return a snapshot under another project", async () => {
+    const { state } = await startOAuth(); expect((await oauthReturn(state)).status).toBe(303);
+    const otherProjectId = "99999999-9999-4999-8999-999999999999";
+    const { GET } = await import("../../../src/app/api/v1/projects/[projectId]/github-repository/snapshots/[snapshotId]/route");
+    await expectError(await GET(new NextRequest(`${origin}/api/v1/projects/${otherProjectId}/github-repository/snapshots/${snapshotId}`),
+      { params: Promise.resolve({ projectId: otherProjectId, snapshotId }) }), 404);
+  });
+  it("preserves the previous binding if App access is revoked before final linking", async () => {
+    const { state } = await startOAuth(); expect((await oauthReturn(state)).status).toBe(303);
+    boundary.providerFailure = "/app/installations/123/access_tokens";
+    await expectError(await request("link"), 403);
+    expect(boundary.writes.filter(({ sql }) => /UPDATE app.projects/i.test(sql))).toEqual([]);
   });
 });

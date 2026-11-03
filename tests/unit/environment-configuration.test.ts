@@ -344,6 +344,9 @@ function stubBaseEnvironment(appEnvironment: "development" | "production"): void
   vi.stubEnv("DATABASE_CA_CERT", "-----BEGIN CERTIFICATE-----\nSYNTHETIC\n-----END CERTIFICATE-----");
   vi.stubEnv("GITHUB_APP_CLIENT_ID", "synthetic-app-client");
   vi.stubEnv("GITHUB_APP_CLIENT_SECRET", "synthetic-app-secret");
+  vi.stubEnv("GITHUB_APP_ID", "123");
+  vi.stubEnv("GITHUB_APP_SLUG", "synthetic-app");
+  vi.stubEnv("GITHUB_APP_PRIVATE_KEY", "synthetic-private-key");
 }
 
 async function loadGetServerConfig() {
