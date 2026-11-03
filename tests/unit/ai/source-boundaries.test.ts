@@ -9,6 +9,9 @@ import { describe, expect, it } from "vitest";
 // openspec/changes/project-task-management/design.md, and the AGENTS.md coupling and AI
 // containment rules). These are coarse text checks; the reviewer still reads the code
 // (for example, for mutable module-level objects, which a text check cannot detect).
+// Task 6.2 (llm-gateway-secret-redaction) adds redaction.ts to the expected files; the same
+// checks apply to it (AC18 in workflow/handoffs/llm-gateway-secret-redaction.md, decision D7
+// "Secret Redaction Decisions" in design.md).
 
 const repositoryRoot = fileURLToPath(new URL("../../../", import.meta.url));
 const aiDirectory = join(repositoryRoot, "src", "server", "ai");
@@ -38,8 +41,8 @@ function importSpecifiers(text: string): string[] {
 }
 
 describe("src/server/ai source boundaries", () => {
-  it("contains the public entry point and the adapter modules", () => {
-    for (const name of ["index.ts", "llm-adapter.ts", "soclaas-adapter.ts", "fake-adapter.ts"]) {
+  it("contains the public entry point, the adapter modules, and the redaction module", () => {
+    for (const name of ["index.ts", "llm-adapter.ts", "soclaas-adapter.ts", "fake-adapter.ts", "redaction.ts"]) {
       expect(existsSync(join(aiDirectory, name)), name).toBe(true);
     }
   });

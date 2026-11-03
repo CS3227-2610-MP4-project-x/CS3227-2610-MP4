@@ -24,6 +24,29 @@ The system SHALL detect and redact likely secrets, such as API keys, tokens, pri
 - **WHEN** an attached diff contains a string matching a known secret pattern
 - **THEN** the string is replaced with a redaction marker before the LLM call, and the result notes that content was redacted
 
+### Requirement: Redaction is complete, marked, and reported
+Redaction SHALL apply to every text segment placed in a prompt, including task text, acceptance criteria, commit messages, diffs and feedback, and SHALL replace each detected secret with a fixed marker that does not contain any part of the secret. Redaction SHALL be deterministic and SHALL report whether any redaction occurred and how many, without returning the secret.
+
+#### Scenario: Common token formats are redacted
+- **WHEN** content contains a GitHub token, a SoC LLM API key, a cloud access key, a JWT, or a private key block
+- **THEN** each is replaced by the redaction marker and no part of the secret remains in the output
+
+#### Scenario: Credential assignments and connection strings are redacted
+- **WHEN** content contains an assignment such as `password=<value>` or `api_key: <value>`, or a connection string with embedded credentials
+- **THEN** the secret value is replaced by the redaction marker, and the surrounding non-secret text is kept
+
+#### Scenario: Content without secrets is unchanged
+- **WHEN** content contains no match for a secret pattern
+- **THEN** the output equals the input and the result reports no redaction
+
+#### Scenario: Redaction is reported without the secret
+- **WHEN** content has been redacted
+- **THEN** the result states that redaction occurred and how many replacements were made, and neither the report nor any log or usage record contains the secret
+
+#### Scenario: Redaction is repeatable
+- **WHEN** already-redacted content is redacted again
+- **THEN** the output is unchanged
+
 ### Requirement: Model output is validated
 The system SHALL validate every model response against the feature's output schema. An invalid response SHALL be retried once. If it is still invalid, the system SHALL show an error and store nothing.
 
