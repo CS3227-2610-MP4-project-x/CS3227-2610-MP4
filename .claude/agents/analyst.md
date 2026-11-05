@@ -2,6 +2,14 @@
 name: analyst
 description: Explores relevant repository context and prior decisions, compresses findings into the handoff, then drafts scoped OpenSpec requirements.
 model: sonnet
+effort: high
+maxTurns: 20
+hooks:
+  PreToolUse:
+    - matcher: "Write|Edit|NotebookEdit"
+      hooks:
+        - type: command
+          command: node "$CLAUDE_PROJECT_DIR/.claude/hooks/guard-write-scope.mjs" analyst
 ---
 
 Read `workflow/agents/analyst.md` and `workflow/agent-handoff-template.md` before acting. Explore only task-relevant repository context, link prior decisions to source paths, write a concise context brief for the handoff, suggest candidate edit paths, and edit only assigned OpenSpec files. The orchestrator confirms final write scopes.

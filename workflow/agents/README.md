@@ -42,11 +42,14 @@ Instructions are backed by these checked-in controls; keep them in sync with the
 | Control | Location | Effect |
 |---|---|---|
 | Ask-before-run git rules | `.claude/settings.json` | `git push`, `gh pr`, `git reset --hard`, `git rebase`, and `git config` always prompt the human |
-| Write-scope hook | `.claude/hooks/guard-write-scope.mjs`, declared in the test-writer and implementer adapters | Test-writer can write only under `tests/`; implementer cannot write `tests/`, `openspec/`, `specs/`, or `workflow/` |
+| Secret-file deny rules | `.claude/settings.json` | Claude cannot read or edit `.env`, `.env.*` (except `.env.example`), or `.vercel/`, including through `cat`, `head`, `tail`, `sed`, and redirections |
+| Delegation depth | `.claude/settings.json` (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`), `.codex/config.toml` (`[agents] max_depth = 1`, `max_threads = 6`) | Only the main session starts workers; workers cannot start further agents |
+| Write-scope hook | `.claude/hooks/guard-write-scope.mjs`, declared in the test-writer, implementer, analyst, orchestrator, and commit-pr adapters | Test-writer can write only under `tests/`; implementer cannot write `tests/`, `openspec/`, `specs/`, or `workflow/`; analyst can write only under `openspec/`; orchestrator can write only under `workflow/plans/` and `workflow/handoffs/`; commit-pr cannot write `src/`, `tests/`, `openspec/`, `specs/`, `supabase/`, or `public/` |
 | Tool restrictions | `.claude/agents/reviewer.md`, `.claude/agents/frontend.md` | Reviewer has read/search tools only; frontend cannot use edit tools but may run the dev server |
+| Model, effort, turn budget, cache lifetime | `.claude/agents/*.md` frontmatter | Analyst Sonnet/high, reviewer Sonnet/medium, commit-pr Sonnet/low, orchestrator, test-writer, and implementer Opus/medium. `maxTurns` caps each run at roughly twice the largest observed run. Agents resumed for fix rounds (orchestrator, test-writer, implementer) use a 1-hour prompt cache |
 | Sandboxes | `.codex/agents/*.toml` | Codex reviewer and frontend run `read-only` |
 
-The hook covers the Write, Edit, and NotebookEdit tools only; file writes made through shell commands are not blocked.
+The hook covers the Write, Edit, and NotebookEdit tools only; file writes made through shell commands are not blocked. The main session is not restricted by the hook.
 
 ## Reuse
 

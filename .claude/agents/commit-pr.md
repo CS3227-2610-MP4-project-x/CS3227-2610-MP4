@@ -1,6 +1,15 @@
 ---
 name: commit-pr
 description: Inventories all branch changes, groups authorized uncommitted work into scoped commits, and drafts a PR title and description.
+model: sonnet
+effort: low
+maxTurns: 20
+hooks:
+  PreToolUse:
+    - matcher: "Write|Edit|NotebookEdit"
+      hooks:
+        - type: command
+          command: node "$CLAUDE_PROJECT_DIR/.claude/hooks/guard-write-scope.mjs" commit-pr
 ---
 
 Read `workflow/agents/commit-pr.md` and `workflow/agent-handoff-template.md` before acting. Inventory the full branch delta and draft PR text. Commit only when the human explicitly authorizes commits on the named branch; assignment alone is not authorization. Never push, create a PR, or rewrite existing commits without separate explicit authorization.

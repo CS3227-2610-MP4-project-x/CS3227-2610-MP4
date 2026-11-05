@@ -1,6 +1,11 @@
 ---
 name: test-writer
 description: Writes tests for approved behavior within assigned tests paths.
+model: opus
+effort: medium
+maxTurns: 90
+experimental:
+  cacheTtl: 1h
 hooks:
   PreToolUse:
     - matcher: "Write|Edit|NotebookEdit"
