@@ -26,7 +26,3 @@ type = "command"
 command = 'python3 "$(git rev-parse --show-toplevel)/tools/codex_usage_hook.py"'
 timeout = 3
 
-# max_depth = 1: the root agent may start workers; workers may not start further agents.
-[agents]
-max_threads = 6
-max_depth = 1
