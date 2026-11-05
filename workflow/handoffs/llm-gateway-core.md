@@ -133,16 +133,18 @@ Out of scope, explicitly: G11 (route `maxDuration`; no Route Handler in 6.3) and
 
 ## Worker session reports
 
-### Session `orchestrator / not available`
+### Session `orchestrator / a8a609c7262124516`
 
 #### Shared fields `[ALL]`
 
-- Platform and model (if surfaced): Claude Code, Opus 5.5
+- Provider session ID: subagent `a8a609c7262124516` in root session `fc037bf9-e91f-4d24-96e9-a9ef2b7f533d`
+- Platform and model (if surfaced): Claude Code, `claude-opus-5-5`
+- Started / ended / elapsed: 2026-11-02 20:57–21:09 SGT (12 min); measured from first to last transcript record, so it includes waiting between continuations
+- Resource usage (provider-reported): tokens in (uncached) 30; cache read 850,536; cache write 190,584; out 25,131 (thinking 2,543); total 1,066,281; cache-read share of input 82%; tool calls 15; responses 14; 1 launch + 1 `SendMessage` continuation. Source: local Claude Code transcript, de-duplicated by message ID; backfilled 2026-11-05.
+- Unavailable resource metrics: cost (not recorded in local transcripts)
 - Role: orchestrator
 - Human owner and assigned task scope: Developer B (thegrimbee); task 6.3 planning and handoff.
 - Source revision: `9685edf`
-- Resource usage (provider-reported): not available
-- Unavailable resource metrics: tokens, cost, elapsed time
 - Work completed / findings: read the approved sources and the code and test layout; confirmed write paths; defined shared interface names; listed Q1 to Q6.
 - Files changed (use `none` if read-only): `workflow/handoffs/llm-gateway-core.md`
 - Checks run and exact results (use `none` if none were run): none
@@ -156,17 +158,27 @@ Out of scope, explicitly: G11 (route `maxDuration`; no Route Handler in 6.3) and
   - It extended the test-writer's scope by one line in `tests/unit/authentication.test.ts` (stub `AI_PROVIDER=fake`, needed because G10 makes the variable required).
   - It found that vitest fails to load any file when run from a lowercase `d:` path; run it from `D:`.
 
-### Session `test-writer / not available`
+### Session `test-writer / a9fe87ddd25ec497b`
 
-- Platform and model: Claude Code, Opus 5.5. Role: test-writer. Source revision: `9685edf` plus the working tree. Resource usage: not available.
+- Role: test-writer. Source revision: `9685edf` plus the working tree.
+- Provider session ID: subagent `a9fe87ddd25ec497b` in root session `fc037bf9-e91f-4d24-96e9-a9ef2b7f533d`
+- Platform and model (if surfaced): Claude Code, `claude-opus-5-5`
+- Started / ended / elapsed: 2026-11-02 21:09–21:59 SGT (50 min); measured from first to last transcript record, so it includes waiting between continuations
+- Resource usage (provider-reported): tokens in (uncached) 92; cache read 5,117,581; cache write 312,132; out 67,033 (thinking 12,199); total 5,496,838; cache-read share of input 94%; tool calls 56; responses 45; 1 launch + 2 `SendMessage` continuations. Source: local Claude Code transcript, de-duplicated by message ID; backfilled 2026-11-05.
+- Unavailable resource metrics: cost (not recorded in local transcripts)
 - Files changed:
   - New: `tests/unit/ai/{gateway,prompt,limits}.test.ts` and `tests/integration/db/usage-repository.test.ts`.
   - Updated: `tests/unit/ai/{source-boundaries,soclaas-adapter}.test.ts`, `tests/unit/environment-configuration.test.ts`, `tests/unit/authentication.test.ts` (one line, a scope extension), and `tests/integration/db/support/fixtures.ts`.
 - Fix round 2: added 26 S1/S3/S4 tests to `gateway.test.ts`.
 
-### Session `implementer / not available`
+### Session `implementer / aab50b522ffed355e`
 
-- Platform and model: Claude Code, Opus 5.5. Role: implementer. Source revision: `9685edf` plus the working tree. Resource usage: not available.
+- Role: implementer. Source revision: `9685edf` plus the working tree.
+- Provider session ID: subagent `aab50b522ffed355e` in root session `fc037bf9-e91f-4d24-96e9-a9ef2b7f533d`
+- Platform and model (if surfaced): Claude Code, `claude-opus-5-5`
+- Started / ended / elapsed: 2026-11-02 21:19–22:00 SGT (41 min); measured from first to last transcript record, so it includes waiting between continuations
+- Resource usage (provider-reported): tokens in (uncached) 44; cache read 1,837,485; cache write 219,753; out 20,883 (thinking 2,278); total 2,078,165; cache-read share of input 89%; tool calls 25; responses 20; 1 launch + 2 `SendMessage` continuations. Source: local Claude Code transcript, de-duplicated by message ID; backfilled 2026-11-05.
+- Unavailable resource metrics: cost (not recorded in local transcripts)
 - Files changed:
   - New: `src/server/ai/{gateway,prompt,output,limits,usage-port}.ts`, `src/server/repositories/usage-repository.ts`, and `supabase/migrations/20261102120000_usage_environment_check.sql`.
   - Updated: `src/server/ai/index.ts`, `src/server/config/index.ts`, and `src/server/composition.ts`.
@@ -175,13 +187,43 @@ Out of scope, explicitly: G11 (route `maxDuration`; no Route Handler in 6.3) and
   - Extra exported types: `UsageCacheHit`, `CacheHitInput`, `LlmGatewayOptions`, `BuiltPrompt`, `AiConfig`.
   - `reserve` rolls back the quota-day row on refusal.
 
-### Session `reviewer / not available`
+### Session `reviewer / a0b359c211727e81a + a895d42e442f6c794`
 
-- Platform and model: Claude Code, Opus 5.5. Role: reviewer (read-only, static). Resource usage: not available.
+- Role: reviewer (read-only, static).
+- Provider session ID: subagent `a0b359c211727e81a` + `a895d42e442f6c794` in root session `fc037bf9-e91f-4d24-96e9-a9ef2b7f533d`
+- Platform and model (if surfaced): Claude Code, `claude-sonnet-5-5`
+- Started / ended / elapsed: 2026-11-02 21:22–21:24 SGT (2 min); 2026-11-02 23:06–23:07 SGT (1 min); measured from first to last transcript record, so it includes waiting between continuations
+- Resource usage (provider-reported): tokens in (uncached) 28; cache read 427,075; cache write 117,475; out 19,920 (thinking 7,127); total 564,498; cache-read share of input 78%; tool calls 44; responses 14; 2 launches + 0 `SendMessage` continuations. Source: local Claude Code transcript, de-duplicated by message ID; backfilled 2026-11-05.
+- Unavailable resource metrics: cost (not recorded in local transcripts)
 - Findings: no must-fix.
   - Should-fix: S1 to S4 were decided by the human and fixed in round 2. S5 was fixed in round 1.
   - Notes: N1 to N6. N3 was fixed. N2: settled rows from before 6.3 with null `charged_tokens` count as 0.
 - No second reviewer pass after fix round 2.
+
+## Backfilled resource usage `[ORCH]`
+
+Backfilled on 2026-11-05 from the local Claude Code transcripts of this task's sessions. Each subagent's usage is summed over its own transcript, de-duplicated by message ID (a response logged on several lines is counted once). `Continuations` counts `SendMessage` calls from the main session to that subagent (fix rounds and follow-ups). Times are first to last transcript record, in SGT, so they include waiting time. Main-session rows cover the whole conversation, including chat not about this task. Cost is not recorded in the transcripts. Nothing was estimated.
+
+| Role | Agent ID | Model | Start–end (SGT) | Continuations | Input (uncached) | Cache read | Cache write | Output | of which thinking | Cache-read share | Tool calls |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| main session | root `fc037bf9…` | `claude-opus-5-5` | 2026-11-02 16:33–2026-11-03 16:00 SGT (1407 min) | n/a | 244 | 13,435,300 | 486,604 | 71,622 | 12,217 | 97% | 84 |
+| analyst | `aa4a9a7f5a385fdd8` | `claude-sonnet-5-5` | 2026-11-02 16:34–16:36 SGT (2 min) | 0 | 14 | 301,305 | 68,058 | 6,805 | 184 | 82% | 12 |
+| orchestrator | `a8a609c7262124516` | `claude-opus-5-5` | 2026-11-02 20:57–21:09 SGT (12 min) | 1 | 30 | 850,536 | 190,584 | 25,131 | 2,543 | 82% | 15 |
+| test-writer | `a9fe87ddd25ec497b` | `claude-opus-5-5` | 2026-11-02 21:09–21:59 SGT (50 min) | 2 | 92 | 5,117,581 | 312,132 | 67,033 | 12,199 | 94% | 56 |
+| implementer | `aab50b522ffed355e` | `claude-opus-5-5` | 2026-11-02 21:19–22:00 SGT (41 min) | 2 | 44 | 1,837,485 | 219,753 | 20,883 | 2,278 | 89% | 25 |
+| reviewer | `a0b359c211727e81a` | `claude-sonnet-5-5` | 2026-11-02 21:22–21:24 SGT (2 min) | 0 | 14 | 247,033 | 71,640 | 12,589 | 4,659 | 78% | 25 |
+| commit-pr | `ac0cd284b5075eccd` | `claude-opus-5-5` | 2026-11-02 22:40–22:41 SGT (1 min) | 0 | 14 | 292,164 | 58,223 | 6,390 | 557 | 83% | 8 |
+| reviewer | `a895d42e442f6c794` | `claude-sonnet-5-5` | 2026-11-02 23:06–23:07 SGT (1 min) | 0 | 14 | 180,042 | 45,835 | 7,331 | 2,468 | 80% | 19 |
+| **Subagents total** | | | | | 222 | 8,826,146 | 966,225 | 146,162 | 24,888 | 90% | 160 |
+| **All sessions total** | | | | | 466 | 22,261,446 | 1,452,829 | 217,784 | 37,105 | 94% | 244 |
+
+Thinking tokens were 17% of all output tokens for this task.
+
+Notes:
+
+- The reviewer ran on `claude-sonnet-5-5` (from `.claude/agents/reviewer.md`), not Opus 5.5 as the block previously said; the model fields are corrected.
+- The transcript shows a second reviewer subagent, "Re-review fix round 2" (`a895d42e…`, 23:06–23:07 SGT, after the commit-pr run). The reviewer block still says no second pass was run. Needs human confirmation of what that re-review found; the narrative was not changed.
+- The analyst (`aa4a9a7f…`) and commit-pr (`ac0cd284…`) have no session block; their usage is in the table.
 
 ## Consolidated outcome `[ORCH]`
 
@@ -208,3 +250,4 @@ Out of scope, explicitly: G11 (route `maxDuration`; no Route Handler in 6.3) and
 | 2026-11-02 | orchestrator / not available | Handoff created; ACs, interfaces, paths, and questions recorded. |
 | 2026-11-02 | orchestrator / not available | Recorded human answers to Q1 to Q6; updated AC14, AC18, AC24; added AC25 to AC28; `UsageSettlement.chargedTokens`; migration contents and fixture scope; A4 resolved, A5 added. |
 | 2026-11-02 | main session | Recorded worker sessions, fix rounds 1 and 2, approval of A1 to A3 and A5, and check results including integration tests; status set to implemented. |
+| 2026-11-05 | main session (backfill) | Backfilled provider session IDs, models, timing, and token usage from local Claude Code transcripts; see "Backfilled resource usage". |

@@ -67,23 +67,23 @@ Scenarios from the spec, interpreted through D1–D16. "Local" evidence is gathe
 
 ## Worker session reports
 
-### Session `implementer / not available`
+### Session `implementer / a98ade9a32f384859`
 
 - Provider: `claude`
-- Provider session ID: not available
+- Provider session ID: subagent `a98ade9a32f384859` in root session `df975a13-14f2-4add-a3df-74fe2205aa89`
+- Platform and model (if surfaced): Claude Code, `claude-opus-5-5`
+- Started / ended / elapsed: 2026-10-29 14:44–14:54 SGT (10 min); measured from first to last transcript record, so it includes waiting between continuations
+- Resource usage (provider-reported): tokens in (uncached) 44; cache read 1,198,716; cache write 121,811; out 17,204 (thinking 4,125); total 1,337,775; cache-read share of input 91%; tool calls 23; responses 21; 1 launch + 1 `SendMessage` continuation. Source: local Claude Code transcript, de-duplicated by message ID; backfilled 2026-11-05.
+- Unavailable resource metrics: cost (not recorded in local transcripts)
 - Work ID: ci-github-actions
 - Agent: implementer
 - Phase: implementation
 
 #### Shared fields `[ALL]`
 
-- Platform and model (if surfaced): Claude Code, Opus 5.5
 - Role: implementer
 - Human owner and assigned task scope: Developer B; task 2.2 within the permitted paths above.
 - Source revision: not available
-- Started / ended / elapsed: not available
-- Resource usage (provider-reported): tokens in / out / total: not available; cache read / write: not available; cost: not available; tool calls: not available
-- Unavailable resource metrics: tokens, cache, cost, tool-call count, elapsed time
 - Work completed / findings:
   - Six jobs `lint`, `typecheck`, `unit-tests`, `build`, `secret-scan`, `dependency-audit` on `ubuntu-24.04`.
   - Triggers: `pull_request` (all branches), `push` to `master` and `dev`, `workflow_dispatch`, weekly `schedule` `0 1 * * 1`. The schedule runs only `dependency-audit`; the other five jobs are guarded by `if: github.event_name != 'schedule'`.
@@ -108,23 +108,23 @@ Scenarios from the spec, interpreted through D1–D16. "Local" evidence is gathe
 - Visual diff path, or reason skill was unavailable: `present-changes-visually` skill unavailable.
 - Other generated artifacts / dependencies: none; no dependencies added. Build-regenerated `next-env.d.ts` was reverted.
 
-### Session `reviewer / not available`
+### Session `reviewer / aec514cbfbe88d578`
 
 - Provider: `claude`
-- Provider session ID: not available
+- Provider session ID: subagent `aec514cbfbe88d578` in root session `df975a13-14f2-4add-a3df-74fe2205aa89`
+- Platform and model (if surfaced): Claude Code, `claude-sonnet-5-5`
+- Started / ended / elapsed: 2026-10-29 14:54–14:55 SGT (1 min); measured from first to last transcript record, so it includes waiting between continuations
+- Resource usage (provider-reported): tokens in (uncached) 6; cache read 36,214; cache write 27,850; out 6,000 (thinking 1,368); total 70,070; cache-read share of input 57%; tool calls 11; responses 3; 1 launch + 0 `SendMessage` continuations. Source: local Claude Code transcript, de-duplicated by message ID; backfilled 2026-11-05.
+- Unavailable resource metrics: cost (not recorded in local transcripts)
 - Work ID: ci-github-actions
 - Agent: reviewer
 - Phase: review
 
 #### Shared fields `[ALL]`
 
-- Platform and model (if surfaced): Claude Code, claude-sonnet-5-5
 - Role: reviewer
 - Human owner and assigned task scope: Developer B; read-only review of the implementer's changes against AC1–AC9 and D1–D16.
 - Source revision: not available
-- Started / ended / elapsed: not available
-- Resource usage (provider-reported): tokens in / out / total: not available; cache read / write: not available; cost: not available; tool calls: not available
-- Unavailable resource metrics: tokens, cache, cost, tool-call count, elapsed time
 - Work completed / findings: static inspection of the workflow and supporting files against AC1–AC9 and D1–D16. No must-fix findings; no fix rounds.
 - Files changed (use `none` if read-only): none
 - Checks run and exact results (use `none` if none were run): none (static inspection only)
@@ -143,23 +143,23 @@ Scenarios from the spec, interpreted through D1–D16. "Local" evidence is gathe
   - Minor: `dependency-audit` running without `npm ci` judged acceptable; option noted: `npm ci --ignore-scripts`.
 - Review limits: no network access; static inspection only.
 
-### Session `commit-pr / not available`
+### Session `commit-pr / a8d1ac00be9046c8c`
 
 - Provider: `claude`
-- Provider session ID: not available
+- Provider session ID: subagent `a8d1ac00be9046c8c` in root session `df975a13-14f2-4add-a3df-74fe2205aa89`
+- Platform and model (if surfaced): Claude Code, `claude-opus-5-5`
+- Started / ended / elapsed: 2026-10-29 16:42–16:43 SGT (1 min); measured from first to last transcript record, so it includes waiting between continuations
+- Resource usage (provider-reported): tokens in (uncached) 12; cache read 246,042; cache write 56,577; out 7,089 (thinking 403); total 309,720; cache-read share of input 81%; tool calls 6; responses 6; 1 launch + 1 `SendMessage` continuation. Source: local Claude Code transcript, de-duplicated by message ID; backfilled 2026-11-05.
+- Unavailable resource metrics: cost (not recorded in local transcripts)
 - Work ID: ci-github-actions
 - Agent: commit-pr
 - Phase: commit / PR draft
 
 #### Shared fields `[ALL]`
 
-- Platform and model (if surfaced): Claude Code, Opus 5.5
 - Role: commit-pr
 - Human owner and assigned task scope: Developer B; read-only branch inventory and PR draft for `ci/ci-cd-setup`.
 - Source revision: `db02033`
-- Started / ended / elapsed: not available
-- Resource usage (provider-reported): tokens in / out / total: not available; cache read / write: not available; cost: not available; tool calls: not available
-- Unavailable resource metrics: tokens, cache, cost, tool-call count, elapsed time
 - Work completed / findings: inventoried the branch delta, proposed a commit for the remaining uncommitted records, and drafted the PR title and description.
 - Files changed (use `none` if read-only): none
 - Checks run and exact results (use `none` if none were run): none
@@ -177,23 +177,23 @@ Scenarios from the spec, interpreted through D1–D16. "Local" evidence is gathe
 - Draft PR description: given to the human in chat (not reproduced here); it summarises the spec and decisions D1–D16, the workflow, hardening, a testing table, and follow-ups.
 - Push / PR creation status: not pushed; no upstream; no PR created.
 
-### Session `orchestrator / not available`
+### Session `orchestrator / a4a7329e97110262f + a75ef6a0a59223ec1`
 
 - Provider: `claude`
-- Provider session ID: not available
+- Provider session ID: subagent `a4a7329e97110262f` + `a75ef6a0a59223ec1` in root session `df975a13-14f2-4add-a3df-74fe2205aa89`
+- Platform and model (if surfaced): Claude Code, `claude-opus-5-5`
+- Started / ended / elapsed: 2026-10-29 14:43–14:44 SGT (1 min); 2026-10-29 16:43–16:44 SGT (1 min); measured from first to last transcript record, so it includes waiting between continuations
+- Resource usage (provider-reported): tokens in (uncached) 16; cache read 309,272; cache write 96,230; out 16,202 (thinking 478); total 421,720; cache-read share of input 76%; tool calls 14; responses 8; 2 launches + 0 `SendMessage` continuations. Source: local Claude Code transcript, de-duplicated by message ID; backfilled 2026-11-05.
+- Unavailable resource metrics: cost (not recorded in local transcripts)
 - Work ID: ci-github-actions
 - Agent: orchestrator
 - Phase: planning / handoff
 
 #### Shared fields `[ALL]`
 
-- Platform and model (if surfaced): Claude Code (Claude Agent SDK); model not available
 - Role: orchestrator
 - Human owner and assigned task scope: Developer B; coordination of task 2.2 and this handoff record only.
 - Source revision: `755f917` (creation); `db02033` (consolidation)
-- Started / ended / elapsed: not available
-- Resource usage (provider-reported): tokens in / out / total: not available; cache read / write: not available; cost: not available; tool calls: not available
-- Unavailable resource metrics: tokens, cache, cost, tool-call count, elapsed time
 - Work completed / findings: recorded task scope, permitted and prohibited paths, acceptance criteria AC1–AC9 from the spec and D1–D16, role sequence, and human follow-ups; later consolidated implementer, reviewer, main-session, and commit-pr results.
 - Files changed (use `none` if read-only): `workflow/handoffs/ci-github-actions.md`
 - Checks run and exact results (use `none` if none were run): none
@@ -213,6 +213,30 @@ Scenarios from the spec, interpreted through D1–D16. "Local" evidence is gathe
   - Main session verified the two action SHAs against `git ls-remote` tags and the gitleaks checksum against the release checksums file — all match.
   - Main session local runs (Windows, Node 24.12.0): see Consolidated outcome.
   - Session IDs and resource metrics were not surfaced for any session.
+
+## Backfilled resource usage `[ORCH]`
+
+Backfilled on 2026-11-05 from the local Claude Code transcripts of this task's sessions. Each subagent's usage is summed over its own transcript, de-duplicated by message ID (a response logged on several lines is counted once). `Continuations` counts `SendMessage` calls from the main session to that subagent (fix rounds and follow-ups). Times are first to last transcript record, in SGT, so they include waiting time. Main-session rows cover the whole conversation, including chat not about this task. Cost is not recorded in the transcripts. Nothing was estimated.
+
+| Role | Agent ID | Model | Start–end (SGT) | Continuations | Input (uncached) | Cache read | Cache write | Output | of which thinking | Cache-read share | Tool calls |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| main session (implementation session) | root `df975a13…` | `claude-opus-5-5` | 2026-10-29 11:50–17:01 SGT (311 min) | n/a | 128 | 5,938,514 | 411,680 | 34,078 | 5,513 | 94% | 36 |
+| main session (spec session) | root `85ef727f…` | `claude-opus-5-5` | 2026-10-29 13:44–14:35 SGT (51 min) | n/a | 32 | 936,644 | 53,365 | 12,925 | 2,825 | 95% | 14 |
+| analyst | `a38693ab1da9c8f39` | `claude-sonnet-5-5` | 2026-10-29 13:45–13:46 SGT (1 min) | 0 | 10 | 201,308 | 58,704 | 8,222 | 198 | 77% | 9 |
+| orchestrator | `a4a7329e97110262f` | `claude-opus-5-5` | 2026-10-29 14:43–14:44 SGT (1 min) | 0 | 10 | 191,672 | 56,926 | 6,385 | 123 | 77% | 9 |
+| implementer | `a98ade9a32f384859` | `claude-opus-5-5` | 2026-10-29 14:44–14:54 SGT (10 min) | 1 | 44 | 1,198,716 | 121,811 | 17,204 | 4,125 | 91% | 23 |
+| reviewer | `aec514cbfbe88d578` | `claude-sonnet-5-5` | 2026-10-29 14:54–14:55 SGT (1 min) | 0 | 6 | 36,214 | 27,850 | 6,000 | 1,368 | 57% | 11 |
+| commit-pr | `a8d1ac00be9046c8c` | `claude-opus-5-5` | 2026-10-29 16:42–16:43 SGT (1 min) | 1 | 12 | 246,042 | 56,577 | 7,089 | 403 | 81% | 6 |
+| orchestrator | `a75ef6a0a59223ec1` | `claude-opus-5-5` | 2026-10-29 16:43–16:44 SGT (1 min) | 0 | 6 | 117,600 | 39,304 | 9,817 | 355 | 75% | 5 |
+| **Subagents total** | | | | | 88 | 1,991,552 | 361,172 | 54,717 | 6,572 | 85% | 63 |
+| **All sessions total** | | | | | 248 | 8,866,710 | 826,217 | 101,720 | 14,910 | 91% | 113 |
+
+Thinking tokens were 15% of all output tokens for this task.
+
+Notes:
+
+- The analyst ran in the separate spec session (`85ef727f…`) and has no session block in this handoff; its usage is in the table.
+- The orchestrator block covers two subagents: handoff creation (`a4a7329e…`) and consolidation (`a75ef6a0…`).
 
 ## Consolidated outcome `[ORCH]`
 
@@ -261,3 +285,4 @@ Scenarios from the spec, interpreted through D1–D16. "Local" evidence is gathe
 | 2026-10-29 | main session | Verified action SHAs and gitleaks checksum; lint, typecheck, test, build, audit pass locally. |
 | 2026-10-29 | commit-pr / not available | Inventoried branch, proposed one records commit, drafted PR; no commits, push, or PR. |
 | 2026-10-29 | orchestrator / not available | Consolidated sessions; status implemented and locally verified, awaiting human commit, push, PR, and live CI run. |
+| 2026-11-05 | main session (backfill) | Backfilled provider session IDs, models, timing, and token usage from local Claude Code transcripts; see "Backfilled resource usage". |
