@@ -26,6 +26,18 @@ export class PeopleRepository {
     return result.rows[0]?.id ?? null;
   }
 
+  /** Every registered person whose GitHub username matches exactly, ignoring case (design.md D5, S4). */
+  async findPeopleByGitHubUsername(githubUsername: string): Promise<{ id: string; githubUsername: string }[]> {
+    const result = await this.database.query<{ id: string; github_username: string }>(
+      `SELECT id::text AS id, github_username
+         FROM app.people
+        WHERE lower(github_username) = lower($1)
+        ORDER BY id`,
+      [githubUsername],
+    );
+    return result.rows.map((row) => ({ id: row.id, githubUsername: row.github_username }));
+  }
+
   async upsertVerifiedGitHubIdentity(identity: VerifiedGitHubIdentity): Promise<{ id: string }> {
     const result = await this.database.query<{ id: string }>(
       `INSERT INTO app.people (auth_user_id, github_user_id, github_username)
