@@ -30,7 +30,7 @@ The actual human owner remains the authority for a workstream. Developer A (Lim-
 
 ## Coordination limits
 
-- **Who orchestrates.** Claude Code subagents cannot start other subagents, so in Claude Code the main session plays the orchestrator and dispatches each role directly. Invoke the `orchestrator` subagent only to write plans and consolidated handoffs.
+- **Who orchestrates.** In Claude Code the main session plays the orchestrator and dispatches each role directly, so every human gate stays in the session the human is watching. Claude Code allows nested subagents (three layers by default), but this repository sets the spawn depth to 1 (see Enforcement), so workers cannot start further agents. Invoke the `orchestrator` subagent only to write plans and consolidated handoffs.
 - **Leaf workers never delegate.** Analyst, test-writer, implementer, frontend, reviewer, and commit/PR agents do their assigned work themselves and must not spawn further agents.
 - **Bounded review loop.** Implementer → reviewer is a generator-verifier loop with at most two fix rounds. If findings remain after the second review, stop and escalate to the human owner.
 - **Match effort to task size.** Small single-file fixes skip the agent sequence. Use the full sequence for one `tasks.md` item or larger.
@@ -42,11 +42,16 @@ Instructions are backed by these checked-in controls; keep them in sync with the
 | Control | Location | Effect |
 |---|---|---|
 | Ask-before-run git rules | `.claude/settings.json` | `git push`, `gh pr`, `git reset --hard`, `git rebase`, and `git config` always prompt the human |
-| Write-scope hook | `.claude/hooks/guard-write-scope.mjs`, declared in the test-writer and implementer adapters | Test-writer can write only under `tests/`; implementer cannot write `tests/`, `openspec/`, `specs/`, or `workflow/` |
+| Secret-file deny rules | `.claude/settings.json` | Claude cannot read or edit `.env`, `.env.*` (except `.env.example`), or `.vercel/`, including through `cat`, `head`, `tail`, `sed`, `tee`, and redirections. Commands that read files without naming them (e.g. `grep -r` over a directory) and scripts that open files themselves are not covered |
+| Delegation depth | `.claude/settings.json` (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`) | In Claude Code, only the main session starts workers; workers cannot start further agents. Codex delegation settings are not set in `.codex/config.toml` |
+| Write-scope hook | `.claude/hooks/guard-write-scope.mjs`, registered once in `.claude/settings.json`; it reads the role from the hook input's `agent_type` | Test-writer can write only under `tests/`; implementer cannot write `tests/`, `openspec/`, `specs/`, or `workflow/`; analyst can write only under `openspec/`; orchestrator can write only under `workflow/plans/` and `workflow/handoffs/`; commit-pr cannot write `src/`, `tests/`, `openspec/`, `specs/`, `supabase/`, or `public/` |
 | Tool restrictions | `.claude/agents/reviewer.md`, `.claude/agents/frontend.md` | Reviewer has read/search tools only; frontend cannot use edit tools but may run the dev server |
+| Model, effort, turn budget | `.claude/agents/*.md` frontmatter | Analyst Sonnet/high, reviewer and frontend Sonnet/medium, commit-pr Sonnet/low, orchestrator, test-writer, and implementer Opus/medium. `maxTurns` caps each run at roughly twice the largest observed run; frontend has no cap yet because it has never run. All agents use the default 5-minute prompt cache: a 1-hour cache was tried and removed because, re-priced on past sessions, it would have cost about 8% more (it doubles every cache write, and several fix-round gaps were human waits of over an hour) |
 | Sandboxes | `.codex/agents/*.toml` | Codex reviewer and frontend run `read-only` |
 
-The hook covers the Write, Edit, and NotebookEdit tools only; file writes made through shell commands are not blocked.
+The hook covers the Write, Edit, and NotebookEdit tools only; file writes made through shell commands are not blocked. The main session is not restricted by the hook.
+
+**Verified in a real session (2026-11-06).** The hook used to be declared in each subagent's frontmatter, where it never ran: Claude Code runs frontmatter hooks of project subagents only after the workspace trust dialog is accepted, and no transcript showed a hook record. It is now a project settings hook, which Claude Code also runs for subagent tool calls. A deliberate check then blocked a test-writer Write to `src/canary.ts` with the message above. Roles without an entry in the hook (reviewer, frontend, built-in agents) and the main session are not restricted.
 
 ## Reuse
 

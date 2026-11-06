@@ -121,23 +121,23 @@ From E2, E8, and "Task 2.3 scope after task 2.4". No agent performs or verifies 
 
 ## Worker session reports
 
-### Session `orchestrator / not available`
+### Session `orchestrator / aa4cf381e1de8283d`
 
 - Provider: `claude`
-- Provider session ID: not available
+- Provider session ID: subagent `aa4cf381e1de8283d` in root session `e7217dab-f623-446f-a6c0-943cdd334d82`
+- Platform and model (if surfaced): Claude Code, `claude-opus-5-5`
+- Started / ended / elapsed: 2026-10-31 00:14–00:25 SGT (11 min); measured from first to last transcript record, so it includes waiting between continuations. Previously recorded from the Agent result: ~140 s (platform-reported, planning session)
+- Resource usage (provider-reported): tokens in (uncached) 24; cache read 700,745; cache write 177,775; out 22,739 (thinking 3,588); total 901,283; cache-read share of input 80%; tool calls 21; responses 11; 1 launch + 1 `SendMessage` continuation. Source: local Claude Code transcript, de-duplicated by message ID; backfilled 2026-11-05. Previously recorded from the Agent result: tokens total: 89,251; tool calls: 10; tokens in / out, cache read / write, cost: not available
+- Unavailable resource metrics: cost (not recorded in local transcripts)
 - Work ID: environment-configuration
 - Agent: orchestrator
 - Phase: planning / handoff
 
 #### Shared fields `[ALL]`
 
-- Platform and model (if surfaced): Claude Code (Claude Agent SDK), Opus 5.5
 - Role: orchestrator
 - Human owner and assigned task scope: Developer B; coordination of task 2.3 and this handoff record only.
 - Source revision: `7900499`
-- Started / ended / elapsed: ~140 s (platform-reported, planning session)
-- Resource usage (provider-reported): tokens total: 89,251; tool calls: 10; tokens in / out, cache read / write, cost: not available
-- Unavailable resource metrics: tokens in / out split, cache, cost
 - Work completed / findings: recorded the task scope, non-overlapping write paths, role order, acceptance criteria AC1–AC14, assumptions, and the human provisioning checklist. Confirmed `.env.example` has the four task 2.4 variables, `.gitignore` lacks `.vercel/`, the developer guide covers only the database, `tests/unit/` holds only `home.test.tsx`, and `vitest.config.ts` unit mode includes `tests/unit/**`.
 - Files changed (use `none` if read-only): `workflow/handoffs/environment-configuration.md`
 - Checks run and exact results (use `none` if none were run): none
@@ -166,23 +166,23 @@ From E2, E8, and "Task 2.3 scope after task 2.4". No agent performs or verifies 
   - Usage figures for the orchestrator, test-writer, implementer, and reviewer sessions were relayed by the main session from platform reports. Cost and cache were not surfaced.
   - The consolidation update to this file is part of the orchestrator session; its usage is not separately reported.
 
-### Session `analyst / not available`
+### Session `analyst / ac86349a16fb0e239`
 
 - Provider: `claude`
-- Provider session ID: not available
+- Provider session ID: subagent `ac86349a16fb0e239` in root session `e7217dab-f623-446f-a6c0-943cdd334d82`
+- Platform and model (if surfaced): Claude Code, `claude-sonnet-5-5`
+- Started / ended / elapsed: 2026-10-30 23:55–23:56 SGT (1 min); measured from first to last transcript record, so it includes waiting between continuations. Previously recorded from the Agent result: ~56 s (platform-reported)
+- Resource usage (provider-reported): tokens in (uncached) 10; cache read 181,549; cache write 58,493; out 6,390 (thinking 191); total 246,442; cache-read share of input 76%; tool calls 7; responses 5; 1 launch + 0 `SendMessage` continuations. Source: local Claude Code transcript, de-duplicated by message ID; backfilled 2026-11-05. Previously recorded from the Agent result: tokens total: 63,455; tool calls: 7; tokens in / out, cache read / write, cost: not available
+- Unavailable resource metrics: cost (not recorded in local transcripts)
 - Work ID: environment-configuration
 - Agent: analyst
 - Phase: exploration / spec drafting
 
 #### Shared fields `[ALL]`
 
-- Platform and model (if surfaced): not available
 - Role: analyst
 - Human owner and assigned task scope: Developer B; task 2.3 context brief and the `environment-configuration` spec delta.
 - Source revision: not available
-- Started / ended / elapsed: ~56 s (platform-reported)
-- Resource usage (provider-reported): tokens total: 63,455; tool calls: 7; tokens in / out, cache read / write, cost: not available
-- Unavailable resource metrics: tokens in / out split, cache, cost
 - Work completed / findings: see Analyst fields.
 - Files changed (use `none` if read-only): spec and design changes were committed by the commit/PR agent in `3cef33d` and `78edcf7`.
 - Checks run and exact results (use `none` if none were run): none
@@ -194,23 +194,23 @@ From E2, E8, and "Task 2.3 scope after task 2.4". No agent performs or verifies 
 - Dependencies, conflicts, and open product/design decisions: C1 (`.env.example` ownership already taken by task 2.4), C2 (Supabase projects already exist), C3 (callback scenario only manually verifiable). All resolved in design.md "Environment Decisions".
 - OpenSpec files changed: `openspec/changes/project-task-management/specs/environment-configuration/spec.md`, `openspec/changes/project-task-management/design.md` (committed in `3cef33d`, `78edcf7`).
 
-### Session `commit-pr / not available` (spec commits)
+### Session `commit-pr / a19e9c7855c52aa14` (spec commits)
 
 - Provider: `claude`
-- Provider session ID: not available
+- Provider session ID: subagent `a19e9c7855c52aa14` in root session `e7217dab-f623-446f-a6c0-943cdd334d82`
+- Platform and model (if surfaced): Claude Code, `claude-opus-5-5`
+- Started / ended / elapsed: 2026-10-31 00:06–00:06 SGT (1 min); measured from first to last transcript record, so it includes waiting between continuations. Previously recorded from the Agent result: ~53 s (platform-reported)
+- Resource usage (provider-reported): tokens in (uncached) 16; cache read 332,710; cache write 54,061; out 3,948 (thinking 523); total 390,735; cache-read share of input 86%; tool calls 10; responses 8; 1 launch + 0 `SendMessage` continuations. Source: local Claude Code transcript, de-duplicated by message ID; backfilled 2026-11-05. Previously recorded from the Agent result: tokens total: 55,257; tool calls: 10; tokens in / out, cache read / write, cost: not available
+- Unavailable resource metrics: cost (not recorded in local transcripts)
 - Work ID: environment-configuration
 - Agent: commit-pr
 - Phase: spec commits
 
 #### Shared fields `[ALL]`
 
-- Platform and model (if surfaced): not available
 - Role: commit/PR agent
 - Human owner and assigned task scope: Developer B; committing the approved spec, decisions, and session log.
 - Source revision: parent of `3cef33d`
-- Started / ended / elapsed: ~53 s (platform-reported)
-- Resource usage (provider-reported): tokens total: 55,257; tool calls: 10; tokens in / out, cache read / write, cost: not available
-- Unavailable resource metrics: tokens in / out split, cache, cost
 - Work completed / findings: created commits `3cef33d` (spec), `78edcf7` (Environment Decisions), `7900499` (session log).
 - Files changed (use `none` if read-only): committed only; see commits.
 - Checks run and exact results (use `none` if none were run): not available
@@ -221,23 +221,23 @@ From E2, E8, and "Task 2.3 scope after task 2.4". No agent performs or verifies 
 - Commit hashes, or why commits were not authorized/safe: `3cef33d`, `78edcf7`, `7900499`.
 - Push / PR creation status: not pushed; no PR.
 
-### Session `implementer / not available`
+### Session `implementer / a83b67c1b103b292e`
 
 - Provider: `claude`
-- Provider session ID: not available
+- Provider session ID: subagent `a83b67c1b103b292e` in root session `e7217dab-f623-446f-a6c0-943cdd334d82`
+- Platform and model (if surfaced): Claude Code, `claude-opus-5-5`
+- Started / ended / elapsed: 2026-10-31 00:16–00:23 SGT (6 min); measured from first to last transcript record, so it includes waiting between continuations. Previously recorded from the Agent result: ~263 s; fix round 1 ~36 s (platform-reported)
+- Resource usage (provider-reported): tokens in (uncached) 42; cache read 1,502,439; cache write 82,748; out 27,492 (thinking 10,795); total 1,612,721; cache-read share of input 95%; tool calls 35; responses 20; 1 launch + 1 `SendMessage` continuation. Source: local Claude Code transcript, de-duplicated by message ID; backfilled 2026-11-05. Previously recorded from the Agent result: tokens total: 94,893; tool calls: 27. Fix round 1: tokens total 99,730; tool calls 8. Tokens in / out, cache read / write, cost: not available
+- Unavailable resource metrics: cost (not recorded in local transcripts)
 - Work ID: environment-configuration
 - Agent: implementer
 - Phase: implementation
 
 #### Shared fields `[ALL]`
 
-- Platform and model (if surfaced): Claude Code (Claude Agent SDK), Opus 5.5
 - Role: implementer
 - Human owner and assigned task scope: Developer B; `.env.example`, `.gitignore` (`.vercel/` only), `docs/developer-guide.md` (one new section plus the intro sentence), and this session block.
 - Source revision: `7900499` plus uncommitted working-tree changes
-- Started / ended / elapsed: ~263 s; fix round 1 ~36 s (platform-reported)
-- Resource usage (provider-reported): tokens total: 94,893; tool calls: 27. Fix round 1: tokens total 99,730; tool calls 8. Tokens in / out, cache read / write, cost: not available
-- Unavailable resource metrics: tokens in / out split, cache, cost
 - Work completed / findings: extended `.env.example` with the E1, E3, E6, E7, and E9 variables; added `.vercel/` to `.gitignore`; added "Environments and configuration" to the developer guide. No conflict found with the spec or E1–E9.
 - Files changed (use `none` if read-only): `.env.example`, `.gitignore`, `docs/developer-guide.md`, this handoff (this block only).
 - Checks run and exact results (use `none` if none were run):
@@ -259,23 +259,23 @@ From E2, E8, and "Task 2.3 scope after task 2.4". No agent performs or verifies 
 - Other generated artifacts / dependencies: none. A throwaway regex script lived in the session scratchpad, outside the repository.
 - Fix round 1: in `docs/developer-guide.md` only, applied S1 (Vercel Hobby check now uses E8's confirm-and-record wording, plus "a different setup would need a new recorded decision"), S2 (redirect list: exact callback URLs only, no wildcards, entry added once task 3.1 defines the path), N1 (SoC key use paraphrased from "Keys per environment"; rotation cited to "SoC LLM Facts"), and N2 (a human configures `dev` branch protection; agents do not, D7). `npm run lint` exit 0.
 
-### Session `test-writer / not available`
+### Session `test-writer / ab5e7a9f10b220398`
 
 - Provider: `claude`
-- Provider session ID: not available
+- Provider session ID: subagent `ab5e7a9f10b220398` in root session `e7217dab-f623-446f-a6c0-943cdd334d82`
+- Platform and model (if surfaced): Claude Code, `claude-opus-5-5`
+- Started / ended / elapsed: 2026-10-31 00:16–00:23 SGT (7 min); measured from first to last transcript record, so it includes waiting between continuations. Previously recorded from the Agent result: ~201 s; fix round 1 ~60 s (platform-reported)
+- Resource usage (provider-reported): tokens in (uncached) 34; cache read 1,008,505; cache write 66,089; out 22,032 (thinking 6,461); total 1,096,660; cache-read share of input 94%; tool calls 24; responses 16; 1 launch + 1 `SendMessage` continuation. Source: local Claude Code transcript, de-duplicated by message ID; backfilled 2026-11-05. Previously recorded from the Agent result: tokens total: 75,981; tool calls: 18. Fix round 1: tokens total 83,313; tool calls 6. Tokens in / out, cache read / write, cost: not available
+- Unavailable resource metrics: cost (not recorded in local transcripts)
 - Work ID: environment-configuration
 - Agent: test-writer
 - Phase: tests
 
 #### Shared fields `[ALL]`
 
-- Platform and model (if surfaced): Claude Code (Claude Agent SDK), Opus 5.5
 - Role: test-writer
 - Human owner and assigned task scope: Developer B; `tests/unit/environment-configuration.test.ts` (new) and this session block only.
 - Source revision: `7900499`. When this session ran, `.env.example` and `.gitignore` already had uncommitted changes from the implementer working in parallel.
-- Started / ended / elapsed: ~201 s; fix round 1 ~60 s (platform-reported)
-- Resource usage (provider-reported): tokens total: 75,981; tool calls: 18. Fix round 1: tokens total 83,313; tool calls 6. Tokens in / out, cache read / write, cost: not available
-- Unavailable resource metrics: tokens in / out split, cache, cost
 - Work completed / findings: wrote 28 unit tests (Node built-ins and Vitest only; no network, database, or dependency). `.env.example` is parsed line by line: `NAME=` lines are active assignments, `# NAME=` lines (upper-case names only) are commented assignments, and the body of a multi-line quoted value such as `DATABASE_CA_CERT` is consumed so it is never read as assignments. `.gitignore` is checked with `git check-ignore --no-index --quiet` through `spawnSync` with an argument array. No `src/` `process.env` scan (E5 defers it).
 - Files changed (use `none` if read-only): `tests/unit/environment-configuration.test.ts` (new); this session block.
 - Checks run and exact results (use `none` if none were run):
@@ -316,23 +316,23 @@ From E2, E8, and "Task 2.3 scope after task 2.4". No agent performs or verifies 
   - AI security evaluation cases: out of scope; owned by Developer A.
 - Fix round 1 (reviewer S3): the AC2 test now requires a `# Set in:` line in the contiguous comment block directly above each active variable and the commented `SUPABASE_DB_URL`; a blank line or an assignment ends the block. Results: `npm test` 29/29 passed; `npx tsc --noEmit` exit 0; `npm run lint` exit 0. A scratch copy of `.env.example` with one `Set in:` line removed and a blank line inserted made the test fail for exactly `TEST_DATABASE_URL` and `SUPABASE_DB_URL`.
 
-### Session `reviewer / not available`
+### Session `reviewer / a1ad78151bf4f7f03`
 
 - Provider: `claude`
-- Provider session ID: not available
+- Provider session ID: subagent `a1ad78151bf4f7f03` in root session `e7217dab-f623-446f-a6c0-943cdd334d82`
+- Platform and model (if surfaced): Claude Code, `claude-sonnet-5-5`
+- Started / ended / elapsed: 2026-10-31 00:21–00:22 SGT (1 min); measured from first to last transcript record, so it includes waiting between continuations. Previously recorded from the Agent result: ~69 s (platform-reported)
+- Resource usage (provider-reported): tokens in (uncached) 14; cache read 239,269; cache write 52,187; out 8,470 (thinking 2,908); total 299,940; cache-read share of input 82%; tool calls 16; responses 7; 1 launch + 0 `SendMessage` continuations. Source: local Claude Code transcript, de-duplicated by message ID; backfilled 2026-11-05. Previously recorded from the Agent result: tokens total: 56,175; tool calls: 16; tokens in / out, cache read / write, cost: not available
+- Unavailable resource metrics: cost (not recorded in local transcripts)
 - Work ID: environment-configuration
 - Agent: reviewer
 - Phase: review
 
 #### Shared fields `[ALL]`
 
-- Platform and model (if surfaced): not available
 - Role: reviewer (read-only)
 - Human owner and assigned task scope: Developer B; review of the spec scenarios, AC1–AC14, and E1–E9 for the implementer's and test-writer's changes.
 - Source revision: `7900499` plus the uncommitted task 2.3 working tree (before fix round 1)
-- Started / ended / elapsed: ~69 s (platform-reported)
-- Resource usage (provider-reported): tokens total: 56,175; tool calls: 16; tokens in / out, cache read / write, cost: not available
-- Unavailable resource metrics: tokens in / out split, cache, cost
 - Work completed / findings: no must-fix findings. Should-fix S1–S3 and nits N1–N5 (see Reviewer fields).
 - Files changed (use `none` if read-only): none
 - Checks run and exact results (use `none` if none were run): not available (relayed report did not list them)
@@ -356,6 +356,28 @@ From E2, E8, and "Task 2.3 scope after task 2.4". No agent performs or verifies 
   - N4 (nit): the commented-assignment regex matches upper-case names only. Accepted as low risk.
   - N5 (nit): the handoff's consolidated sections were still pending. Addressed by this consolidation.
 - Review limits: read-only; no gitleaks run; no live Supabase, Vercel, or GitHub check; no second pass after fix round 1.
+
+## Backfilled resource usage `[ORCH]`
+
+Backfilled on 2026-11-05 from the local Claude Code transcripts of this task's sessions. Each subagent's usage is summed over its own transcript, de-duplicated by message ID (a response logged on several lines is counted once). `Continuations` counts `SendMessage` calls from the main session to that subagent (fix rounds and follow-ups). Times are first to last transcript record, in SGT, so they include waiting time. Main-session rows cover the whole conversation, including chat not about this task. Cost is not recorded in the transcripts. Nothing was estimated.
+
+| Role | Agent ID | Model | Start–end (SGT) | Continuations | Input (uncached) | Cache read | Cache write | Output | of which thinking | Cache-read share | Tool calls |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| main session | root `e7217dab…` | `claude-opus-5-5` | 2026-10-30 23:54–2026-10-31 21:18 SGT (1283 min) | n/a | 122 | 5,168,536 | 261,875 | 58,465 | 22,667 | 95% | 40 |
+| analyst | `ac86349a16fb0e239` | `claude-sonnet-5-5` | 2026-10-30 23:55–23:56 SGT (1 min) | 0 | 10 | 181,549 | 58,493 | 6,390 | 191 | 76% | 7 |
+| commit-pr | `a19e9c7855c52aa14` | `claude-opus-5-5` | 2026-10-31 00:06–00:06 SGT (1 min) | 0 | 16 | 332,710 | 54,061 | 3,948 | 523 | 86% | 10 |
+| orchestrator | `aa4cf381e1de8283d` | `claude-opus-5-5` | 2026-10-31 00:14–00:25 SGT (11 min) | 1 | 24 | 700,745 | 177,775 | 22,739 | 3,588 | 80% | 21 |
+| test-writer | `ab5e7a9f10b220398` | `claude-opus-5-5` | 2026-10-31 00:16–00:23 SGT (7 min) | 1 | 34 | 1,008,505 | 66,089 | 22,032 | 6,461 | 94% | 24 |
+| implementer | `a83b67c1b103b292e` | `claude-opus-5-5` | 2026-10-31 00:16–00:23 SGT (6 min) | 1 | 42 | 1,502,439 | 82,748 | 27,492 | 10,795 | 95% | 35 |
+| reviewer | `a1ad78151bf4f7f03` | `claude-sonnet-5-5` | 2026-10-31 00:21–00:22 SGT (1 min) | 0 | 14 | 239,269 | 52,187 | 8,470 | 2,908 | 82% | 16 |
+| **Subagents total** | | | | | 140 | 3,965,217 | 491,353 | 91,071 | 24,466 | 89% | 113 |
+| **All sessions total** | | | | | 262 | 9,133,753 | 753,228 | 149,536 | 47,133 | 92% | 153 |
+
+Thinking tokens were 32% of all output tokens for this task.
+
+Notes:
+
+- The earlier `tokens total` figures in the session blocks came from the Agent tool result and measure something different from the per-response transcript sums below. Both are kept; the transcript sums are the per-response provider usage.
 
 ## Consolidated outcome `[ORCH]`
 
@@ -398,3 +420,4 @@ From E2, E8, and "Task 2.3 scope after task 2.4". No agent performs or verifies 
 | 2026-10-31 | implementer, test-writer / fix round 1 | S1, S2, N1, N2 fixed in the guide; S3 fixed in the AC2 test. |
 | 2026-10-31 | orchestrator / not available | Consolidated the reviewer findings, main-session checks, and usage. Status: implementation complete, pending human review and commit authorization. |
 | 2026-10-31 | main session / not available | thegrimbee reported the task 2.3 provisioning finished. Ticked `tasks.md` item 2.3 and set the status to done; the out-of-scope follow-ups stay listed. |
+| 2026-11-05 | main session (backfill) | Backfilled provider session IDs, models, timing, and token usage from local Claude Code transcripts; see "Backfilled resource usage". |

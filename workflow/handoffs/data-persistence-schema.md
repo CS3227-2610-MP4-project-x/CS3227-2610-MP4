@@ -148,23 +148,23 @@ On 30 October 2026 the human asked for these variables to be added now. The main
 
 ## Worker session reports
 
-### Session `orchestrator / not available`
+### Session `orchestrator / a828e3bd02dfde843`
 
 - Provider: `claude`
-- Provider session ID: not available
+- Provider session ID: subagent `a828e3bd02dfde843` in root session `efbad984-2d54-4bc7-8903-64cb6751f7d2`
+- Platform and model (if surfaced): Claude Code, `claude-opus-5-5`
+- Started / ended / elapsed: 2026-10-30 19:27–19:29 SGT (2 min); measured from first to last transcript record, so it includes waiting between continuations
+- Resource usage (provider-reported): tokens in (uncached) 12; cache read 248,721; cache write 65,807; out 10,624 (thinking 816); total 325,164; cache-read share of input 79%; tool calls 9; responses 6; 1 launch + 0 `SendMessage` continuations. Source: local Claude Code transcript, de-duplicated by message ID; backfilled 2026-11-05.
+- Unavailable resource metrics: cost (not recorded in local transcripts)
 - Work ID: data-persistence-schema
 - Agent: orchestrator
 - Phase: planning / handoff
 
 #### Shared fields `[ALL]`
 
-- Platform and model (if surfaced): Claude Code (Claude Agent SDK), Opus 5.5
 - Role: orchestrator
 - Human owner and assigned task scope: Developer B; coordination of task 2.4 and this handoff record only.
 - Source revision: `de3f088`
-- Started / ended / elapsed: not available
-- Resource usage (provider-reported): tokens in / out / total: not available; cache read / write: not available; cost: not available; tool calls: not available
-- Unavailable resource metrics: tokens, cache, cost, tool-call count, elapsed time
 - Work completed / findings: recorded the task scope, non-overlapping write paths, role order, acceptance criteria AC1–AC18, env vars for `.env.example`, and open questions Q1 and Q2. I confirmed `supabase/`, `tests/integration/`, and `docs/developer-guide.md` do not exist and that `vitest.config.ts` includes only `tests/unit/**`.
 - Files changed (use `none` if read-only): `workflow/handoffs/data-persistence-schema.md`
 - Checks run and exact results (use `none` if none were run): none
@@ -182,23 +182,23 @@ On 30 October 2026 the human asked for these variables to be added now. The main
   - No worktree, because the work is sequential.
 - Consolidation notes: worker sessions will be appended here as they finish.
 
-### Session `implementer / not available`
+### Session `implementer / a3b095574d7532bfe`
 
 - Provider: `claude`
-- Provider session ID: not available
+- Provider session ID: subagent `a3b095574d7532bfe` in root session `efbad984-2d54-4bc7-8903-64cb6751f7d2`
+- Platform and model (if surfaced): Claude Code, `claude-opus-5-5`
+- Started / ended / elapsed: 2026-10-30 22:35–23:36 SGT (60 min); measured from first to last transcript record, so it includes waiting between continuations
+- Resource usage (provider-reported): tokens in (uncached) 122; cache read 7,796,397; cache write 529,049; out 67,496 (thinking 23,708); total 8,393,064; cache-read share of input 94%; tool calls 74; responses 59; 1 launch + 2 `SendMessage` continuations. Source: local Claude Code transcript, de-duplicated by message ID; backfilled 2026-11-05.
+- Unavailable resource metrics: cost (not recorded in local transcripts)
 - Work ID: data-persistence-schema
 - Agent: implementer
 - Phase: implementation
 
 #### Shared fields `[ALL]`
 
-- Platform and model (if surfaced): Claude Code (Claude Agent SDK), Opus 5.5
 - Role: implementer
 - Human owner and assigned task scope: Developer B. The implementer write paths listed above, plus this session block (the orchestrator assigned it).
 - Source revision: `de3f088` plus the uncommitted test-writer files and this handoff
-- Started / ended / elapsed: not available
-- Resource usage (provider-reported): tokens in / out / total: not available; cache read / write: not available; cost: not available; tool calls: not available
-- Unavailable resource metrics: tokens, cache, cost, tool-call count, elapsed time
 - Work completed / findings:
   - The migration creates schema `app`, a guarded `CREATE ROLE app_runtime NOLOGIN` with no credential, the eleven tables, and `usage_quota_days`. It revokes everything on `app` from `PUBLIC`, `anon`, and `authenticated`. It grants `app_runtime` only `USAGE` on the schema, `SELECT`/`INSERT`/`UPDATE`/`DELETE` on all tables, and `USAGE` on all sequences. No RLS.
   - Mechanisms chosen where the handoff left room:
@@ -287,23 +287,23 @@ On 30 October 2026 the human asked for these variables to be added now. The main
   - `npx tsc --noEmit`: exit 0.
   - `npm run build`: exit 0. `next-env.d.ts` was restored afterwards.
 
-### Session `test-writer / not available` (follow-up: task 2.4 review decisions)
+### Session `test-writer / af9d6b2d4a0797151` (follow-up: task 2.4 review decisions)
 
 - Provider: `claude`
-- Provider session ID: not available
+- Provider session ID: subagent `af9d6b2d4a0797151` in root session `efbad984-2d54-4bc7-8903-64cb6751f7d2`
+- Platform and model (if surfaced): Claude Code, `claude-opus-5-5`
+- Started / ended / elapsed: 2026-10-30 23:28–23:34 SGT (6 min); measured from first to last transcript record, so it includes waiting between continuations
+- Resource usage (provider-reported): tokens in (uncached) 52; cache read 2,661,366; cache write 140,995; out 31,641 (thinking 6,400); total 2,834,054; cache-read share of input 95%; tool calls 29; responses 26; 1 launch + 0 `SendMessage` continuations. Source: local Claude Code transcript, de-duplicated by message ID; backfilled 2026-11-05.
+- Unavailable resource metrics: cost (not recorded in local transcripts)
 - Work ID: data-persistence-schema
 - Agent: test-writer
 - Phase: test update after review
 
 #### Shared fields `[ALL]`
 
-- Platform and model (if surfaced): Claude Code (Claude Agent SDK), Opus 5.5
 - Role: test-writer
 - Human owner and assigned task scope: Developer B. Only `tests/integration/db/**`, plus this session block.
 - Source revision: `de3f088` plus the uncommitted task 2.4 working tree
-- Started / ended / elapsed: not available
-- Resource usage (provider-reported): tokens in / out / total: not available; cache read / write: not available; cost: not available; tool calls: not available
-- Unavailable resource metrics: tokens, cache, cost, tool-call count, elapsed time
 - Work completed / findings: encoded design.md "Task 2.4 review decisions" (approved 30 Oct 2026) and the reviewer's test-adequacy gaps. The tests for decisions 1–4 fail against the current migration as intended. The gap tests pass. No test was weakened to pass.
 - Files changed (use `none` if read-only): `tests/integration/db/support/fixtures.ts`, `tests/integration/db/support/harness.ts`, `tests/integration/db/schema-migrations.test.ts`, `tests/integration/db/data-api-access.test.ts`, `tests/integration/db/identifiers-and-revisions.test.ts`, `tests/integration/db/secrets-and-content.test.ts`, `tests/integration/db/stored-results.test.ts`, `tests/integration/db/task-history.test.ts` (new), this session block
 - Checks run and exact results (use `none` if none were run):
@@ -347,6 +347,30 @@ On 30 October 2026 the human asked for these variables to be added now. The main
   - The `service_role` default-privileges block simulates Supabase-like grants. It does not reproduce Supabase's exact defaults, and the operator's `\dp app.*` release check remains the real-project evidence.
   - Calling a trigger function directly is checked through the catalog (`has_function_privilege`), not by invocation.
 
+## Backfilled resource usage `[ORCH]`
+
+Backfilled on 2026-11-05 from the local Claude Code transcripts of this task's sessions. Each subagent's usage is summed over its own transcript, de-duplicated by message ID (a response logged on several lines is counted once). `Continuations` counts `SendMessage` calls from the main session to that subagent (fix rounds and follow-ups). Times are first to last transcript record, in SGT, so they include waiting time. Main-session rows cover the whole conversation, including chat not about this task. Cost is not recorded in the transcripts. Nothing was estimated.
+
+| Role | Agent ID | Model | Start–end (SGT) | Continuations | Input (uncached) | Cache read | Cache write | Output | of which thinking | Cache-read share | Tool calls |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| main session | root `efbad984…` | `claude-opus-5-5` | 2026-10-29 23:36–2026-10-30 23:53 SGT (1457 min) | n/a | 178 | 9,065,317 | 464,270 | 61,819 | 18,153 | 95% | 66 |
+| analyst | `aeb721b6d11a825f5` | `claude-sonnet-5-5` | 2026-10-29 23:36–23:38 SGT (2 min) | 0 | 14 | 341,498 | 72,703 | 8,350 | 1,018 | 82% | 12 |
+| orchestrator | `a828e3bd02dfde843` | `claude-opus-5-5` | 2026-10-30 19:27–19:29 SGT (2 min) | 0 | 12 | 248,721 | 65,807 | 10,624 | 816 | 79% | 9 |
+| test-writer | `a695c138c62f9fb2b` | `claude-opus-5-5` | 2026-10-30 19:29–19:39 SGT (10 min) | 0 | 50 | 2,253,298 | 106,554 | 64,148 | 21,324 | 95% | 26 |
+| implementer | `a3b095574d7532bfe` | `claude-opus-5-5` | 2026-10-30 22:35–23:36 SGT (60 min) | 2 | 122 | 7,796,397 | 529,049 | 67,496 | 23,708 | 94% | 74 |
+| reviewer | `a1c1b3bfd66496846` | `claude-sonnet-5-5` | 2026-10-30 23:00–23:03 SGT (3 min) | 0 | 20 | 499,569 | 89,144 | 19,557 | 9,721 | 85% | 32 |
+| test-writer | `af9d6b2d4a0797151` | `claude-opus-5-5` | 2026-10-30 23:28–23:34 SGT (6 min) | 0 | 52 | 2,661,366 | 140,995 | 31,641 | 6,400 | 95% | 29 |
+| commit-pr | `a1253e2cc4ababdb5` | `claude-opus-5-5` | 2026-10-30 23:37–23:38 SGT (1 min) | 0 | 14 | 301,657 | 37,940 | 5,546 | 357 | 89% | 7 |
+| commit-pr | `a346f7e02bd0d7837` | `claude-opus-5-5` | 2026-10-30 23:49–23:49 SGT (0 min) | 0 | 6 | 76,194 | 42,223 | 1,552 | 47 | 64% | 5 |
+| **Subagents total** | | | | | 290 | 14,178,700 | 1,084,415 | 208,914 | 63,391 | 93% | 194 |
+| **All sessions total** | | | | | 468 | 23,244,017 | 1,548,685 | 270,733 | 81,544 | 94% | 260 |
+
+Thinking tokens were 30% of all output tokens for this task.
+
+Notes:
+
+- The analyst (`aeb721b6…`), the first test-writer run (`a695c138…`), the reviewer (`a1c1b3bf…`), and two commit-pr runs (`a1253e2c…`, `a346f7e0…`) ran but have no session block in this handoff; their usage is in the table.
+
 ## Consolidated outcome `[ORCH]`
 
 - Changed files and rationale: pending (only this handoff exists so far).
@@ -363,3 +387,4 @@ On 30 October 2026 the human asked for these variables to be added now. The main
 | Date/time (SGT) | Role/session | Update |
 |---|---|---|
 | 2026-10-30 | orchestrator / not available | Created handoff for task 2.4; status planned, test-writer next; Q1 raised. |
+| 2026-11-05 | main session (backfill) | Backfilled provider session IDs, models, timing, and token usage from local Claude Code transcripts; see "Backfilled resource usage". |
