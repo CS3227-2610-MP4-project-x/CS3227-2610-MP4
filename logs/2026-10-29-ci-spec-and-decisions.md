@@ -9,4 +9,4 @@
   - `proposal.md`: added the `continuous-integration` capability and an impact line.
 - Checks: `openspec validate project-task-management --strict` passed. No application code, workflow YAML, tests, or dependencies were added.
 - Human follow-up: configure branch protection on `master` to require the six named checks (D7). Optionally enable GitHub's own secret scanning (D4). Task 2.3 owns the `.env.example` gitignore exception (D16).
-- Human verification of this interaction summary is pending. No secrets recorded. No commit, push, or pull request was created.
+- Human has approved the changes. No secrets recorded. No commit, push, or pull request was created.

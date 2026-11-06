@@ -1,11 +1,37 @@
 {
+  "env": {
+    "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "1"
+  },
   "permissions": {
+    "deny": [
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(!.env.example)",
+      "Read(.vercel/**)",
+      "Edit(.env)",
+      "Edit(.env.*)",
+      "Edit(!.env.example)",
+      "Edit(.vercel/**)"
+    ],
     "ask": [
       "Bash(git push *)",
       "Bash(gh pr *)",
       "Bash(git reset --hard*)",
       "Bash(git rebase *)",
       "Bash(git config *)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-write-scope.mjs\""
+          }
+        ]
+      }
     ]
   }
 }

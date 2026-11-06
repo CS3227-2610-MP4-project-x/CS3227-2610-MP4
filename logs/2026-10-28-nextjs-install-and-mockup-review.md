@@ -5,7 +5,7 @@
 - Dependency change: installed exact versions `next@16.4.3`, `react@19.3.1`, and `react-dom@19.3.1`; npm generated `package.json` and `package-lock.json`. Added `node_modules/` to `.gitignore`.
 - Frontend review: the mockups mostly follow the dark UI guidance. The reviewer recommends adding the specified Task Allocation section; replacing the developer's generic status dropdown with lifecycle-safe actions; aligning the Acceptance Criteria Check state and submit action; showing alternate date-range, no-commits, and evidence-unavailable states in the commit picker; showing the latest check/run action on task detail; using monochrome for non-Done statuses; and adding a clear settings control. Recent project-wide activity visibility remains unspecified. Review evidence was screenshot-only; no runtime was available.
 - Verification: `npm ls next react react-dom --depth=0` reports the installed versions. No tests or application build were run; this repository had no application scaffold or package scripts before this request.
-- Human verification: pending review of this interaction summary.
+- Human verification: approved.
 - No secrets recorded. No commit, push, or pull request was created.
 
 ## Follow-up
@@ -23,4 +23,4 @@
 - Added root lint, Vitest, and Playwright configuration and setup smoke tests. Pinned `eslint@9.39.5` to match the peer ranges of the Next ESLint plugins, and `typescript@5.9.3` for successful Next build compatibility; `vite@8.3.5` is pinned for Vitest 5. All dependencies are recorded exactly in `package.json` and `package-lock.json`.
 - Checks: clean `npm ci --no-audit --no-fund` passed; `npm run lint`, `npm run typecheck`, and `npm run test` passed (1 test); `npm run test:e2e` passed (1 Chromium test); `npx next build --webpack` passed; `npm audit --offline --cache=/tmp/codex-npm-cache --omit=optional` reported 0 vulnerabilities. The default `npm run build` still fails because Turbopack cannot bind its local port in this environment (`EPERM`); the Webpack production build passed.
 - The generated side-by-side change review is `_temp/visual-diff.html`. No commits, pushes, or pull requests were made. OpenSpec task 2.1 remains unchecked because it explicitly includes committing the lockfile and repository instructions require direct human authorization before committing.
-- Human verification of this interaction summary remains pending. No secrets recorded.
+- Human has approved the changes. No secrets recorded.

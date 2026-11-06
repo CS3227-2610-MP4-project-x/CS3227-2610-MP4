@@ -27,4 +27,4 @@
 - **Commits:** the human committed `5a07d81` and `db02033`. The agents made no commits, pushes or pull requests.
 - **Unverified until push:** the live run of all six checks, the gitleaks result on Linux, the weekly schedule and the manual trigger (`workflow_dispatch`).
 - **Human follow-up:** make the six checks required in branch protection on `master` (D7).
-- No dependencies were added and no secrets were recorded. Human verification of this summary is pending.
+- No dependencies were added and no secrets were recorded. Human has approved the changes.

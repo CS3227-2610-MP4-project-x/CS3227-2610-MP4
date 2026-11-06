@@ -20,33 +20,43 @@ Depends on: none.
 
 Depends on: 2.
 
-- [ ] 3.1 Implement GitHub sign-in and sign-out with Supabase Auth, storing the verified GitHub user ID and username; add tests for first sign-in and sign-out.
-- [ ] 3.2 Implement server-side membership and role checks used by every Route Handler and service; add API tests for non-members, developers calling product-manager actions, and unauthenticated requests.
+- [x] 3.1 Implement GitHub sign-in and sign-out with Supabase Auth, storing the verified GitHub user ID and username; add tests for first sign-in and sign-out.
+- [x] 3.2 Implement server-side membership and role authorization and temporary project/task API stubs for the approved routes in `identity-and-access`; add API tests for unauthenticated requests, non-members, product-manager-only actions, assigned and unassigned developer transitions, product-manager transitions, and denied requests making no state changes. Authorized stubs return HTTP 501 without mutation.
+- [ ] 3.3 Build the public `/sign-in` page and signed-in workspace account UI with verified GitHub username and avatar, sign-out success and generic failure handling, and session-based redirects; follow `specs/ui-spec.md` and cover the identity-and-access scenarios.
 
 ## 4. Task Management
 
 Depends on: 3.
 
-- [ ] 4.1 **[P]** Implement projects with keys, memberships, the one-product-manager invariant, and product-manager transfer; add PostgreSQL tests for multiple memberships, manager uniqueness, and transfer.
-- [ ] 4.2 **[P]** Implement task create, edit, reassign, and soft delete with acceptance criteria and task IDs; add tests for missing criteria, assignees outside the project, and task IDs that are never reused.
-- [ ] 4.3 Implement the To Do → In Progress → In Review → Done lifecycle, request-changes with feedback, and progress updates; add transition, permission, and competing-write tests.
+- [ ] 4.1 **[P]** Implement project creation, keys, memberships, the one-product-manager invariant, and product-manager transfer; decide who may create a project and how its initial product manager is selected; add PostgreSQL integrity and project-route authorization tests.
+- [ ] 4.2 **[P]** Implement task create, read, edit, reassign, and soft delete with acceptance criteria and task IDs; replace the task stubs and add API authorization tests plus tests for missing criteria, assignees outside the project, and task IDs that are never reused.
+- [ ] 4.3 Implement the To Do → In Progress → In Review → Done lifecycle, request-changes with feedback, and progress updates; replace the state stub and add transition, assignment/permission, competing-write, and route authorization tests.
 - [ ] 4.4 Build the board, task detail, and review queue pages following `specs/ui-spec.md`.
 
 ## 5. GitHub Evidence
 
 Depends on: 3. Can run alongside group 4.
 
-- [ ] 5.1 **[P]** Implement repository linking with an encrypted read-only token; add tests that the token is never returned or logged and that unreadable repositories are refused.
-- [ ] 5.2 **[P]** Implement the GitHub adapter (list commits by author, date range, and branch; fetch diffs) with a fake for tests.
-- [ ] 5.3 Implement the commit picker and commit attachment with the authorship check; add tests for pre-selection by task ID, no commits found, unavailable evidence, and commits by other authors.
+- [ ] 5.1 **[P]** Implement the product-manager repository authorization/link flow: start a server-side setup attempt bound to the project and verified PM with single-use state and a 10-minute expiry; verify the GitHub installation through separate user authorization before listing repositories; retain a normalized server-side repository-list snapshot with a 10-minute expiry and no OAuth-token persistence; and link only a repository from that verified snapshot after rechecking current App access. Any failure leaves an existing binding unchanged. Implement the approved setup callback, snapshot-read, and final-link route contracts in `specs/github-evidence/spec.md`. Add product-manager authorization, failed-link, and PostgreSQL integrity tests. Add OAuth client ID/secret settings to server config and `.env.example`, plus minimal composition wiring. Task 5.3 provides the setup URL entry point and UI. Create a new versioned migration to replace the shipped PAT ciphertext columns with installation and repository IDs and add normalized attempt/snapshot storage; do not edit the shipped migration. Clear any legacy repository fields and PAT ciphertext so affected projects become unlinked for PM relinking. Developer A owns all Section 5 work and migrations by explicit human-approved exception to the general migration ownership rule in `AGENTS.md`. PostgreSQL migration/integrity execution remains unverified and must be recorded when validated.
+- [x] 5.2 **[P]** Implement the server-side GitHub App adapter and deterministic fake. Use GitHub REST API version `2026-03-10`; mint short-lived installation tokens restricted to one linked repository with read-only permissions; list branches and commits by verified author, date range, and branch; fetch diffs; and test safe provider-error handling and token scoping.
+- [ ] 5.3 Wire the remaining App environment configuration and repository-read adapter composition; provide the PM-only setup URL route; build the PM Project Settings repository panel and developer commit picker; and implement the approved task-scoped branch/commit listing and idempotent commit attachment routes. Add only the minimal task-detail host page needed to open and mount the commit picker because the task-detail page from 4.4 does not yet exist. Update `.env.example`. Add assigned-developer route authorization tests and tests for branch choices, date filters, task-ID preselection, no commits found, unavailable evidence, foreign authors, atomic refusal, and already-attached SHA idempotency.
+
+### Approved scope note for task 5.3
+
+- Project Settings repository panel using the approved mockup as visual reference: unlinked state, install/configure action, in-app list after installation, linked state, and safe unavailable/recovery state.
+- Minimal task-detail host page sufficient to mount and open the Section 5 developer commit picker. This is a narrow Section 5.3 dependency allowance, not completion of task 4.4.
+- Approved task-scoped branch and commit listing routes and commit attachment route are specified in `specs/github-evidence/spec.md`.
+- The approved security flow, setup callback, snapshot-read, final-link routes and payloads, 10-minute attempt and snapshot TTLs, normalized persistence, current App-access recheck, task-scoped pagination (`page` default 1, `perPage` default 50/max 100, `nextPage`), and in-request first-seen SHA deduplication are recorded in that spec. PostgreSQL migration/integrity execution is not yet verified.
+- Keep task 5.3 unchecked until implementation and applicable tests are complete.
+- Task 4.4 remains unchecked and pending. Its remaining board, task-detail, and review-queue page work is outside this Section 5.3 allowance; do not expand the minimal host page into general task-management UI or mark 4.4 complete.
 
 ## 6. LLM Gateway and Safeguards
 
 Depends on: 2. Can run alongside groups 3–5.
 
-- [ ] 6.1 **[P]** Implement the SoC LLM adapter and a deterministic fake adapter.
-- [ ] 6.2 **[P]** Implement secret redaction; add unit tests for common secret patterns.
-- [ ] 6.3 Implement the gateway: prompt building with untrusted content separated, schema validation with one retry, safe errors, per-person rate limits and quotas (reserved before the call, reset at 00:00 SGT, cached results not counted), and usage records; add unit tests for each.
+- [x] 6.1 **[P]** Implement the SoC LLM adapter and a deterministic fake adapter.
+- [x] 6.2 **[P]** Implement secret redaction; add unit tests for common secret patterns.
+- [x] 6.3 Implement the gateway: prompt building with untrusted content separated, schema validation with one retry, safe errors, per-person rate limits and quotas (reserved before the call, reset at 00:00 SGT, cached results not counted), and usage records; add unit tests for each.
 
 ## 7. Acceptance Criteria Check
 
@@ -54,15 +64,15 @@ Depends on: 5 and 6.
 
 - [ ] 7.1 Implement diff filtering and the input budget; add tests for excluded files and skipped-file reporting.
 - [ ] 7.2 Implement the check service: per-criterion result, evidence verification against the diff, and caching by commit set and criteria; add fake-adapter tests for success, failure, unverifiable evidence, and cache hits.
-- [ ] 7.3 Show the check to the developer and attach the latest result to submissions; add tests that a check never changes task state.
+- [ ] 7.3 Show the check to the developer and attach the latest result to submissions; add assigned-developer and product-manager result-access API tests, and tests that a check never changes task state.
 
 ## 8. Progress Report
 
 Depends on: 4 and 6. Can run alongside group 7.
 
 - [ ] 8.1 Implement report input assembly from structured activity for a date range in SGT; add tests for range boundaries (including late-evening activity), excluded diffs, empty ranges, ranges longer than 7 days, and activity over the input budget.
-- [ ] 8.2 Implement report generation with citation checks and caching invalidated by new activity; add fake-adapter tests and product-manager-only access tests.
-- [ ] 8.3 Build the report page and the project AI usage view.
+- [ ] 8.2 Implement report generation with citation checks and caching invalidated by new activity; add fake-adapter tests and product-manager-only API authorization tests.
+- [ ] 8.3 Build the report page and the project AI usage view; add product-manager-only project usage API authorization tests.
 
 ## 9. Verification and Evidence
 

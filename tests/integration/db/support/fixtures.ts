@@ -16,8 +16,8 @@
  *
  * people            (auth_user_id UNIQUE, github_user_id UNIQUE, github_username)
  * projects          (key UNIQUE + CHECK, name, last_task_number integer NOT NULL DEFAULT 0,
- *                    github_token_key_version, github_token_iv, github_token_ciphertext,
- *                    github_token_auth_tag — all nullable until a repository is linked)
+ *                    github_installation_id, github_repository_id, github_repository_owner,
+ *                    github_repository_name — all nullable until a repository is linked)
  * memberships       (project_id, person_id, role IN ('product_manager','developer'))
  * tasks             (project_id, number, title, description, assignee_id -> people.id,
  *                    due_date, status IN ('to_do','in_progress','in_review','done'),
@@ -34,7 +34,8 @@
  *                    statements jsonb,
  *                    github_evidence_unavailable boolean NOT NULL DEFAULT false)
  * usage_records     (feature, project_id, person_id, environment, input_tokens, output_tokens,
- *                    reserved_tokens, latency_ms, outcome, cached boolean, created_at;
+ *                    reserved_tokens, charged_tokens (task 6.3, Q1), latency_ms, outcome,
+ *                    cached boolean, created_at;
  *                    input/output tokens and latency_ms nullable or defaulted while pending)
  * usage_quota_days  (person_id, sgt_date date, UNIQUE (person_id, sgt_date))
  *
@@ -52,7 +53,7 @@
  * Privileges ("Task 2.4 review decisions", design.md): app_runtime has SELECT, INSERT,
  * UPDATE and DELETE on every app table except tasks (no DELETE) and task_events
  * (SELECT and INSERT only). anon, authenticated and service_role have nothing in app.
- * - Only feature 'acceptance_criteria_check' and environment 'development' are inserted.
+ * - Only feature 'acceptance_check' and environment 'development' are inserted (task 6.3, Q5).
  */
 import { randomBytes, randomInt, randomUUID } from "node:crypto";
 
@@ -131,11 +132,20 @@ export const TASK_EVENT_TYPES = ["state_change", "submission", "assignment_chang
 
 export const USAGE_OUTCOMES = ["pending", "succeeded", "invalid_output", "provider_error", "cached"] as const;
 
-export const ENCRYPTED_TOKEN_COLUMNS = [
+/** Retired PAT fields, removed by the new task 5.1 migration (D-H). */
+export const RETIRED_GITHUB_TOKEN_COLUMNS = [
   "github_token_key_version",
   "github_token_iv",
   "github_token_ciphertext",
   "github_token_auth_tag",
+] as const;
+
+/** Internal SQL names coordinated for task 5.1; all fields form one binding. */
+export const GITHUB_BINDING_COLUMNS = [
+  "github_installation_id",
+  "github_repository_id",
+  "github_repository_owner",
+  "github_repository_name",
 ] as const;
 
 export const USAGE_RECORD_COLUMNS = [
@@ -145,6 +155,7 @@ export const USAGE_RECORD_COLUMNS = [
   "environment",
   "input_tokens",
   "output_tokens",
+  "charged_tokens",
   "latency_ms",
   "outcome",
   "cached",
@@ -164,7 +175,7 @@ export const REPORT_LOOKUP_COLUMNS = ["project_id", "range_start", "range_end", 
 /** Reports' "GitHub evidence unavailable" note (review decisions; daily-progress-report). */
 export const REPORT_GITHUB_UNAVAILABLE_COLUMN = "github_evidence_unavailable";
 
-export const SYNTHETIC_FEATURE = "acceptance_criteria_check";
+export const SYNTHETIC_FEATURE = "acceptance_check";
 export const SYNTHETIC_ENVIRONMENT = "development";
 export const SYNTHETIC_MODEL = "synthetic-model";
 
@@ -393,4 +404,39 @@ export async function insertPendingUsageRecord(
     outcome: input.outcome ?? "pending",
     cached: false,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Task 6.3 (llm-gateway-core): a pg.Pool stand-in for UsageRepository
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimal `pg.Pool` stand-in built on the harness's `connectAsRuntime`, so UsageRepository
+ * (which takes a Pool, one client per transaction) runs as `app_runtime`. It provides
+ * `connect()` (a client with `release()`), `query()` and a no-op `end()`; clients are reused
+ * after release and closed by the harness after the file.
+ */
+export function runtimePool(connect: () => Promise<pg.Client>): pg.Pool {
+  const idle: pg.Client[] = [];
+  const acquire = async (): Promise<pg.Client> => idle.pop() ?? (await connect());
+  const pool = {
+    async connect(): Promise<pg.Client & { release: (error?: unknown) => void }> {
+      const client = await acquire();
+      return Object.assign(client, {
+        release: () => {
+          idle.push(client);
+        },
+      });
+    },
+    async query(...args: unknown[]): Promise<unknown> {
+      const client = await acquire();
+      try {
+        return await (client.query as (...queryArgs: unknown[]) => Promise<unknown>)(...args);
+      } finally {
+        idle.push(client);
+      }
+    },
+    async end(): Promise<void> {},
+  };
+  return pool as unknown as pg.Pool;
 }
