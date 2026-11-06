@@ -292,7 +292,7 @@ Recorded on 2 November 2026 during task 6.3. `AGENTS.md` refers to an API error 
 
 ## Risks / Trade-offs
 
-- **The GitHub token gives access to the whole repository.** It is limited to read-only access for one repository, encrypted, and never exposed. The product manager can replace or remove it.
+- **The GitHub App can read the whole linked repository.** Each installation access token is short-lived and restricted to the one linked repository with read-only Contents and Metadata permissions. Tokens are never returned to clients, logged, or persisted, and the App private key stays in server-side environment variables (see "Repository-scoped installation tokens"). This bullet replaces an earlier one that described an encrypted personal access token, which the GitHub App change retired (corrected 6 November 2026 during task 4.1).
 - **Developers commit with an email that is not linked to their GitHub account.** Those commits won't match the author filter. The commit picker explains this when no commits are found.
 - **The model may judge criteria wrongly.** Results are advisory, evidence is verified against the diff, and only the product manager can approve.
 - **Prompt injection through commits or task text.** This is mitigated by separating untrusted content, validating against the schema and evidence rules, and giving AI no ability to change state. Adversarial fixtures check it.
