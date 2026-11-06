@@ -6,8 +6,40 @@ Defines how project members are organized and how product managers and developer
 
 ## ADDED Requirements
 
+### Requirement: Signed-in people create projects
+The system SHALL allow any signed-in person to create a project with a key and a name through `POST /api/v1/projects`. The creator SHALL become the project's only product manager, and the project and that membership SHALL be created together or not at all.
+
+#### Scenario: Creator becomes product manager
+- **WHEN** a signed-in person creates a project with key `WEB` and a valid name
+- **THEN** the system returns HTTP 201 with the project's `id`, `key`, `name`, and `role` of `product_manager`
+- **AND** the creator is the project's only product manager and no other membership exists
+
+#### Scenario: Unauthenticated creation
+- **WHEN** a request without a valid session creates a project
+- **THEN** the system returns HTTP 401 and no project exists
+
+#### Scenario: Invalid key
+- **WHEN** the key does not match 2 to 10 uppercase letters and digits starting with a letter, including a lowercase key
+- **THEN** the system returns HTTP 400 with code `INVALID_REQUEST`, does not normalize the key, and creates nothing
+
+#### Scenario: Duplicate key
+- **WHEN** a person creates a project with a key that already exists
+- **THEN** the system returns HTTP 409 with code `PROJECT_KEY_TAKEN`, and the existing project is unchanged
+
+#### Scenario: Invalid name or fields
+- **WHEN** the name is blank after trimming or longer than 100 characters, or the body has fields other than `key` and `name`
+- **THEN** the system returns HTTP 400 with code `INVALID_REQUEST` and creates nothing
+
+#### Scenario: Creation is atomic
+- **WHEN** creating the product manager's membership fails
+- **THEN** no project row remains
+
+#### Scenario: Creator keeps other roles
+- **WHEN** a person who is a developer in one project creates another project
+- **THEN** they remain a developer in the first project and become the product manager of the new one
+
 ### Requirement: Project membership and roles
-The system SHALL allow a person to belong to multiple projects with one role per project, either Product Manager or Developer, and each project SHALL have exactly one product manager.
+The system SHALL allow a person to belong to multiple projects with one role per project, either Product Manager or Developer, and each project SHALL have exactly one product manager. The product manager SHALL add a registered person as a developer through `POST /api/v1/projects/{projectId}/members` with a `githubUsername`, matched exactly and case-insensitively against registered people.
 
 #### Scenario: Person belongs to multiple projects
 - **WHEN** a person is added to a second project
@@ -18,23 +50,70 @@ The system SHALL allow a person to belong to multiple projects with one role per
 - **THEN** the project has exactly one product manager
 
 #### Scenario: Product manager adds a developer
-- **WHEN** the product manager adds a registered person to the project as a developer
-- **THEN** that person can see the project and can be assigned its tasks
+- **WHEN** the project's product manager adds the registered person with that GitHub username as a developer
+- **THEN** the system returns HTTP 201, that person becomes a developer, can see the project, and can be assigned its tasks
+
+#### Scenario: Unregistered person
+- **WHEN** the product manager adds a username that matches no registered person
+- **THEN** the system returns HTTP 404 with code `NOT_FOUND` and a generic message, and adds no membership
+
+#### Scenario: Ambiguous username
+- **WHEN** the username matches more than one registered person
+- **THEN** the system returns HTTP 409 with code `GITHUB_USERNAME_AMBIGUOUS` and adds no membership
+
+#### Scenario: Person already a member
+- **WHEN** the product manager adds a person who already has a role in the project, including the product manager
+- **THEN** the system returns HTTP 409 with code `ALREADY_MEMBER` and the existing role is unchanged
+
+#### Scenario: Developer cannot add members
+- **WHEN** a developer tries to add a member
+- **THEN** the system returns HTTP 403 and nothing changes, and a non-member receives HTTP 404
 
 ### Requirement: Product manager transfers the role
-The system SHALL allow only the project's current product manager to transfer the product manager role, and only to a developer in the same project. In a single change, the outgoing product manager SHALL become a developer and the incoming developer SHALL become the product manager. The system SHALL refuse the transfer while the incoming developer has assigned tasks that are not Done.
+The system SHALL allow only the project's current product manager to transfer the product manager role, and only to a developer in the same project. In a single change, the outgoing product manager SHALL become a developer and the incoming developer SHALL become the product manager. The system SHALL refuse the transfer while the incoming developer has assigned tasks that are not Done and not deleted.
 
 #### Scenario: Product manager transfers the role
 - **WHEN** the product manager transfers the role to a developer in the project who has no open assigned tasks
 - **THEN** that developer becomes the product manager, the previous product manager becomes a developer, and the project still has exactly one product manager
 
 #### Scenario: Incoming product manager has open tasks
-- **WHEN** the product manager tries to transfer the role to a developer who has an assigned task that is not Done
-- **THEN** the system refuses the transfer and asks for the task to be reassigned first
+- **WHEN** the product manager tries to transfer the role to a developer who has an assigned task that is not Done and not deleted
+- **THEN** the system returns HTTP 409 with code `TRANSFER_BLOCKED_OPEN_TASKS` and a message asking for the task to be reassigned first, and the roles are unchanged
+
+#### Scenario: Deleted tasks do not block transfer
+- **WHEN** the incoming developer's only assigned tasks that are not Done are deleted
+- **THEN** the transfer succeeds
+
+#### Scenario: Target is not a developer in the project
+- **WHEN** the product manager targets a person who is not a developer in the project, or targets themselves
+- **THEN** the system returns HTTP 409 with code `TRANSFER_TARGET_NOT_DEVELOPER` and the roles are unchanged
 
 #### Scenario: Developer tries to take the role
 - **WHEN** a developer requests a product manager transfer
-- **THEN** the system refuses the request and the roles are unchanged
+- **THEN** the system returns HTTP 403, refuses the request, and the roles are unchanged
+
+#### Scenario: Non-member requests transfer
+- **WHEN** a non-member requests a transfer
+- **THEN** the system returns HTTP 404 and nothing changes
+
+#### Scenario: Competing transfers
+- **WHEN** two transfers, or a transfer and a task assignment to the incoming developer, run at the same time
+- **THEN** the project ends with exactly one product manager, and a transfer never completes while the incoming developer has an open assigned task
+
+### Requirement: Transfer targets are identified by GitHub username
+The system SHALL accept a product manager transfer through `POST /api/v1/projects/{projectId}/product-manager-transfer` with the target's `githubUsername`, matched exactly and case-insensitively against registered people, using the same lookup rule as adding a member.
+
+#### Scenario: Target username is not found
+- **WHEN** the target username matches no registered person
+- **THEN** the system returns HTTP 404 with code `NOT_FOUND` and a generic message, and the roles are unchanged
+
+#### Scenario: Target username is ambiguous
+- **WHEN** the target username matches more than one registered person
+- **THEN** the system returns HTTP 409 with code `GITHUB_USERNAME_AMBIGUOUS` and the roles are unchanged
+
+#### Scenario: Target found by username
+- **WHEN** the product manager submits the username of a developer in the project, in any letter case
+- **THEN** the transfer proceeds to the open-task check and the role change
 
 ### Requirement: Projects and tasks have readable IDs
 Each project SHALL have a key of 2 to 10 uppercase letters and digits, starting with a letter, that is unique and cannot change. Each task SHALL have a task ID made of the project key and a number, such as `WEB-12`, that is unique within the project and never reused, including after the task is deleted. Commit messages and progress reports refer to tasks by this task ID.
@@ -46,6 +125,10 @@ Each project SHALL have a key of 2 to 10 uppercase letters and digits, starting 
 #### Scenario: Deleted task number is not reused
 - **WHEN** task `WEB-12` is deleted and a new task is created
 - **THEN** the new task's ID is not `WEB-12`
+
+#### Scenario: Project key cannot change
+- **WHEN** any request tries to change an existing project's key
+- **THEN** the key is unchanged
 
 ### Requirement: Product manager manages tasks
 The system SHALL allow a project's product manager to create, edit, reassign, and delete tasks. Each task SHALL have a title, a description, at least one acceptance criterion, an assignee who is a developer in the project, a due date, and an optional branch name.

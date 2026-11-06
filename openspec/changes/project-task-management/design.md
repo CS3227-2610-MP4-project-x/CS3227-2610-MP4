@@ -156,6 +156,27 @@ Approved by Lim-ZY on 2 November 2026 for task 3.2. Project and task route paths
 - **Temporary behavior.** A permitted request to any approved stub returns HTTP 501 using the safe error envelope and performs no state change. The feature tasks replace each stub with its functional API and include route-level authorization tests. Stubs do not accept or promise feature payload or success-response schemas beyond the transition target field.
 - **Public authentication routes.** `GET /api/v1/auth/sign-in`, `GET /api/v1/auth/callback`, and `POST /api/v1/auth/sign-out` remain outside project membership and role authorization. They retain their authentication-flow-specific protections. The Next.js Proxy remains limited to session refresh; it does not authorize project access.
 
+## Project and Membership Decisions
+
+Approved by thegrimbee on 6 November 2026 for task 4.1. The human approved the analyst's draft spec delta and recommendations D1 to D10, with the resolutions noted below. Developer B (thegrimbee) owns all task 4.1 paths, including the project route files and the project stubs in `src/server/auth/project-authorization.ts`; Lim-ZY cross-reviews.
+
+- **D1 Who may create a project.** Any signed-in person.
+- **D2 Initial product manager.** The creator becomes the project's only product manager, in the same transaction that creates the project. Handing the project over later uses the D-C transfer.
+- **D3 Creation payload.** `POST /api/v1/projects` accepts exactly `{key, name}`. A key that fails `^[A-Z][A-Z0-9]{1,9}$` is rejected, not normalized. The name is trimmed, 1 to 100 characters, plain text. Success is 201 with `{id, key, name, role: "product_manager"}`. Bad input is 400 `INVALID_REQUEST`. A duplicate key is 409 `PROJECT_KEY_TAKEN`.
+- **D4 Routes.** Task 4.1 approves only:
+  - `GET /api/v1/projects/{projectId}` returning `{id, key, name, role}`;
+  - `POST /api/v1/projects/{projectId}/members` with `{githubUsername}`, product manager only, 201;
+  - `POST /api/v1/projects/{projectId}/product-manager-transfer` with `{githubUsername}`, product manager only, 200.
+
+  Project and member listing are left to task 4.4.
+- **D5 Identifying a person.** GitHub username, matched exactly and case-insensitively against registered people. More than one match is 409 `GITHUB_USERNAME_AMBIGUOUS`. Any non-match returns 404 `NOT_FOUND` with a generic message; the product manager may learn whether a username is registered. The same rule serves both the members and transfer routes. Adding a person who already has a role in the project is 409 `ALREADY_MEMBER`. Transferring to a person who is not a developer in the project, including the product manager themselves, is 409 `TRANSFER_TARGET_NOT_DEVELOPER` (error codes chosen by thegrimbee on 6 November 2026 as the agent recommended).
+- **D6 Open tasks and refusal.** Only non-deleted, non-Done tasks block a transfer, consistent with D-E. A blocked transfer is 409 `TRANSFER_BLOCKED_OPEN_TASKS`. The check runs inside the transfer transaction after locking both membership rows `FOR UPDATE`, so a concurrent assignment (which share-locks the developer membership) cannot slip in.
+- **D7 Out of scope.** Member removal and role change are not part of task 4.1. The reassignment rule in "Assignees after membership changes" stays pending until they are specified.
+- **D8 Origin check.** The three mutating routes share one helper: `Origin` must equal `APP_ORIGIN` and `Content-Type` must be `application/json`. A bad Origin returns 403 `FORBIDDEN` (resolution of conflict C2); a wrong content type returns 400 `INVALID_REQUEST`. The existing github-repository route and spec are unchanged, so the two behaviors differ until a later task aligns them.
+- **D9 Placement.** A new `src/server/projects/` module holds the service, repository, types and errors behind an `index.ts` entry. `composition.ts` and the stubs in `project-authorization.ts` get minimal edits (resolution of C3).
+- **D10 "Exactly one" product manager.** The database enforces at most one (partial unique index). At least one relies on the creation transaction and an integration test; no new migration.
+- **C4.** Task 4.1 has no UI. The members screen stays with task 4.4.
+
 ## GitHub App Repository-Link API Decision (Earlier Contract; Flow Superseded)
 
 Approved by Lim-ZY on 3 November 2026 for task 5.1. The human's subsequent approval of verification-before-listing on 3 November 2026 supersedes the route sequence in the first three bullets below. Preserve them as history only; use the current approved behavior and route contracts in `specs/github-evidence/spec.md`.
@@ -260,6 +281,11 @@ Recorded on 2 November 2026 during task 6.3. `AGENTS.md` refers to an API error 
   - `AUTHENTICATION_FAILED` (500 or 502).
   - `FORBIDDEN` (403).
   - The LLM Gateway Decisions G3 codes: `RATE_LIMITED` (429), `QUOTA_EXCEEDED` (429), `AI_UNAVAILABLE` (503), `AI_ERROR` (502) and `INVALID_OUTPUT` (502).
+  - `PROJECT_KEY_TAKEN` (409): a project key already exists (task 4.1).
+  - `TRANSFER_BLOCKED_OPEN_TASKS` (409): the incoming product manager has open assigned tasks (task 4.1).
+  - `GITHUB_USERNAME_AMBIGUOUS` (409): a GitHub username matches more than one registered person (task 4.1).
+  - `ALREADY_MEMBER` (409): the person already has a role in the project (task 4.1).
+  - `TRANSFER_TARGET_NOT_DEVELOPER` (409): the transfer target is not a developer in the project, or is the product manager (task 4.1).
 - **Message.** A fixed, human-readable message chosen by the server. It never contains a stack trace, SQL, a provider message or body, a credential, or user-supplied text.
 - **Headers.** Error responses send `Cache-Control: no-store`.
 - **Unexpected errors.** Errors not mapped to a specific code return 500 with a generic message, and their details are not exposed.
@@ -278,7 +304,7 @@ Recorded on 2 November 2026 during task 6.3. `AGENTS.md` refers to an API error 
 ## Open Questions
 
 - Tester accounts for the deployed environments.
-- Task 4.1 must decide who may create a project and how its initial product manager is selected. The task 3.2 project-creation stub does not settle this.
+- Resolved 6 November 2026 (task 4.1): who may create a project and how its initial product manager is selected. See "Project and Membership Decisions".
 
 ## Migration Plan
 

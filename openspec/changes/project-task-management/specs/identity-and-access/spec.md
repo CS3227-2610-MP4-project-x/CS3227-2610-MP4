@@ -80,13 +80,11 @@ The system SHALL provide temporary project and task route stubs to verify server
 
 #### Scenario: Project details require membership
 - **WHEN** a person requests `GET /api/v1/projects/{projectId}`
-- **THEN** an authenticated project member reaches the stub, while an authenticated non-member receives HTTP 404
+- **THEN** an authenticated project member receives HTTP 200 with the project's `id`, `key`, `name`, and the requester's `role`, while an authenticated non-member receives HTTP 404
 
-#### Scenario: Project creation stub requires authentication
+#### Scenario: Project creation is functional
 - **WHEN** a person requests `POST /api/v1/projects`
-- **THEN** an unauthenticated person receives HTTP 401 and an authenticated person reaches the stub
-- **AND** the stub does not create a project or determine its initial product manager
-- **AND** project creation policy remains a task 4.1 design decision, and payload and successful-response schemas are unspecified
+- **THEN** the endpoint is no longer a stub, and the task-management requirement "Signed-in people create projects" defines its policy, payload, and responses
 
 #### Scenario: Task creation stub requires the product-manager role
 - **WHEN** a person requests `POST /api/v1/projects/{projectId}/tasks`
@@ -166,3 +164,18 @@ Protected API errors SHALL use the JSON envelope `{ "error": { "code": "...", "m
 #### Scenario: Authenticated person opens the sign-in page
 - **WHEN** a person with a valid session requests `/sign-in`
 - **THEN** the browser is redirected to the signed-in workspace at `/`
+
+### Requirement: Mutating project routes check the request origin
+Every state-changing project route SHALL require an `Origin` header equal to the environment's `APP_ORIGIN` and a `Content-Type` of `application/json`, and SHALL reject other requests before changing any state.
+
+#### Scenario: Bad origin is refused
+- **WHEN** a mutating request to `POST /api/v1/projects`, `POST /api/v1/projects/{projectId}/members`, or `POST /api/v1/projects/{projectId}/product-manager-transfer` has a missing `Origin` header or one that differs from `APP_ORIGIN`
+- **THEN** the system returns HTTP 403 with code `FORBIDDEN` and a safe message, and nothing changes
+
+#### Scenario: Wrong content type is refused
+- **WHEN** such a request does not have `Content-Type: application/json`
+- **THEN** the system returns HTTP 400 with code `INVALID_REQUEST` and nothing changes
+
+#### Scenario: Matching origin proceeds to authorization
+- **WHEN** such a request has an `Origin` equal to `APP_ORIGIN` and a JSON content type
+- **THEN** the normal authentication, membership, and role checks apply
