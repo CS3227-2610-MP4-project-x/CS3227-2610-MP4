@@ -218,6 +218,20 @@ Approved by thegrimbee on 6 November 2026 for task 4.1. The human approved the a
     - The transfer's membership lock statement contains `FOR UPDATE`.
     - Unique violations are recognised by SQLSTATE `23505` and the constraint name: `projects_key_key` becomes `PROJECT_KEY_TAKEN`, and `memberships_project_person_key` becomes `ALREADY_MEMBER`.
   - *S7 Losing a competing transfer.* When two transfers compete, the one that waits on the membership locks finds that the caller is no longer the product manager. It returns 403 `FORBIDDEN` and changes nothing.
+- **Review decisions R1 to R8 (task 4.1, review round 1).** Approved by thegrimbee on 6 November 2026. Each records the behaviour the 4.1 implementation already has; no code change follows from them.
+  - *R1 Name length.* The 1–100 character limit on a project name (D3) counts Unicode code points after trimming.
+  - *R2 Content-type parameters.* For the D8 check, `Content-Type` parameters after `;` are ignored, and the media type is compared after trimming and lowercasing. `application/json; charset=utf-8` is accepted. This matches the existing project-authorization stubs.
+  - *R3 Conflict messages.* The fixed messages for the new 409 codes (Q2) are:
+    - `PROJECT_KEY_TAKEN`: "A project with this key already exists"
+    - `GITHUB_USERNAME_AMBIGUOUS`: "The GitHub username matches more than one person"
+    - `ALREADY_MEMBER`: "The person is already a member of this project"
+    - `TRANSFER_TARGET_NOT_DEVELOPER`: "The product manager role can only be transferred to a developer in this project"
+    - `TRANSFER_BLOCKED_OPEN_TASKS`: "Reassign the developer's open tasks before transferring the product manager role"
+  - *R4 Caller without membership in the service.* If the service's in-transaction role check finds no membership for the caller, it fails with `NOT_FOUND`, the same as the non-member rule. The handler's earlier check already conceals this case over HTTP.
+  - *R5 Add-member lock.* Adding a member takes a `FOR SHARE` lock on the caller's membership row inside the transaction. It therefore waits for a concurrent transfer's `FOR UPDATE`, and a product manager demoted by that transfer cannot add a member.
+  - *R6 Lock waits.* No `lock_timeout` or retry is set for the transfer and add-member lock waits.
+  - *R7 Mocked-test row shapes.* S6 stays as recorded: result-row shapes and statement forms are not fixed. The unit `pg` fake evaluates the statements it receives and fails on any it cannot read; locks are verified only by the PostgreSQL integration tests.
+  - *R8 Duplicated constants.* The error table and the UUID pattern stay copied in `src/server/projects/`, `src/server/auth/request-access.ts` and `src/server/auth/project-authorization.ts`. Sharing them would widen the S5 and Q7 exports or add a file outside the 4.1 paths.
 
 ## GitHub App Repository-Link API Decision (Earlier Contract; Flow Superseded)
 
