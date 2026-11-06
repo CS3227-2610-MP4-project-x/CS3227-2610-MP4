@@ -84,3 +84,8 @@
 
 - User explicitly authorized the commit agent to create scoped commits on `chore/product-website`.
 - Audited the branch from `96b77c5` (`dev` at branch creation), confirmed the index was clean, and grouped the MarkBind site, Pages workflow, unfinished linked guide/reflection documents, and supporting records into one website commit. Preserved the earlier task-status commit; did not push or create a pull request.
+
+## Follow-up: Website handoff and commit cleanup
+
+- The orchestrator requested a follow-up after the user authorized scoped commits on `chore/product-website`.
+- Updated `workflow/handoffs/product-website.md` to record commits `9091982` and `4018c88`, the clean worktree, no push or PR, restored original footer spacing, and the supplied PR draft. Removed the extra blank line at EOF from `product-website/stylesheets/main.css` and recorded this follow-up. No push or PR creation.
