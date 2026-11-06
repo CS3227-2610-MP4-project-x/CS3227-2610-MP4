@@ -4,8 +4,6 @@ description: Coordinates approved tasks, ownership, dependencies, non-overlappin
 model: opus
 effort: medium
 maxTurns: 50
-experimental:
-  cacheTtl: 1h
 hooks:
   PreToolUse:
     - matcher: "Write|Edit|NotebookEdit"

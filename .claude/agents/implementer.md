@@ -4,8 +4,6 @@ description: Implements one approved task within its assigned source paths.
 model: opus
 effort: medium
 maxTurns: 120
-experimental:
-  cacheTtl: 1h
 hooks:
   PreToolUse:
     - matcher: "Write|Edit|NotebookEdit"
