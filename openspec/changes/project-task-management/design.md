@@ -186,6 +186,38 @@ Approved by thegrimbee on 6 November 2026 for task 4.1. The human approved the a
 - **Planning decisions Q7 and Q8.** Approved by thegrimbee on 6 November 2026 as the agent recommended, answering the orchestrator's questions in `workflow/handoffs/projects-membership-4-1.md`.
   - *Q7 Auth public entry.* Task 4.1 creates `src/server/auth/index.ts` as the auth module's public entry for the Q5 helpers. It exports only those helpers and their result types, and must not re-export `project-authorization.ts`. Existing direct imports of other `src/server/auth/*` files are left unchanged. The auth files are in Developer A's identity-and-access area, so Lim-ZY cross-reviews the 4.1 changes to `src/server/auth/` before merge.
   - *Q8 No import cycle.* The session and membership helpers in `project-authorization.ts` (`getAuthenticatedUserId`, `resolveProjectAccess`, and the private code they depend on) move to a new file, `src/server/auth/request-access.ts`. They are moved, not copied. `project-authorization.ts` imports them from there, and the task stubs keep their behaviour. The Q6 step, which maps the session to a person or returns 401, is a new function in the same file. Dependencies run one way: `src/server/projects` imports `@/server/auth`, which resolves to `index.ts` and then `request-access.ts`; `project-authorization.ts` imports `@/server/projects` and `request-access.ts`. The auth entry never imports `src/server/projects`.
+- **Planning decisions S1 to S7 (public seam for test-first work).** Approved by thegrimbee on 6 November 2026 as the agent drafted them, so that the task 4.1 test-writer can run before the implementer without guessing names.
+  - *S1 Projects module exports.* `src/server/projects/index.ts` exports only the following:
+    - `ProjectService`;
+    - `ProjectRepository`: constructed with a database exposing `query()` and `connect()`, as `GitHubEvidenceRepository` is;
+    - `ProjectError`, keyed by error `code`, and `projectErrorResponse(error: unknown): Response`;
+    - the validators `parseCreateProjectBody(body: unknown)`, which returns `{key, name}` or `null`, and `parseGitHubUsernameBody(body: unknown)`, which returns the trimmed username or `null`. They live in `src/server/projects/validation.ts`;
+    - the handlers `handleProjectCreate(request, composition)`, `handleProjectRead(request, context, composition)`, `handleMemberAdd(request, context, composition)` and `handleProductManagerTransfer(request, context, composition)`;
+    - the types `ProjectView` = `{id, key, name, role}`, `MemberView` = `{personId, githubUsername, role: "developer"}`, and `PersonLookup`.
+
+    The project stubs in `project-authorization.ts` keep their names and call these handlers.
+  - *S2 Service methods.* The constructor is `new ProjectService(projects: ProjectRepository, people: PersonLookup)`. Its methods:
+    - `createProject(personId, {key, name})` returns `ProjectView`;
+    - `getProject(projectId, personId)` returns `ProjectView`;
+    - `addMember(projectId, actorPersonId, githubUsername)` returns `MemberView`;
+    - `transferProductManager(projectId, actorPersonId, githubUsername)` returns the caller's new `ProjectView`, with role `developer`.
+
+    Failures throw `ProjectError(code)`. The service checks the actor's product manager role inside the transaction, as well as the handler's earlier check. Repository method names are the implementer's choice.
+  - *S3 Composition.* One new field, `projectService: ProjectService`.
+  - *S4 Username lookup.* `PeopleRepository.findPeopleByGitHubUsername(githubUsername)` returns every exact, case-insensitive match as `{id, githubUsername}`. `PersonLookup`, defined in `src/server/projects/types.ts`, is that one method.
+  - *S5 Auth helpers.* `src/server/auth/request-access.ts` exports:
+    - `getAuthenticatedUserId(composition)`;
+    - `resolveProjectAccess(composition, projectId)`;
+    - `resolveSessionPerson(composition)`, which returns a person ID or a 401 `Response` (Q6);
+    - the `AccessResult` type.
+
+    `src/server/auth/index.ts` re-exports these.
+  - *S6 Database seam for mocked tests.* Exact SQL text is not fixed. Tests identify a statement by table (`app.projects`, `app.memberships`, `app.people`, `app.tasks`) and kind (SELECT, INSERT, UPDATE).
+    - Single reads use `pool.query`.
+    - Transactions use `pool.connect()`, then `BEGIN`, `COMMIT`, or `ROLLBACK` on any error, then `release()`.
+    - The transfer's membership lock statement contains `FOR UPDATE`.
+    - Unique violations are recognised by SQLSTATE `23505` and the constraint name: `projects_key_key` becomes `PROJECT_KEY_TAKEN`, and `memberships_project_person_key` becomes `ALREADY_MEMBER`.
+  - *S7 Losing a competing transfer.* When two transfers compete, the one that waits on the membership locks finds that the caller is no longer the product manager. It returns 403 `FORBIDDEN` and changes nothing.
 
 ## GitHub App Repository-Link API Decision (Earlier Contract; Flow Superseded)
 

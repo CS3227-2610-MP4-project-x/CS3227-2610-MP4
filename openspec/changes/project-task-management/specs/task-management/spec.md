@@ -110,6 +110,10 @@ The system SHALL allow only the project's current product manager to transfer th
 - **WHEN** two transfers, or a transfer and a task assignment to the incoming developer, run at the same time
 - **THEN** the project ends with exactly one product manager, and a transfer never completes while the incoming developer has an open assigned task
 
+#### Scenario: Losing a competing transfer
+- **WHEN** a transfer waits for another transfer in the same project to finish, after which its caller is no longer the product manager
+- **THEN** the system returns HTTP 403 with code `FORBIDDEN`, and the waiting transfer changes nothing
+
 ### Requirement: Transfer targets are identified by GitHub username
 The system SHALL accept a product manager transfer through `POST /api/v1/projects/{projectId}/product-manager-transfer` with the target's `githubUsername`, matched exactly and case-insensitively against registered people, using the same lookup rule as adding a member.
 
