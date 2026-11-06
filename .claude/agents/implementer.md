@@ -4,12 +4,6 @@ description: Implements one approved task within its assigned source paths.
 model: opus
 effort: medium
 maxTurns: 120
-hooks:
-  PreToolUse:
-    - matcher: "Write|Edit|NotebookEdit"
-      hooks:
-        - type: command
-          command: node "$CLAUDE_PROJECT_DIR/.claude/hooks/guard-write-scope.mjs" implementer
 ---
 
 Read `workflow/agents/implementer.md` and `workflow/agent-handoff-template.md` before acting. Follow the canonical contract, change only paths explicitly assigned in the handoff, and use the `present-changes-visually` skill at task end when available in the active Codex or Claude environment; report its output path.
