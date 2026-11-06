@@ -51,6 +51,8 @@ Instructions are backed by these checked-in controls; keep them in sync with the
 
 The hook covers the Write, Edit, and NotebookEdit tools only; file writes made through shell commands are not blocked. The main session is not restricted by the hook.
 
+**Known failure (2026-11-06): the write-scope hook does not currently fire.** In a deliberate check, a test-writer subagent created `src/canary.ts` with the Write tool and an analyst subagent edited `workflow/README.md` with the Edit tool. Neither was blocked, and neither transcript has any hook record. Run by hand with the same input, the script blocks correctly (exit 2), so the hook is never invoked; the script logic is fine. Until this is fixed and re-checked, the write scopes are instruction-only: the role contracts and human review are the only control.
+
 ## Reuse
 
 Keep these seven role profiles checked in and invoke applicable roles for new work. Invoke the frontend role only for tasks that change visible UI. Continue a suitable existing worker conversation/session when the platform supports it. If a fresh context is necessary, pass the current task handoff to a new invocation of the same role. Create new worktrees for isolation when concurrent write scopes require it, not a new role definition for every task. Do not reuse a session across unrelated human ownership scopes or incompatible permissions.
