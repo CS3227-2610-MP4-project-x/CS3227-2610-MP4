@@ -30,7 +30,7 @@ The actual human owner remains the authority for a workstream. Developer A (Lim-
 
 ## Coordination limits
 
-- **Who orchestrates.** Claude Code subagents cannot start other subagents, so in Claude Code the main session plays the orchestrator and dispatches each role directly. Invoke the `orchestrator` subagent only to write plans and consolidated handoffs.
+- **Who orchestrates.** In Claude Code the main session plays the orchestrator and dispatches each role directly, so every human gate stays in the session the human is watching. Claude Code allows nested subagents (three layers by default), but this repository sets the spawn depth to 1 (see Enforcement), so workers cannot start further agents. Invoke the `orchestrator` subagent only to write plans and consolidated handoffs.
 - **Leaf workers never delegate.** Analyst, test-writer, implementer, frontend, reviewer, and commit/PR agents do their assigned work themselves and must not spawn further agents.
 - **Bounded review loop.** Implementer → reviewer is a generator-verifier loop with at most two fix rounds. If findings remain after the second review, stop and escalate to the human owner.
 - **Match effort to task size.** Small single-file fixes skip the agent sequence. Use the full sequence for one `tasks.md` item or larger.
@@ -42,8 +42,8 @@ Instructions are backed by these checked-in controls; keep them in sync with the
 | Control | Location | Effect |
 |---|---|---|
 | Ask-before-run git rules | `.claude/settings.json` | `git push`, `gh pr`, `git reset --hard`, `git rebase`, and `git config` always prompt the human |
-| Secret-file deny rules | `.claude/settings.json` | Claude cannot read or edit `.env`, `.env.*` (except `.env.example`), or `.vercel/`, including through `cat`, `head`, `tail`, `sed`, and redirections |
-| Delegation depth | `.claude/settings.json` (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`), `.codex/config.toml` (`[agents] max_depth = 1`, `max_threads = 6`) | Only the main session starts workers; workers cannot start further agents |
+| Secret-file deny rules | `.claude/settings.json` | Claude cannot read or edit `.env`, `.env.*` (except `.env.example`), or `.vercel/`, including through `cat`, `head`, `tail`, `sed`, `tee`, and redirections. Commands that read files without naming them (e.g. `grep -r` over a directory) and scripts that open files themselves are not covered |
+| Delegation depth | `.claude/settings.json` (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`) | In Claude Code, only the main session starts workers; workers cannot start further agents. Codex delegation settings are not set in `.codex/config.toml` |
 | Write-scope hook | `.claude/hooks/guard-write-scope.mjs`, declared in the test-writer, implementer, analyst, orchestrator, and commit-pr adapters | Test-writer can write only under `tests/`; implementer cannot write `tests/`, `openspec/`, `specs/`, or `workflow/`; analyst can write only under `openspec/`; orchestrator can write only under `workflow/plans/` and `workflow/handoffs/`; commit-pr cannot write `src/`, `tests/`, `openspec/`, `specs/`, `supabase/`, or `public/` |
 | Tool restrictions | `.claude/agents/reviewer.md`, `.claude/agents/frontend.md` | Reviewer has read/search tools only; frontend cannot use edit tools but may run the dev server |
 | Model, effort, turn budget, cache lifetime | `.claude/agents/*.md` frontmatter | Analyst Sonnet/high, reviewer Sonnet/medium, commit-pr Sonnet/low, orchestrator, test-writer, and implementer Opus/medium. `maxTurns` caps each run at roughly twice the largest observed run. Agents resumed for fix rounds (orchestrator, test-writer, implementer) use a 1-hour prompt cache |
