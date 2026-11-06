@@ -8,28 +8,80 @@
 - Branch: `feat/projects-membership-4-1`
 - Human owner (Developer A / Developer B): Developer B (thegrimbee); cross-review Lim-ZY (per C3 resolution)
 - Date: 2026-11-06
-- Requirement IDs:
-- Status:
-- Next human action:
+- Requirement IDs: None. No formal IDs exist and none are constructed. Workers cite requirements by name:
+  - task-management: "Signed-in people create projects", "Project membership and roles", "Product manager transfers the role", "Transfer targets are identified by GitHub username", and "Projects and tasks have readable IDs" (only the "Project key cannot change" scenario).
+  - identity-and-access: "Protected route authorization stubs" (only the "Project details require membership" and "Project creation is functional" scenarios), "Mutating project routes check the request origin", and "Protected API errors use stable safe responses".
+- Status: planned. No workers have been launched.
+- Next human action: thegrimbee answers open questions Q1–Q6 below (Decisions and open questions). The answers must be recorded in `design.md` "Project and Membership Decisions" or in the spec delta. thegrimbee also confirms or changes the sequence: implementer, then test-writer, then reviewer. After that, thegrimbee launches the implementer (assignment A1).
 
 ## Source and scope `[ORCH]`
 
-- Repository / branch / worktree:
-- Source revision:
-- Permitted paths and actions:
+- Repository / branch / worktree: `CS3227-2610-MP4`, branch `feat/projects-membership-4-1`, primary checkout `D:/Education/CS3227/CS3227-2610-MP4`. The two workers run one after the other in this checkout, so they do not need separate worktrees. If the human decides to run them in parallel, each needs its own worktree from the same revision.
+- Source revision: `d3ce36218749794f43be9e2910420f95772ed982`, plus one uncommitted edit to `openspec/changes/project-task-management/design.md`. That edit is the C5 "Risks / Trade-offs" correction and does not affect 4.1. Workers must not edit, revert or commit it.
+- Permitted paths and actions: see the Orchestrator fields in the orchestrator session block below. Assignment A1 is the implementer and A2 is the test-writer. Their write paths do not overlap.
 - Prohibited paths and actions:
+  - Do not edit OpenSpec: `openspec/**`, including the uncommitted `design.md` edit.
+  - Do not edit `specs/ui-spec.md`. Do not add a migration or edit `supabase/migrations/**` (D10).
+  - Do not add UI (C4). Do not add listing routes (D4).
+  - Do not add member-removal or role-change logic (D7).
+  - Do not edit the task stub functions in `src/server/auth/project-authorization.ts`. These are `handleTaskCreationStub`, `handleTaskReadStub`, `handleTaskEditStub` and `handleTaskStateStub`, and they belong to 4.2 and 4.3.
+  - Do not edit the task route files under `src/app/api/v1/projects/[projectId]/tasks/**`.
+  - Do not edit the github-repository route or its spec (D8). Do not edit other `src/server/*` modules.
+  - Do not edit `.env*`, `package.json` or `package-lock.json`. No new dependencies.
+  - Do not edit the existing tests and fixtures in `tests/integration/db/`, except where A2 allows it.
+  - Do not touch AI security evaluation paths (Developer A).
+  - Do not commit, push or open a PR. Do not run git rebase or reset.
 - Dependencies and parallel work:
+  - Upstream: task 3.2 is complete (route stubs and authorization helpers). Requirements were approved at the human gate below and committed in `07974b9`.
+  - Overlap with task 4.2: 4.2 also edits `src/server/composition.ts`, `src/server/auth/project-authorization.ts` and `tests/unit/project-authorization-routes.test.ts`. 4.2 has no branch or worktree yet.
+  - Recommendation: do not start 4.2 work on those three files until 4.1 is merged to `master`. Branch 4.2 from that merge. 4.2 may begin analysis and spec work earlier. If 4.2 must start writing code earlier, it should limit itself to new files and leave the three shared files to one integration pass after 4.1 merges.
 
 ## Context references `[ALL, when relevant]`
 
-List only the OpenSpec, design, code, tests, or prior handoff paths needed for this agent's task. Omit this section if no references apply. The analyst should use its role-specific source index below instead of duplicating the same paths here.
+- Requirements:
+  - `openspec/changes/project-task-management/specs/task-management/spec.md:9-131`
+  - `openspec/changes/project-task-management/specs/identity-and-access/spec.md:78-87`, `:142-152` and `:168-181`
+- Decisions:
+  - `openspec/changes/project-task-management/design.md`: "Project and Membership Decisions" (D1–D10, C4), "API Error Contract" (new 409 codes), and "Data Persistence Decisions" (D-C transfer, D-D keys, D-E open tasks).
+- Task line: `openspec/changes/project-task-management/tasks.md:31`
+- Schema (read-only):
+  - `supabase/migrations/20261030144500_create_app_schema.sql`: assignee trigger with a `FOR SHARE` membership lock at L102-120 and L435-437; `people.github_username`, which is not unique, at L135-142; project key check and immutability at L152-179; partial unique index for one PM at L188-205.
+- Code to change or reuse:
+  - `src/server/composition.ts`
+  - `src/server/auth/project-authorization.ts`: project stubs at L150-170; reuse its session and membership helpers.
+  - `src/server/repositories/people-repository.ts`
+  - `src/app/api/v1/projects/route.ts` and `src/app/api/v1/projects/[projectId]/route.ts`
+  - Module layout precedent: `src/server/github-evidence/` (service, repository, types, errors and `index.ts`).
+  - Origin check precedent: `src/app/api/v1/projects/[projectId]/github-repository/route.ts:12`.
+- Tests to change or reuse:
+  - `tests/unit/project-authorization-routes.test.ts`: the real handlers run with `pg` and Supabase mocked; 501 is asserted at L215-222.
+  - `tests/integration/db/support/harness.ts` and `tests/integration/db/support/fixtures.ts` (`createPerson`, `createProject`, `addMembership`, `createTask`, `runtimePool`).
+  - Existing DB coverage for key immutability, at-most-one PM and the swap: `tests/integration/db/identifiers-and-revisions.test.ts:141-240` and `tests/integration/db/memberships.test.ts:87-110`.
+  - `vitest.config.ts`: `npm test` runs unit tests; `npm run test:integration` needs `TEST_DATABASE_URL`.
+- Prior handoff: `workflow/handoffs/identity-access-3-2.md:261,293` (the Origin/CSRF requirement carries into 4.1).
 
 ## Decisions and open questions `[ORCH]`
 
-- Current state:
+- Current state: Planned. Requirements and decisions were approved and committed in `07974b9`. The two assignments are defined below. Workers are waiting for the human to answer Q1–Q6 and launch them.
 - Human-approved decisions:
+  - D1–D10 and C1–C5, as recorded under "Human gate" below and in `design.md` "Project and Membership Decisions".
+  - Error codes: 409 `PROJECT_KEY_TAKEN`, 409 `GITHUB_USERNAME_AMBIGUOUS`, 409 `ALREADY_MEMBER`, 409 `TRANSFER_TARGET_NOT_DEVELOPER`, 409 `TRANSFER_BLOCKED_OPEN_TASKS`, and 404 `NOT_FOUND` for an unmatched username. These are recorded in the "API Error Contract".
+  - Developer B (thegrimbee) owns all 4.1 paths, and Lim-ZY cross-reviews.
+- Orchestrator decisions (coordination only; the human may override):
+  - Sequence: A1 implementer, then A2 test-writer, then reviewer. The approved records do not fix the public seam the tests need: the composition field, the service interface and the module exports. The route tests mock `pg` by SQL text, and the integration tests drive the service against PostgreSQL. Writing tests first would mean guessing those names or the SQL.
+  - Route file paths for the new routes follow D4 directly: `src/app/api/v1/projects/[projectId]/members/route.ts` and `src/app/api/v1/projects/[projectId]/product-manager-transfer/route.ts`.
 - Assumptions (identify unapproved assumptions):
-- Open questions / conflicts:
+  - A-1 (REJECTED 2026-11-06 by thegrimbee, see Q5 in design.md): the handlers for the members and transfer routes live in `src/server/auth/project-authorization.ts`, next to the replaced project stubs. So does the shared Origin and content-type helper (D8). This lets them reuse the file's private session and membership helpers. The module `src/server/projects/` stays limited to service, repository, types and errors, as D9 lists.
+  - A-2: the existing DB tests already cover key immutability at the database level. For 4.1, A2 adds a check that no 4.1 route or service changes a key, and does not duplicate the trigger test.
+  - A-3: the "Creation is atomic" test may force the membership insert to fail with a test-only trigger, created by the harness superuser and dropped in the same test file. It must not change shared infrastructure.
+- Open questions / conflicts (unrecorded decisions; not resolved here):
+  - Q1 — RESOLVED 2026-11-06 (thegrimbee approved the agent's recommendation; recorded in design.md "Planning decisions Q1 to Q6" and the spec delta). Original question: (blocks A1 and the A2 body assertions): the success response bodies are not recorded for `POST /members` (201) and `POST /product-manager-transfer` (200). D4 gives only the status codes.
+  - Q2 — RESOLVED 2026-11-06 (thegrimbee approved the agent's recommendation; recorded in design.md "Planning decisions Q1 to Q6" and the spec delta). Original question: (blocks the exact message text): no fixed `message` strings are recorded for the five new 409 codes. The spec says only that the `TRANSFER_BLOCKED_OPEN_TASKS` message asks for the task to be reassigned first. The human can record the strings, or decide that tests assert only the `code` and the implementer chooses messages that follow the "Message" rule.
+  - Q3 — RESOLVED 2026-11-06 (thegrimbee approved the agent's recommendation; recorded in design.md "Planning decisions Q1 to Q6" and the spec delta). Original question:: validation of the `githubUsername` body is not recorded. Open points: whether it must be exactly one field, whether it must be a string, whether it is trimmed, whether empty is allowed, and the length limit. Each case that fails should return 400 `INVALID_REQUEST`. The AGENTS.md rule on strict mutation fields suggests unknown fields are rejected, but nothing records this for these routes.
+  - Q4 — RESOLVED 2026-11-06 (thegrimbee approved the agent's recommendation; recorded in design.md "Planning decisions Q1 to Q6" and the spec delta). Original question:: the order of checks on the three mutating routes is not fully recorded. The spec puts Origin and content-type before authentication. It does not record which comes first when both Origin and content-type are bad. It also does not record whether a bad body or path UUID (400) comes before authentication (401), membership (404) and role (403). The 3.2 stubs validate the body and UUID before authentication.
+  - Q5 — RESOLVED 2026-11-06 (thegrimbee approved the agent's recommendation; recorded in design.md "Planning decisions Q1 to Q6" and the spec delta). Original question:: confirm or reject A-1, the handler and Origin-helper placement. D9 says `project-authorization.ts` gets "minimal edits", and adding two handlers plus a helper there may go beyond that. The alternative is a handler file inside `src/server/projects/`, which would need the session and membership helpers exported from `project-authorization.ts`.
+  - Q6 — RESOLVED 2026-11-06 (thegrimbee approved the agent's recommendation; recorded in design.md "Planning decisions Q1 to Q6" and the spec delta). Original question:: `POST /api/v1/projects` from a signed-in user with no `people` row is not recorded. The 3.2 creation stub checked only authentication, and the project-scoped routes return 404 for an unmapped identity. D2 needs a person ID to create the membership.
+  - Conflicts: none found between the approved specs, design.md and the code.
 
 ## Worker session reports
 
@@ -141,78 +193,90 @@ Repeat one session block for each assigned agent session. Include the shared fie
   - `openspec/changes/project-task-management/specs/task-management/spec.md`
   - `openspec/changes/project-task-management/specs/identity-and-access/spec.md`
 
-### Session `<role> / <session-id>`
+### Session `orchestrator / 4-1-plan`
 
-For Codex work, include the following structured attribution fields in the root
-session block so its workflow role and work item can be matched without
-inference. Use the exact provider session ID surfaced by Codex; never use a
-subagent hook's parent `session_id` as a child ID. Codex lifecycle hooks map
-subagents through their exact transcript relationship and provide the surfaced
-agent type/ID. Do not invent missing identifiers. For Claude sessions, include
-these fields when surfaced.
-
-- Provider: `codex` or `claude`; required for the root session
-- Provider session ID: exact provider-generated session identifier; required when surfaced
-- Work ID: explicit task/work identifier; required for Codex root sessions
-- Agent: workflow role or agent label; required for Codex root sessions
-- Phase: lifecycle phase; required when recorded by the workflow
+- Provider: `claude`
+- Provider session ID: not available
+- Work ID: `projects-membership-4-1`
+- Agent: orchestrator
+- Phase: planning (assignment definition; no workers launched)
 
 #### Shared fields `[ALL]`
 
-- Platform and model (if surfaced):
-- Role:
-- Human owner and assigned task scope:
-- Source revision:
-- Started / ended / elapsed `[ALL, optional when surfaced]`:
-- Resource usage (provider-reported): tokens in / out / total; cache read / write; cost; tool calls or other surfaced metrics:
-- Unavailable resource metrics:
+- Platform and model (if surfaced): Claude Code (Agent SDK subagent), Opus 5.5 (`claude-opus-5-5`)
+- Role: Orchestrator
+- Human owner and assigned task scope: Developer B (thegrimbee). Plan task 4.1 in this handoff only.
+- Source revision: `d3ce36218749794f43be9e2910420f95772ed982`, plus the uncommitted `design.md` C5 edit
+- Started / ended / elapsed `[ALL, optional when surfaced]`: Ended about 2026-11-06 09:55 SGT. Start time and elapsed time are not available.
+- Resource usage (provider-reported): tokens in / out / total; cache read / write; cost; tool calls or other surfaced metrics: 21 tool calls, counted from this session's own transcript; the final handback is not included. No usage figures were reported by the provider.
+- Unavailable resource metrics: tokens in / out / total, cache read / write, cost and elapsed time: not available
 - Work completed / findings:
-- Files changed (use `none` if read-only):
-- Checks run and exact results (use `none` if none were run):
-- Gaps / blockers (use `none` if none):
-
-#### Test-writer fields `[TEST-WRITER]`
-
-- Test files changed:
-- Scenarios and requirement IDs covered:
-- Coverage gaps:
-
-#### Implementer fields `[IMPLEMENTER]`
-
-- Implementation files and rationale:
-- Visual diff path, or reason skill was unavailable:
-- Other generated artifacts / dependencies:
-
-#### Frontend fields `[FRONTEND; only for UI changes]`
-
-- UI intent / acceptance criteria / UI-spec sections checked:
-- Routes, user role, browser/runtime, viewport(s), and UI states inspected:
-- Actions exercised and results (or reason runtime inspection was unavailable):
-- Evidence references (screenshot, browser state, or UI source path):
-- UI fit assessment (matches / partly matches / unverified) and limitations:
-- Specific UI update recommendations, each in `location / element: current → desired`, with rationale and severity:
-
-#### Reviewer fields `[REVIEWER]`
-
-- Acceptance-criteria status (met / unmet / unverified, with evidence):
-- Code-quality findings (cohesion, coupling, abstractions, reuse):
-- Other findings by severity and evidence:
-- Review limits:
-
-#### Commit/PR fields `[COMMIT-PR]`
-
-- Base branch and comparison used:
-- Complete branch-change inventory:
-- Existing commits and proposed scoped commit groups:
-- Commit hashes, or why commits were not authorized/safe:
-- Draft PR title:
-- Draft PR description:
-- Push / PR creation status:
+  - Filled the Task record, Source and scope, Context references, and Decisions and open questions.
+  - Defined assignments A1 and A2 with paths that do not overlap.
+  - Marked the gate's open items as resolved.
+  - Recorded open questions Q1–Q6 for the human.
+  - Confirmed the write paths against the repository. No `src/server/projects/` module exists. The members and product-manager-transfer route directories do not exist. No 4.2 branch or worktree exists. `workflow/plans/` does not exist, so no plan file was created and the plan is kept in this handoff.
+- Files changed (use `none` if read-only): `workflow/handoffs/projects-membership-4-1.md`
+- Checks run and exact results (use `none` if none were run): none
+- Gaps / blockers (use `none` if none): Q1–Q6 must be answered before A1 starts. Q1 and Q2 also limit what A2 can assert.
 
 #### Orchestrator fields `[ORCH]`
 
 - Assignments, dependencies, and handoff decisions:
-- Consolidation notes:
+
+  **A1: implementer** (runs first; owner thegrimbee)
+  - Scope: the 4.1 behavior in the approved specs and D1–D10. Only the 4.1 project routes.
+  - New files, may create:
+    - `src/server/projects/index.ts`: the public entry; export only what composition and handlers need.
+    - `src/server/projects/service.ts`
+    - `src/server/projects/repository.ts`
+    - `src/server/projects/types.ts`
+    - `src/server/projects/errors.ts`
+    - `src/app/api/v1/projects/[projectId]/members/route.ts`
+    - `src/app/api/v1/projects/[projectId]/product-manager-transfer/route.ts`
+  - Existing files, may edit:
+    - `src/server/repositories/people-repository.ts`: add the exact, case-insensitive GitHub-username lookup (D5).
+    - `src/server/composition.ts`: wire the new repository and service; add only the fields needed.
+    - `src/server/auth/project-authorization.ts`: replace `handleProjectCreationStub` and `handleProjectReadStub`, and add the members and transfer handlers and the shared Origin and content-type helper (D8). The placement of the handlers and helper depends on Q5. Do not change the task stub functions or their behavior.
+    - `src/app/api/v1/projects/route.ts` and `src/app/api/v1/projects/[projectId]/route.ts`: point them at the replaced handlers.
+  - Must follow:
+    - D6: lock both membership rows `FOR UPDATE`, which conflicts with the assignee trigger's `FOR SHARE`, then run the open-task check in the same transaction.
+    - D2 and D10: create the project and the PM membership in one transaction.
+    - Map unique violations to `PROJECT_KEY_TAKEN` or `ALREADY_MEMBER`.
+    - Use parameterized SQL, send `Cache-Control: no-store`, and follow the "API Error Contract".
+    - Do not hold a transaction open across anything other than database calls.
+  - Must not edit tests, OpenSpec, migrations or dependencies. Use the `present-changes-visually` skill if it is available.
+  - Checks: `npm run lint`, `npx tsc --noEmit`, `npm run build`, and `npm test`. Before A2 runs, the 501 assertions in `tests/unit/project-authorization-routes.test.ts` are expected to fail. Report that as expected and do not fix it.
+
+  **A2: test-writer** (runs after A1; owner thegrimbee)
+  - Scope: tests for every 4.1 scenario listed under Requirement IDs, written against the approved requirements and A1's public seam: route handlers, `@/server/projects` exports and composition fields. Do not depend on private internals beyond the SQL the `pg` mock must answer.
+  - May edit: `tests/unit/project-authorization-routes.test.ts`. Replace the 501 project read and create assertions (L215-222) and their unmapped-identity exemption with the approved 200 and 201 behavior. Keep all task-stub assertions.
+  - May create:
+    - `tests/unit/project-routes.test.ts`: route tests for create, read, members and transfer. Cover authentication (401), non-member concealment (404), developer refusal (403), validation (400), the 409 codes, an unmatched username (404 `NOT_FOUND`), case-insensitive match, and no state change on any denied request.
+    - `tests/unit/project-origin-check.test.ts`: on all three mutating routes, a missing or different Origin returns 403 `FORBIDDEN`, a wrong content type returns 400 `INVALID_REQUEST`, and a match proceeds to authorization.
+    - `tests/unit/projects/project-service.test.ts`: service and validation unit tests (key format without normalization, name trim and 1-100 characters, exact fields, error mapping).
+    - `tests/integration/db/projects-membership.test.ts`: PostgreSQL tests through the real service using `runtimePool`. Cover:
+      - the creation transaction: exactly one PM, plus the atomic-failure case per A-3;
+      - a creator who keeps a role in another project;
+      - add-member, including concurrent duplicate adds;
+      - the transfer success path;
+      - the open-task block, where deleted and Done tasks do not block;
+      - two competing transfers, ending with exactly one PM;
+      - a transfer racing a task assignment to the incoming developer, where the transfer never completes while that developer holds an open task;
+      - key immutability through the 4.1 surface (A-2).
+  - Must not edit `tests/integration/db/support/**`, other existing tests, product code, OpenSpec, or AI security evaluation paths. If a shared fixture is needed, report it and do not add it.
+  - Checks: `npm test`. Run `npm run test:integration` only if `TEST_DATABASE_URL` points to a disposable database. Otherwise mark the integration tests unverified.
+
+  **Dependencies and sequence:**
+  1. Human answers Q1–Q6.
+  2. A1 runs.
+  3. A2 runs.
+  4. An independent reviewer checks every scenario, the boundaries and code quality, and runs lint, tsc, build, unit and, where possible, integration.
+  5. Human resolves the findings.
+  6. Commit/PR agent, only on explicit authorization for `feat/projects-membership-4-1`.
+
+  A1 and A2 never write the same path. Task 4.2 should wait for 4.1 to merge before editing `composition.ts`, `project-authorization.ts` or `tests/unit/project-authorization-routes.test.ts`.
+- Consolidation notes: There are no worker reports to consolidate yet. Reusable sessions: the analyst session `a4c7d9e33d08ddc74` has the 4.1 context. No earlier implementer or test-writer session exists for 4.1.
 
 ## Human gate
 
@@ -237,7 +301,7 @@ these fields when surfaced.
 - C2: 403 `FORBIDDEN` for a bad Origin on 4.1's mutating routes (see D8).
 - C3: Developer B owns all 4.1 paths (see D9).
 - C4: Task 4.1 has no UI; the members screen stays with task 4.4.
-- C5: Leave the stale encrypted-token text in design.md "Risks / Trade-offs" untouched; follow-up only.
+- C5: Leave the stale encrypted-token text in design.md "Risks / Trade-offs" untouched; follow-up only. (Superseded the same day: the human later asked for the correction; see "Open items at the gate".)
 
 ### Approved spec paths
 
@@ -253,7 +317,8 @@ these fields when surfaced.
 
 - Resolved 2026-11-06: the main session added the decisions record, the Open Questions resolution and the new error codes to `design.md` at the human's request.
 - Resolved 2026-11-06 (human accepted the agent's recommendation): 409 `GITHUB_USERNAME_AMBIGUOUS`, 409 `ALREADY_MEMBER`, 409 `TRANSFER_TARGET_NOT_DEVELOPER`; unmatched usernames return 404 `NOT_FOUND` on both routes. Recorded in the task-management spec and design.md.
-- `tests/unit/project-authorization-routes.test.ts:215-222` still asserts 501 and contradicts the approved specs; for the test-writer.
+- Resolved 2026-11-06 (orchestrator plan): `tests/unit/project-authorization-routes.test.ts:215-222` still asserts 501, which contradicts the approved specs. Updating it is now assigned to the test-writer (A2).
+- Resolved 2026-11-06 after the gate: C5 was reversed at the human's request on 6 November 2026. The out-of-date encrypted-token bullet in `design.md` "Risks / Trade-offs" was corrected. The edit is uncommitted and does not affect 4.1.
 
 ## Consolidated outcome `[ORCH]`
 
@@ -272,4 +337,6 @@ these fields when surfaced.
 
 | Date/time (SGT) | Role/session | Update |
 |---|---|---|
-| YYYY-MM-DD HH:MM | role / session-id | concise update |
+| 2026-11-06 | analyst / a4c7d9e33d08ddc74 | Context brief, D1–D10 and C1–C5 drafted. After the human gate, the spec delta was written and committed in `07974b9`. |
+| 2026-11-06 09:55 | orchestrator / 4-1-plan | Plan written: Task record set to planned. Scope, context, decisions and open questions Q1–Q6 filled. Assignments A1 (implementer) and A2 (test-writer) defined with paths that do not overlap; sequence A1, then A2, then reviewer. Gate open items marked resolved (design.md updated, error codes chosen, 501 test assigned to A2, C5 corrected at the human's request). |
+| 2026-11-06 | main session | Human approved Q1–Q6 as recommended (A-1 rejected); recorded in design.md "Planning decisions Q1 to Q6" and the spec delta, `openspec validate --strict` passes. PR base chosen: `dev`. Worker order (implementer-first plan vs AGENTS.md test-writer-first) awaits the human's decision. |
