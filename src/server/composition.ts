@@ -2,7 +2,8 @@ import "server-only";
 
 import { Pool } from "pg";
 import { AI_LIMITS, FakeAdapter, LlmGateway, SoclaasAdapter, type LlmAdapter } from "@/server/ai";
-import { getServerConfig, type AiConfig } from "@/server/config";
+import { getServerConfig, type AiConfig, type ServerConfig } from "@/server/config";
+import { logServerFailure } from "@/server/logging";
 import { AuthService } from "@/server/auth/auth-service";
 import { PeopleRepository } from "@/server/repositories/people-repository";
 import { ProjectAccessRepository } from "@/server/repositories/project-access-repository";
@@ -39,7 +40,15 @@ export function getServerComposition(): ServerComposition {
     return composition;
   }
 
-  const config = getServerConfig();
+  let config: ServerConfig;
+  try {
+    config = getServerConfig();
+  } catch (error) {
+    // Every route reaches configuration through here, so one log covers them all. Config
+    // errors name the variable, never its value.
+    logServerFailure("server configuration", error);
+    throw error;
+  }
   const databaseUrl = new URL(config.databaseUrl);
   databaseUrl.searchParams.delete("sslmode");
   const pool = new Pool({

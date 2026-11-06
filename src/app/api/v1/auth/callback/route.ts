@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createRequestSupabaseClient } from "@/server/auth/supabase-auth";
 import { getServerComposition } from "@/server/composition";
+import { logServerFailure } from "@/server/logging";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,7 +30,8 @@ export async function GET(request: NextRequest) {
     const response = NextResponse.redirect(config.appOrigin, 303);
     response.headers.set("Cache-Control", "no-store");
     return response;
-  } catch {
+  } catch (error) {
+    logServerFailure("GitHub sign-in callback", error);
     return callbackFailure(config.appOrigin);
   }
 }

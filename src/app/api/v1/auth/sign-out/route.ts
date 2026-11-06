@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createRequestSupabaseClient } from "@/server/auth/supabase-auth";
 import { getServerComposition } from "@/server/composition";
+import { logServerFailure } from "@/server/logging";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,7 +29,8 @@ export async function POST(request: NextRequest) {
     const client = await createRequestSupabaseClient(config);
     await authService.signOut(client);
     return new NextResponse(null, { status: 204, headers: { "Cache-Control": "no-store" } });
-  } catch {
+  } catch (error) {
+    logServerFailure("sign-out", error);
     return NextResponse.json(
       { error: { code: "AUTHENTICATION_FAILED", message: "Sign-out could not be completed." } },
       { status: 502, headers: { "Cache-Control": "no-store" } },
