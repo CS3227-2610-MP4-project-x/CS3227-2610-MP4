@@ -417,6 +417,48 @@ Repeat one session block for each assigned agent session. Include the shared fie
   - X1 record: 4.1 is the full-pipeline arm of X1 and 4.2 the single-agent arm. X1, recorded from the human's notes, 2026-11-06: question "Did the pipeline pay for itself? When not to use it?"; tasks "**4.1** full pipeline vs **4.2** single agent"; design "Sibling [P] tasks with the same layers (service, repository, route, PostgreSQL and API-authorization tests). 4.1 gets the pipeline because it has an open product decision (who may create a project, how the first PM is chosen), which is where the analyst and human gate add value. 4.2 is done in the main session with TDD and the same checks. Afterwards run **one** reviewer with the same configuration on both final diffs, as a common yardstick"; measure "total tokens, wall time, human interventions, yardstick reviewer findings by severity, later defects". The same split ("task 4.1 with the full pipeline, 4.2 single-agent") is in `logs/2026-11-06-reflection-open-items-resolution.md` prompt 1. The main session records in each worker's session block the resolved model ID (from the transcript, since `sonnet`/`opus` are aliases), effort and maxTurns actually used.
   - Yardstick reviewer (for X1): one fresh `reviewer` agent session with the config above (Sonnet / medium / 25, Read/Grep/Glob, blob `92ce8a9`), run once on the final 4.1 diff and once on the final 4.2 diff with the same prompt. It is separate from 4.1's pipeline reviewer. 4.2 must use the same blob; if `.claude/agents/reviewer.md` changes before then, the comparison is not like-for-like and must say so. The diff base for both is `dev` (the PR base).
 
+  **Yardstick reviewer prompt (reuse for 4.2)**
+
+  The exact prompt given to the 4.1 yardstick reviewer `aec617cc55ece5fe3`, copied byte for byte from the main session's scratchpad file `yardstick-prompt-4-1.md`. The block is not indented, so the prompt text is unchanged.
+
+````text
+You are the X1 yardstick reviewer for task 4.1 (`projects-membership-4-1`), branch `feat/projects-membership-4-1`, in `D:/Education/CS3227/CS3227-2610-MP4`. Follow `workflow/agents/reviewer.md` and AGENTS.md "Review Procedure". You are read-only and cannot run commands, so check output is provided below.
+
+Purpose: give an independent defect count on the final task diff against `dev`. You are separate from the task's pipeline reviewer. Do not read or rely on any earlier review findings: ignore the "Reviewer findings" text, the review-round table, the reviewer, security-pass and fix-round session blocks in the handoff, and design.md "Review decisions R1 to R8" as a list of findings (R1–R8 are still approved decisions you must respect as requirements). Review the code as if for the first time. The same prompt, with only the task-specific inputs changed, will be run on task 4.2's final diff so the two counts can be compared.
+
+## Given
+- Task handoff: `workflow/handoffs/projects-membership-4-1.md` — read the Task record (Requirement IDs, by name), "Source and scope" (prohibited paths), "Decisions and open questions", and assignments A1 (including its "Must follow" list) and A2 (including its test targets) under Session `orchestrator / 4-1-plan-2`.
+- Specs: `openspec/changes/project-task-management/specs/task-management/spec.md` and `openspec/changes/project-task-management/specs/identity-and-access/spec.md`.
+- Decisions: `openspec/changes/project-task-management/design.md` — "Project and Membership Decisions" (all decision blocks under it), "API Error Contract", and "Data Persistence Decisions".
+- Final diff against `dev` (`git diff dev...HEAD -- src tests`, merge-base `e9c29cdf875b93589fbe4ef1b6816f9c0e742157`, HEAD `bd629c5c1b5d9a44cf590e073f79e4e810299017`): `C:\Users\gabri\AppData\Local\Temp\claude\3019322dfb901958\6ecf3aaa-5dc3-4a1e-942d-87675486cfa9\scratchpad\yardstick-4-1-diff.patch`. Full name-status list of the branch delta: `C:\Users\gabri\AppData\Local\Temp\claude\3019322dfb901958\6ecf3aaa-5dc3-4a1e-942d-87675486cfa9\scratchpad\yardstick-4-1-files.txt`. All work is committed; the working tree is clean.
+- Check output (run by the main session in PowerShell on the same `src` and `tests` content as HEAD, before it was committed): `npm run lint` exit 0; `npx tsc --noEmit` exit 0; `npm run build` exit 0; `npm test` 21/21 files, 888/888 tests. `npm run test:integration` run by the human against a disposable database: 14/14 files, 274/274 tests.
+
+You may read the whole repository.
+
+## Check
+1. Every scenario under the handoff's Requirement IDs: implemented and tested? Name the code and test location, or the omission.
+2. Every A1 "Must follow" rule and every recorded decision the code depends on.
+3. Boundaries: only assigned paths changed; prohibited paths untouched; AGENTS.md coupling rules (no module-level mutable state, no control flags, public-entry imports only, adapters at edges); server-only; security (authorization, project membership, 404 concealment, Origin/CSRF, input validation, parameterized SQL, no internal detail in errors, no-store).
+4. Code quality: cohesion, coupling, abstraction, reuse and duplication.
+5. Test quality: do the tests verify the scenarios, or would they pass on wrong behaviour?
+
+Do not invent requirements or redesign. Where something depends on an unrecorded decision, report it as such, not as a defect.
+
+## Report
+Findings grouped **must / should / nit**, each with `file:line` evidence, the requirement or decision it relates to, and why. Then: the total count per severity; a per-scenario coverage table; the list of unrecorded decisions needing a human; and resource usage as surfaced ("not available" otherwise).
+````
+
+  For 4.2, substitute only these inputs; everything else stays identical, character for character:
+  - The task ID and branch (`projects-membership-4-1`, `feat/projects-membership-4-1`).
+  - The handoff path (`workflow/handoffs/projects-membership-4-1.md`).
+  - The Requirement IDs and the assignment names (A1, A2, and the session `orchestrator / 4-1-plan-2`).
+  - The spec files, if 4.2's differ.
+  - The diff file path, the merge-base and the HEAD.
+  - The name-status file path.
+  - The check output.
+
+  4.2 must run the yardstick with `.claude/agents/reviewer.md` blob `92ce8a9963b5bb086e60a0921fdf85fff7795fa7`. If the blob differs, the 4.2 record must say that the comparison is not like-for-like.
+
   **Context plan**
 
   | Worker | Given up front | May search on its own |
@@ -599,6 +641,39 @@ Repeat one session block for each assigned agent session. Include the shared fie
 - Checks run and exact results (use `none` if none were run): none
 - Gaps / blockers (use `none` if none): none
 
+### Session `yardstick reviewer / aec617cc55ece5fe3`
+
+- Provider: `claude`
+- Provider session ID: not available (agent ID surfaced: `aec617cc55ece5fe3`)
+- Work ID: `projects-membership-4-1`
+- Agent: reviewer (X1 yardstick; a fresh `reviewer` session, separate from the pipeline reviewer `a318d1e2d8adcc7c5`)
+- Phase: X1 yardstick review of the final 4.1 diff, after commit
+
+#### Shared fields `[ALL]`
+
+- Platform and model (if surfaced): Claude Code (Agent SDK subagent). Config: `.claude/agents/reviewer.md` blob `92ce8a9963b5bb086e60a0921fdf85fff7795fa7` (verified by the main session with `git rev-parse HEAD:.claude/agents/reviewer.md`): model `sonnet`, effort `medium`, maxTurns 25, tools Read, Grep, Glob. Resolved model ID: `claude-sonnet-5-5` (53 responses in the subagent transcript `subagents/agent-aec617cc55ece5fe3.jsonl` carry this model; one other `"model"` string, `claude-opus-5-5`, appears once in the transcript and is not a reviewer response).
+- Role: Reviewer (X1 yardstick)
+- Human owner and assigned task scope: Developer B (thegrimbee); independent defect count on the final 4.1 diff against `dev`, using the prompt in "Yardstick reviewer prompt (reuse for 4.2)" under `orchestrator / 4-1-plan-2`.
+- Source revision: HEAD `bd629c5c1b5d9a44cf590e073f79e4e810299017`, merge-base with `dev` `e9c29cdf875b93589fbe4ef1b6816f9c0e742157`; clean tree.
+- Started / ended / elapsed `[ALL, optional when surfaced]`: 126,027 ms. Start/end timestamps not available.
+- Resource usage (provider-reported): tokens in / out / total; cache read / write; cost; tool calls or other surfaced metrics: 126,933 tokens, 27 tool uses, 126,027 ms (platform).
+- Unavailable resource metrics: Token in/out split, cache read/write, cost: not available.
+- Work completed / findings:
+  - Input: final diff `git diff dev...HEAD -- src tests` (20 files, 3556 insertions, 69 deletions); same context as the pipeline reviewer; told to ignore earlier review findings.
+  - Totals: must 0, should 1, nit 8. Details under "X1 yardstick review" in Consolidated outcome → "Reviewer findings".
+- Files changed (use `none` if read-only): none
+- Checks run and exact results (use `none` if none were run): none (read-only tools; used the main session's check output given in the prompt).
+- Gaps / blockers (use `none` if none): none
+
+#### Reviewer fields `[REVIEWER]`
+
+- Acceptance-criteria status (met / unmet / unverified, with evidence): every 4.1 scenario Met; "Competing transfers" relies on the real database (the unit fake does not model locks, per R7). Boundaries, security and A1 must-follow rules all met.
+- Code-quality findings (cohesion, coupling, abstractions, reuse): should 1 (duplicated in-memory SQL interpreter across two test files); nits 3, 4, 5 and 6. See "X1 yardstick review".
+- Other findings by severity and evidence: nits 1, 2, 7 and 8; five unrecorded decisions raised (not defects). See "X1 yardstick review".
+- Review limits:
+  - Reviewer's own: read the full `src` diff and the integration test, plus unit-test headers, title lists and selected bodies; did not read every line of `tests/unit/project-routes.test.ts` or `tests/unit/projects/project-service.test.ts`; ran no commands.
+  - Main-session caveat on evidence: many `file:line` citations are line numbers in the diff patch file, not in the source files. Examples: `src/server/projects/service.ts` has 78 lines but is cited at :723–777; `handlers.ts` has 115 lines but is cited at :411–466; `tests/unit/project-routes.test.ts` has 1,272 lines but is cited at :1757-1870. Citations to the integration test and to `project-routes.test.ts` below 1,272 may also be patch offsets. The findings themselves are identifiable by function name. If 4.2's yardstick prompt is reused, this behaviour may recur; the prompt was not changed.
+
 ## Human gate
 
 - Approver: thegrimbee (Developer B), 2026-11-06. The human approved the analyst's draft spec delta and recommendations D1–D10, and chose resolutions for conflicts C2, C3, C5 and the D4 transfer-identifier gap.
@@ -742,6 +817,32 @@ Repeat one session block for each assigned agent session. Include the shared fie
   - Properties verified: exact Origin match (`request-guard.ts:12`); media type check (`:15`); Q4 order (`handlers.ts:37-43`, `:80-87`; GET `:59-62` no Origin); PM-only checked in handler (`handlers.ts:87`) and again in the transaction (`service.ts:32-37`, `:47-51`, `:73-77`; `repository.ts:72-82`); no cross-project access (`validation.ts:10,38-40`; `repository.ts` project_id filters; `service.ts:52`); 404 concealment (`request-access.ts:70-73`, `service.ts:24-28`); parameterized SQL; strict bodies (`validation.ts:12-16`); safe errors (`errors.ts:44-50`, `repository.ts:19-28`); no-store everywhere; transfer FOR UPDATE then open-task check in one transaction (`repository.ts:88-99,123-132,157-171`); helper move unchanged for task stubs; create requires a people row.
   - Reviewed, not flagged: username enumeration by a PM (accepted by D5); lookup before in-service role check (handler already enforces PM).
   - Security fix rounds used: 0 of 1.
+
+  **X1 yardstick review: reviewer `aec617cc55ece5fe3`** (fresh `reviewer` session; Sonnet / medium / 25, `claude-sonnet-5-5`; Read, Grep, Glob only; blob `92ce8a9963b5bb086e60a0921fdf85fff7795fa7`)
+  - Scope: final diff `git diff dev...HEAD -- src tests`, merge-base `e9c29cdf875b93589fbe4ef1b6816f9c0e742157`, HEAD `bd629c5c1b5d9a44cf590e073f79e4e810299017` (20 files, 3556 insertions, 69 deletions); same context as the pipeline reviewer; told to ignore earlier review findings.
+  - Usage (platform): 126,933 tokens, 27 tool uses, 126,027 ms. Token in/out split, cache, cost: not available.
+  - Evidence caveat (main session): many `file:line` citations are diff-patch line numbers, not source line numbers; findings are identified by function name. See the session block's review limits.
+  - Totals: must 0, should 1, nit 8.
+
+  Must: none.
+
+  Should:
+  1. **Duplicated in-memory SQL interpreter across two test files** (`tests/unit/project-routes.test.ts` and `tests/unit/projects/project-service.test.ts`; `scanTopLevel`, `findTop`, `UnsupportedSql` defined in both). S6/R7 accept the fake's limits, not its duplication. A parser bug could let assertions pass on wrong behaviour and must be fixed in two places. Suggested: a shared helper under `tests/unit/support/`.
+
+  Nit:
+  1. `addMember` and `transferProductManager` look up the username before the in-transaction role check; a developer actor calling the service directly gets 404/409 instead of 403. Unreachable over HTTP (handler order); untested because the integration "developer actor FORBIDDEN" tests use valid usernames.
+  2. `getProject` re-queries membership and project after `resolveProjectAccess` already ran three queries.
+  3. Handlers and `request-access.ts` functions take the whole `ServerComposition` (stamp coupling); prescribed by S1/S5, not a defect.
+  4. Small duplicates beyond R8: JSON error-envelope helpers in `projects/errors.ts`, `handlers.ts`, `request-access.ts`; UUID regex in `projects/validation.ts`, `request-access.ts`, `project-authorization.ts`.
+  5. `handleProjectCreationStub` and `handleProjectReadStub` names in `project-authorization.ts` are now misleading; Q5 requires keeping them.
+  6. `lockMemberships` selects an unused `id` column; `handleProjectRead`'s `request` parameter is unused.
+  7. Tests assert only "non-empty" for four of the five 409 messages and exact text only for `TRANSFER_BLOCKED_OPEN_TASKS`; follows Q2, but R3 later fixed the strings.
+  8. The integration "both race" test accepts either outcome (non-deterministic); the deterministic D6 test covers the case.
+
+  - Boundaries, security and A1 must-follow: all met (paths, coupling rules, server-only, Q1, Q2/R3, Q3, Q4, Q6, D2/D10, D6/S7, R5, S6 constraint names, parameterized SQL, no-store, safe errors, 404 concealment, PM check in handler and service, no transaction across non-DB calls).
+  - Per-scenario coverage: every 4.1 scenario Met; "Competing transfers" relies on the real DB (unit fake does not model locks, per R7).
+  - Unrecorded decisions it raised (not defects): no log/trace for unmapped 500s; no request body size limit; no `lower(github_username)` index (D10 says no migration for 4.1); D5 lookup behaviour when a username changes between sign-ins; rate limiting for these routes not specified.
+  - Comparison note: the pipeline reviewer's final state (round 2) was 0 must / 0 should / 2 nit, with round 1 at 0 / 7 / 9. The yardstick's should 1 matches the pipeline round 2 nit 1 (duplicated evaluator), rated higher.
 - Frontend UI findings and requested screen/component changes (include only when frontend agent was assigned):
 - Branch inventory, scoped commits, and PR draft (include only when commit/PR agent was assigned):
 - Suggested skills / references for the next worker `[ORCH, when applicable]`:
@@ -761,3 +862,4 @@ Repeat one session block for each assigned agent session. Include the shared fie
 | 2026-11-06 | main session | Round 1 fixes: A1 (`ad038f9c88bcc9f5f`: 220,115 tokens, 6 tool uses, 113,983 ms) merged the PM-only handlers and removed the unused 401 entry. A2 (`aac2443f6cc3948a8`: 282,655 tokens, 19 tool uses, 347,784 ms) used the real `PeopleRepository` in integration tests (+4 lookup tests) and replaced the unit `pg` fake with a strict evaluator. Main-session checks at `9c33dc4` on uncommitted changes: lint, tsc, build pass; `npm test` 888/888. thegrimbee ran `npm run test:integration` on a disposable database at 20:09 SGT: 14/14 files, 274/274 tests. The human approved decisions 1–8 as-is (recorded as design.md "Review decisions R1 to R8", `openspec validate --strict` valid), accepted the finding 7 duplication, and had `next-env.d.ts` reverted. |
 | 2026-11-06 | orchestrator / 4-1-consolidation | Consolidated from main-session data at `9c33dc4` (uncommitted changes): session blocks added for test-writer `aac2443f6cc3948a8`, implementer `ad038f9c88bcc9f5f`, reviewer `a318d1e2d8adcc7c5` and the security pass. Loop table round 2 (0 / 0 / 2) and re-review choices recorded. Consolidated outcome filled: changed files, checks (lint, tsc, build pass; `npm test` 888/888; integration 274/274 by thegrimbee), no generated artifacts or dependencies, round 2 and security-pass findings (no vulnerabilities; 0 of 1 security fix rounds). Next: thegrimbee reviews, arranges Lim-ZY's cross-review of `src/server/auth/`, then authorizes commits. |
 | 2026-11-06 | orchestrator / 4-1-temp-removal | Removed every dependency on the untracked notes folder at thegrimbee's request; no decision, assignment, path, model, effort or maxTurns value changed. L59 (Context references, workflow evidence): the notes citation replaced by the in-repo sources (2.4, 6.2 and 6.3 handoffs; worker-order lines in four earlier handoffs; `workflow/agents/README.md` "Who orchestrates" and Enforcement table; `.claude/agents/*.md`; `.claude/settings.json`) and a pointer to the inline human's-notes facts. L385 (worker-order conflict): the notes citation replaced by "Implementer: assigned after the test-writer" in `data-persistence-schema.md` L178, `environment-configuration.md` L158, `llm-gateway-soc-adapter.md` L169, `llm-gateway-secret-redaction.md` L182. L410 (test-writer row): replaced by `data-persistence-schema.md` L359 (out 64,148), `llm-gateway-core.md` L167 (out 67,033, responses 45), the README 2× rule, and the maxTurns decision and observed maxima quoted from the human's notes. L411 (implementer row): replaced by `data-persistence-schema.md` L191 (out 67,496, responses 59). L412 (reviewer row): the reviewer response range and the reviewer-effort decision quoted from the human's notes, `llm-gateway-secret-redaction.md` L297 (out 34,243, thinking 26,060), and X2 defined inline from the human's notes. L413 (commit-pr row): the commit-pr reason quoted from the human's notes. L417 (X1 record): X1 defined inline from the human's notes, with `logs/2026-11-06-reflection-open-items-resolution.md` prompt 1 cited for the 4.1/4.2 split. L432 (parallelism alternative 3): the worktree-isolation decision and reason quoted from the human's notes. |
+| 2026-11-06 | orchestrator / 4-1-yardstick-record | Recorded the X1 yardstick reviewer run from main-session data: session block `yardstick reviewer / aec617cc55ece5fe3` (blob `92ce8a9963b5bb086e60a0921fdf85fff7795fa7`, `claude-sonnet-5-5`; 126,933 tokens, 27 tool uses, 126,027 ms) added before "Human gate"; the exact yardstick prompt added under `orchestrator / 4-1-plan-2` as "Yardstick reviewer prompt (reuse for 4.2)", with the inputs 4.2 must substitute and the blob requirement; "X1 yardstick review" findings (0 must / 1 should / 8 nit, five unrecorded decisions, patch-offset citation caveat) appended under "Reviewer findings". No existing text changed. |
