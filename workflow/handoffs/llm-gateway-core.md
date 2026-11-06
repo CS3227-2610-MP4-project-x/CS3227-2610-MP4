@@ -195,10 +195,18 @@ Out of scope, explicitly: G11 (route `maxDuration`; no Route Handler in 6.3) and
 - Started / ended / elapsed: 2026-11-02 21:22–21:24 SGT (2 min); 2026-11-02 23:06–23:07 SGT (1 min); measured from first to last transcript record, so it includes waiting between continuations
 - Resource usage (provider-reported): tokens in (uncached) 28; cache read 427,075; cache write 117,475; out 19,920 (thinking 7,127); total 564,498; cache-read share of input 78%; tool calls 44; responses 14; 2 launches + 0 `SendMessage` continuations. Source: local Claude Code transcript, de-duplicated by message ID; backfilled 2026-11-05.
 - Unavailable resource metrics: cost (not recorded in local transcripts)
-- Findings: no must-fix.
+- Findings (first pass, `a0b359c2…`): no must-fix.
   - Should-fix: S1 to S4 were decided by the human and fixed in round 2. S5 was fixed in round 1.
   - Notes: N1 to N6. N3 was fixed. N2: settled rows from before 6.3 with null `charged_tokens` count as 0.
-- No second reviewer pass after fix round 2.
+- Re-review of fix round 2 (`a895d42e…`, a fresh reviewer launched at HEAD `8389b4f`, after commit-pr; recovered from the transcript on 2026-11-06). Static review only; it ran no tests.
+  - Verdict: no must-fix. S1, S3, S4, N3 and S5 match the recorded decisions, and AC6–AC9, AC14–AC16 and AC25 show no regression.
+  - Should-fix R1: no test makes `settle` reject while the adapter or validator throws, so moving `settle` inside the new try blocks would go unnoticed (`tests/unit/ai/gateway.test.ts` S1 block).
+  - Should-fix R2: the S3 tests use bare `.rejects.toThrow()` and do not assert that the error message omits the segment name.
+  - Should-fix R3: the fractional-latency test (100.4 ms per call) accepts 200 or 201, so per-call rounding and rounding the total both pass; it should assert exactly 200.
+  - Should-fix R4: the S4 tests don't cover `Number.MAX_SAFE_INTEGER + 1`, so a plain `Number.isInteger` check would pass.
+  - Notes: S5 (client release on a failed reserve) has no test; the two S1 catch bodies repeat the settle-and-return sequence; S3 lacks leading `-`/`_` and trailing-newline cases (the regex already handles them).
+  - Question: S4 sets no upper bound on `maxOutputTokens`, so a huge value could overflow `reserved_tokens` and surface as a database error.
+  - Outcome: reported to the human in the main session on 2026-11-02. No decision was recorded and nothing was changed; as of 2026-11-06 R1–R4, the S5 test gap and the question are still open (see "Known gaps").
 
 ## Backfilled resource usage `[ORCH]`
 
@@ -222,7 +230,7 @@ Thinking tokens were 17% of all output tokens for this task.
 Notes:
 
 - The reviewer ran on `claude-sonnet-5-5` (from `.claude/agents/reviewer.md`), not Opus 5.5 as the block previously said; the model fields are corrected.
-- The transcript shows a second reviewer subagent, "Re-review fix round 2" (`a895d42e…`, 23:06–23:07 SGT, after the commit-pr run). The reviewer block still says no second pass was run. Needs human confirmation of what that re-review found; the narrative was not changed.
+- The transcript shows a second reviewer subagent, "Re-review fix round 2" (`a895d42e…`, 23:06–23:07 SGT, after the commit-pr run). The reviewer block said no second pass had run. Resolved 2026-11-06: its report was recovered from the transcript and is now recorded in the reviewer block.
 - The analyst (`aa4a9a7f…`) and commit-pr (`ac0cd284…`) have no session block; their usage is in the table.
 
 ## Consolidated outcome `[ORCH]`
@@ -237,10 +245,10 @@ Notes:
 - Generated artifacts: none.
 - Dependencies added: none.
 - Known gaps and unverified items:
-  - Fix round 2 was not re-reviewed.
+  - Fix round 2 was re-reviewed (no must-fix). Its should-fix test gaps R1–R4, the missing S5 test, and the question about an upper bound on `maxOutputTokens` await a human decision.
   - Reviewer note N2 (legacy null `charged_tokens`) applies at the D-L backup step.
   - G11 (`maxDuration`) is deferred to the first AI Route Handler.
-- Reviewer findings: all resolved or accepted (see the reviewer session).
+- Reviewer findings: first-pass findings resolved or accepted. Re-review findings are open (see the reviewer session).
 - Next action and responsible human: thegrimbee reviews the commits. Lim-ZY cross-reviews.
 
 ## Change log `[ORCH]`
@@ -251,3 +259,4 @@ Notes:
 | 2026-11-02 | orchestrator / not available | Recorded human answers to Q1 to Q6; updated AC14, AC18, AC24; added AC25 to AC28; `UsageSettlement.chargedTokens`; migration contents and fixture scope; A4 resolved, A5 added. |
 | 2026-11-02 | main session | Recorded worker sessions, fix rounds 1 and 2, approval of A1 to A3 and A5, and check results including integration tests; status set to implemented. |
 | 2026-11-05 | main session (backfill) | Backfilled provider session IDs, models, timing, and token usage from local Claude Code transcripts; see "Backfilled resource usage". |
+| 2026-11-06 | main session | Recorded the fix-round-2 re-review result (`a895d42e…`) recovered from its transcript; open findings listed under known gaps. |
