@@ -56,7 +56,7 @@
   - Origin check precedent: `src/app/api/v1/projects/[projectId]/github-repository/route.ts:12`.
   - `APP_ORIGIN` is read as `config.appOrigin` in `src/server/config/index.ts`.
   - Auth module layout: `src/server/auth/` has `auth-port.ts`, `auth-service.ts`, `project-authorization.ts`, `session-identity.ts` and `supabase-auth.ts`. It has no `index.ts`; callers import these files directly.
-- Workflow evidence for the Step 4 plan: `temp/reflection-notes.md` §1, §2, §3 (D2, D5, D6, D8, D9) and §6 (X1, X2); `.claude/agents/*.md`; `.claude/settings.json`.
+- Workflow evidence for the Step 4 plan: the per-role usage recorded in the backfilled handoffs `workflow/handoffs/data-persistence-schema.md` (2.4), `workflow/handoffs/llm-gateway-secret-redaction.md` (6.2) and `workflow/handoffs/llm-gateway-core.md` (6.3); the earlier worker order in `workflow/handoffs/data-persistence-schema.md` L178, `workflow/handoffs/environment-configuration.md` L158, `workflow/handoffs/llm-gateway-soc-adapter.md` L169 and `workflow/handoffs/llm-gateway-secret-redaction.md` L182; the "Who orchestrates" item and the Enforcement table in `workflow/agents/README.md`; `.claude/agents/*.md`; `.claude/settings.json`. Facts that exist only in the human's notes are written inline where they are used in "Step 4 plan fields" and marked "recorded from the human's notes, 2026-11-06".
 - Tests to change or reuse:
   - `tests/unit/project-authorization-routes.test.ts`: the real handlers run with `pg` and Supabase mocked; 501 is asserted at L215-222.
   - `tests/integration/db/support/harness.ts` and `tests/integration/db/support/fixtures.ts` (`createPerson`, `createProject`, `addMembership`, `createTask`, `runtimePool`).
@@ -382,7 +382,7 @@ Repeat one session block for each assigned agent session. Include the shared fie
   A1 and A2 never write the same path.
 
   **Worker order — RESOLVED 2026-11-06: alternative 1, test-writer first (A2, then A1).** The record below is kept as it was presented. Q7 and Q8 now fix where the helpers are exposed: `@/server/auth`, via `request-access.ts`. The other "still unfixed" items remain; see the main-session note in the Change log. A1 receives A2's tests read-only, must make them pass, and reports any test it believes contradicts the specs without editing it.
-  - The conflict: `4-1-plan` put the implementer first. AGENTS.md "Agent Workflow and Roles" lists the test-writer (step 3) before the implementer (step 4). `workflow/agents/test-writer.md` says tests are created "from approved requirements and acceptance examples", and the past workflow ran test-writer before implementer (`temp/reflection-notes.md` §1).
+  - The conflict: `4-1-plan` put the implementer first. AGENTS.md "Agent Workflow and Roles" lists the test-writer (step 3) before the implementer (step 4). `workflow/agents/test-writer.md` says tests are created "from approved requirements and acceptance examples", and the past workflow ran test-writer before implementer (earlier handoffs record "Implementer: assigned after the test-writer" in `workflow/handoffs/data-persistence-schema.md` L178, `workflow/handoffs/environment-configuration.md` L158, `workflow/handoffs/llm-gateway-soc-adapter.md` L169 and `workflow/handoffs/llm-gateway-secret-redaction.md` L182).
   - Now fixed for tests written first:
     - Route paths and methods (D4) and the `GET`/`POST` exports of the route files under `src/app/api/v1/projects/`.
     - Request bodies (D3, Q3), success statuses and bodies (D3, Q1, the read shape in the identity-and-access spec).
@@ -407,14 +407,14 @@ Repeat one session block for each assigned agent session. Include the shared fie
 
   | Role | Model / effort / maxTurns | Config blob at `68a12fb` | Reason (project data) |
   |---|---|---|---|
-  | test-writer | Opus / medium / 90 | `2792a18` | Test-writers were among the largest consumers (2.4: 64.1k output; 6.3: 67.0k); 90 is about 2× the largest observed run of 45 responses (reflection-notes §2, §3 D6). |
-  | implementer | Opus / medium / 120 | `06dcac5` | The 2.4 implementer was the largest single consumer (67.5k output, 59 responses); 120 is about 2× that (§2, §3 D6). |
-  | reviewer | Sonnet / medium / 25; tools Read, Grep, Glob | `92ce8a9` | Past Sonnet reviewers took 3–10 responses (§2). Medium effort is unproven (the 6.2 reviewer thought for 76% of its output); X2 on task 4.3 tests it, not 4.1 (§3 D5). |
-  | commit-pr | Sonnet / low / 20 | `df5d675` | Commit-pr ran on Opus for 3–9 responses of mechanical git work (§3 D5); 20 is about 2× the observed 9 (§3 D6). |
+  | test-writer | Opus / medium / 90 | `2792a18` | Test-writers were among the largest consumers (2.4: 64.1k output; 6.3: 67.0k); 90 is about 2× the largest observed run of 45 responses. Sources: 2.4 test-writer `a695c138c62f9fb2b` out 64,148 (`workflow/handoffs/data-persistence-schema.md` L359); 6.3 test-writer `a9fe87ddd25ec497b` out 67,033, responses 45 (`workflow/handoffs/llm-gateway-core.md` L167). `workflow/agents/README.md` Enforcement table: "`maxTurns` caps each run at roughly twice the largest observed run". Recorded from the human's notes, 2026-11-06: "`maxTurns` per agent at about 2× the largest observed run: analyst 20, reviewer 25, commit-pr 20, orchestrator 50, test-writer 90, implementer 120" and "Observed maximum responses: 7 / 10 / 9 / 26 / 45 / 59". |
+  | implementer | Opus / medium / 120 | `06dcac5` | The 2.4 implementer was the largest single consumer (67.5k output, 59 responses); 120 is about 2× that. Source: 2.4 implementer `a3b095574d7532bfe` out 67,496, responses 59 (`workflow/handoffs/data-persistence-schema.md` L191). The 2× rule and the observed maxima are quoted in the test-writer row. |
+  | reviewer | Sonnet / medium / 25; tools Read, Grep, Glob | `92ce8a9` | Past Sonnet reviewers took 3–10 responses (recorded from the human's notes, 2026-11-06: "Sonnet analysts and reviewers were cheap (analysts 6–8k output each; reviewers 3–10 responses)"). Medium effort is unproven (the 6.2 reviewer thought for 76% of its output: reviewer `a3c0b1096e6484617` out 34,243, thinking 26,060, `workflow/handoffs/llm-gateway-secret-redaction.md` L297); X2 on task 4.3 tests it, not 4.1. Recorded from the human's notes, 2026-11-06: "**The reviewer's medium has no evidence behind it** (the 6.2 reviewer thought for 76% of its output), so it is tested in X2." X2, recorded from the human's notes, 2026-11-06: question "Is the reviewer's medium effort enough? Resume or re-launch for a re-review?"; task "**4.3** (lifecycle, request-changes, competing writes; the riskiest logic left)"; design "Freeze the diff after implementation. Run the reviewer at **medium** and at **high** on the same diff. For the fix-round re-review, run a **resumed** reviewer and a **fresh** reviewer on the same fixed diff"; measure "findings (real vs false), thinking tokens, output tokens, cache reads". |
+  | commit-pr | Sonnet / low / 20 | `df5d675` | Commit-pr ran on Opus for 3–9 responses of mechanical git work; 20 is about 2× the observed 9. Recorded from the human's notes, 2026-11-06: "Commit-pr ran on Opus for 3–9 responses of mechanical git work, so moved to Sonnet." The 2× rule and the observed maxima are quoted in the test-writer row. |
   | frontend | Sonnet / medium | not used | 4.1 has no UI (C4). |
   | security pass | main-session model (`/security-review` runs in the main session) | n/a | Record the main-session model when it runs; not available to this orchestrator. |
 
-  - X1 record: 4.1 is the full-pipeline arm of X1 and 4.2 the single-agent arm (`temp/reflection-notes.md` §6). The main session records in each worker's session block the resolved model ID (from the transcript, since `sonnet`/`opus` are aliases), effort and maxTurns actually used.
+  - X1 record: 4.1 is the full-pipeline arm of X1 and 4.2 the single-agent arm. X1, recorded from the human's notes, 2026-11-06: question "Did the pipeline pay for itself? When not to use it?"; tasks "**4.1** full pipeline vs **4.2** single agent"; design "Sibling [P] tasks with the same layers (service, repository, route, PostgreSQL and API-authorization tests). 4.1 gets the pipeline because it has an open product decision (who may create a project, how the first PM is chosen), which is where the analyst and human gate add value. 4.2 is done in the main session with TDD and the same checks. Afterwards run **one** reviewer with the same configuration on both final diffs, as a common yardstick"; measure "total tokens, wall time, human interventions, yardstick reviewer findings by severity, later defects". The same split ("task 4.1 with the full pipeline, 4.2 single-agent") is in `logs/2026-11-06-reflection-open-items-resolution.md` prompt 1. The main session records in each worker's session block the resolved model ID (from the transcript, since `sonnet`/`opus` are aliases), effort and maxTurns actually used.
   - Yardstick reviewer (for X1): one fresh `reviewer` agent session with the config above (Sonnet / medium / 25, Read/Grep/Glob, blob `92ce8a9`), run once on the final 4.1 diff and once on the final 4.2 diff with the same prompt. It is separate from 4.1's pipeline reviewer. 4.2 must use the same blob; if `.claude/agents/reviewer.md` changes before then, the comparison is not like-for-like and must say so. The diff base for both is `dev` (the PR base).
 
   **Context plan**
@@ -429,7 +429,7 @@ Repeat one session block for each assigned agent session. Include the shared fie
   **Parallelism plan**
   - Chosen (alternative 1): sequential in the primary checkout. No worktree. The alternative 3 commands below are kept for the record only.
   - Alternatives 1 and 2: sequential in the primary checkout. No worktree.
-  - Alternative 3: the implementer stays in the primary checkout; the test-writer gets a manual worktree. Do not use `isolation: worktree`, because it branches from `master` (reflection-notes §3 D9) and this branch is cut from `dev`. A worktree cannot check out a branch that is already checked out, so it needs its own branch:
+  - Alternative 3: the implementer stays in the primary checkout; the test-writer gets a manual worktree. Do not use `isolation: worktree`, because it branches from `master` (recorded from the human's notes, 2026-11-06: "Don't use Claude's `isolation: worktree` on feature branches; create worktrees manually from the current branch", because "Docs: `isolation: worktree` branches from the default branch (`master`), not from `HEAD`; our feature branches are cut from `dev`") and this branch is cut from `dev`. A worktree cannot check out a branch that is already checked out, so it needs its own branch:
 
     ```
     git -C D:/Education/CS3227/CS3227-2610-MP4 worktree add -b feat/projects-membership-4-1-tests D:/Education/CS3227/wt-projects-membership-4-1-tests feat/projects-membership-4-1
@@ -444,10 +444,10 @@ Repeat one session block for each assigned agent session. Include the shared fie
 
   | Round | Findings (must/should/nit) | Fixed by | Disputed? | How resolved |
   |---|---|---|---|---|
-  | 1 | | | | |
-  | 2 | | | | |
+  | 1 | 0 / 7 / 9 (reviewer `a318d1e2d8adcc7c5`; see "Reviewer findings" under Consolidated outcome) | A1 `ad038f9c88bcc9f5f` (should 6; 401 entry from should 7); A2 `aac2443f6cc3948a8` (should 4, 5) | none | Should 1: integration run by thegrimbee, 14/14 files, 274/274 tests. Should 2, 3, 7 (rest) and decisions 1–8 approved as-is and recorded in design.md "Review decisions R1 to R8". `next-env.d.ts` reverted. |
+  | 2 | 0 / 0 / 2 (same reviewer, resumed) | none needed | none | All round 1 findings resolved or accepted (R1–R8). New nits 1 (duplicated test evaluator) and 2 (R1/R2 untested) left open as optional follow-ups. |
 
-  - Re-review used: round 1 — to be recorded; round 2 — to be recorded.
+  - Re-review used: round 1 — fresh reviewer; round 2 — resumed reviewer via SendMessage.
 
   **Who dispatches**
   - `.claude/settings.json` sets `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`, so workers cannot launch workers. The main session dispatches every worker and sends fix rounds with SendMessage (flat). The orchestrator only plans and consolidates. E7 (nested dispatch) is not run.
@@ -467,6 +467,137 @@ Repeat one session block for each assigned agent session. Include the shared fie
 
   Task 4.2 should still wait for 4.1 to merge before editing `composition.ts`, `project-authorization.ts` or `tests/unit/project-authorization-routes.test.ts`.
 - Consolidation notes: No worker reports yet. The analyst session `a4c7d9e33d08ddc74` is still reusable for 4.1 context. The A1/A2 lists and sequence in `4-1-plan` are superseded by this block; `4-1-plan` is kept as history.
+
+### Session `test-writer / aac2443f6cc3948a8`
+
+- Provider: `claude`
+- Provider session ID: not available (agent ID surfaced: `aac2443f6cc3948a8`)
+- Work ID: `projects-membership-4-1`
+- Agent: test-writer (assignment A2)
+- Phase: run 1 (tests first), then round 1 fixes (resumed)
+
+#### Shared fields `[ALL]`
+
+- Platform and model (if surfaced): Claude Code (Agent SDK subagent); configured Opus / medium / 90 (from the Step 4 table, not re-verified from transcripts). Resolved model ID: not available.
+- Role: Test-writer
+- Human owner and assigned task scope: Developer B (thegrimbee); A2 in `orchestrator / 4-1-plan-2`.
+- Source revision: HEAD `9c33dc46d6af9af888f0dd9ce76e002c55cfdff7` on `feat/projects-membership-4-1`, uncommitted changes on top.
+- Started / ended / elapsed `[ALL, optional when surfaced]`: Run 1 1,020,386 ms; round 1 fixes 347,784 ms; total 1,368,170 ms. Start/end timestamps not available.
+- Resource usage (provider-reported): tokens in / out / total; cache read / write; cost; tool calls or other surfaced metrics:
+  - Run 1 (tests first): 243,516 tokens, 53 tool uses, 1,020,386 ms.
+  - Round 1 fixes: 282,655 tokens, 19 tool uses, 347,784 ms.
+  - Total: 526,171 tokens, 72 tool uses, 1,368,170 ms.
+- Unavailable resource metrics: Token in/out split, cache, cost: not available.
+- Work completed / findings:
+  - Context given: the handoff Context plan test-writer row, alternative 1; no implementation files read in run 1.
+  - Red evidence (run 1, `npm test`): 21 files, 4 failed and 17 passed; 807 tests, 144 failed and 663 passed. Failing: 4 in project-authorization-routes, 34 in project-origin-check, 106 in project-routes; project-service.test.ts failed as a suite on `Cannot find package '@/server/projects'` (81 tests not collected). All failures from missing implementation (55 module-not-found for the members and product-manager-transfer routes; the rest status mismatches against the 501 stubs). No fake errors. All existing tests passed.
+  - Interpretations flagged: exact "Insufficient permissions" message for bad-Origin 403; service-level NOT_FOUND for non-member getProject and FORBIDDEN for developer actor; `/reassign/i` for the blocked-transfer message; lock tests assume only caller's and target's rows are locked; A-3 trigger created and dropped in the test file.
+  - Round 1 fixes: should 4 — integration test builds the service with the real PeopleRepository (as composition.ts:51), stand-in removed, +4 direct lookup tests (29 in file). Should 5 — unit pg fake in project-routes.test.ts and project-service.test.ts replaced by a strict SQL evaluator that throws on unreadable statements, returns only named columns, rows only with RETURNING, maps INSERT columns by position, takes the open-task filter from the statement's WHERE, enforces migration constraints; locks not modelled. Should 1 — not run (TEST_DATABASE_URL unset). Disputes: none.
+- Files changed (use `none` if read-only):
+  - Edited `tests/unit/project-authorization-routes.test.ts` (126 tests; 4 new/replaced for 4.1: Q6 401, read 200 for developer and PM, create 201; task-stub assertions unchanged).
+  - Created `tests/unit/project-routes.test.ts` (118 tests), `tests/unit/project-origin-check.test.ts` (39 tests), `tests/unit/projects/project-service.test.ts` (81 tests), `tests/integration/db/projects-membership.test.ts` (25 tests in run 1; 29 after round 1).
+- Checks run and exact results (use `none` if none were run): `npm test` red run as above. Integration not run by the worker (TEST_DATABASE_URL unset).
+- Gaps / blockers (use `none` if none): see Coverage gaps.
+
+#### Test-writer fields `[TEST-WRITER]`
+
+- Test files changed: as listed under Files changed.
+- Scenarios and requirement IDs covered: the 4.1 scenarios listed under Requirement IDs in the Task record, including S7. No formal requirement IDs.
+- Coverage gaps:
+  - Gaps reported in run 1: (1) S6 does not fix result-row shapes; the pg fake assumed column names, an EXISTS/count open-task check, one UPDATE per role change, parameterised INSERTs. (2) PeopleRepository constructor unrecorded; integration test used a stand-in lookup. (3) Whether `application/json; charset=utf-8` passes D8 unrecorded and untested.
+  - Resolution: gap 1 accepted as R7 — S6 stays as recorded; the strict fake fails on unreadable statements; locks verified only by integration tests. Gap 2 resolved in round 1 (real repository used in integration tests). Gap 3: R2 — parameters after `;` ignored; `application/json; charset=utf-8` accepted.
+  - Still open (optional): no test pins R1 (astral characters) or R2 (`application/json; charset=utf-8`).
+
+### Session `implementer / ad038f9c88bcc9f5f`
+
+- Provider: `claude`
+- Provider session ID: not available (agent ID surfaced: `ad038f9c88bcc9f5f`)
+- Work ID: `projects-membership-4-1`
+- Agent: implementer (assignment A1)
+- Phase: run 1, then round 1 fixes (resumed)
+
+#### Shared fields `[ALL]`
+
+- Platform and model (if surfaced): Claude Code (Agent SDK subagent); configured Opus / medium / 120 (from the Step 4 table, not re-verified from transcripts). Resolved model ID: not available.
+- Role: Implementer
+- Human owner and assigned task scope: Developer B (thegrimbee); A1 in `orchestrator / 4-1-plan-2`.
+- Source revision: HEAD `9c33dc46d6af9af888f0dd9ce76e002c55cfdff7` on `feat/projects-membership-4-1`, uncommitted changes on top.
+- Started / ended / elapsed `[ALL, optional when surfaced]`: Run 1 491,101 ms; round 1 fixes 113,983 ms; total 605,084 ms. Start/end timestamps not available.
+- Resource usage (provider-reported): tokens in / out / total; cache read / write; cost; tool calls or other surfaced metrics:
+  - Run 1: 213,655 tokens, 48 tool uses, 491,101 ms.
+  - Round 1 fixes: 220,115 tokens, 6 tool uses, 113,983 ms.
+  - Total: 433,770 tokens, 54 tool uses, 605,084 ms.
+- Unavailable resource metrics: Token in/out split, cache, cost: not available.
+- Work completed / findings:
+  - Green evidence (run 1): npm test 21/21 files, 888/888 tests, no test edits; lint, tsc, build exit 0. Integration not run.
+  - Disputed tests: none. Write-scope blocks: none, except `next-env.d.ts` rewritten by `npm run build` (outside A1/A2; left alone).
+  - Unrecorded decisions it made (run 1): name limit counts code points; caller with no membership in service transaction → NOT_FOUND; add-member FOR SHARE lock on caller's membership; chose the five 409 messages. Later recorded as R1 (code points), R3 (the five 409 messages, word for word), R4 (NOT_FOUND for caller without membership in service), R5 (add-member FOR SHARE), R6 (no lock_timeout or retry).
+  - Round 1 fixes: should 6 — members and transfer handlers share one private helper in handlers.ts (passes service method and success status, no branch flag; S1 signatures unchanged). Should 7 — unused 401 entry removed; the rest of the duplication left because removing it would cross the S5/Q7 seam or need a file outside A1 (seam conflict reported). thegrimbee chose "Accept duplication" — R8.
+- Files changed (use `none` if read-only): see Implementation files and rationale.
+- Checks run and exact results (use `none` if none were run): run 1: `npm test` 21/21 files, 888/888 tests; lint, tsc, build exit 0. Integration not run.
+- Gaps / blockers (use `none` if none): finding 7 seam conflict (resolved by R8).
+
+#### Implementer fields `[IMPLEMENTER]`
+
+- Implementation files and rationale:
+  - Created: `src/server/projects/{index,types,errors,validation,repository,service,request-guard,handlers}.ts`; `src/server/auth/request-access.ts` (getAuthenticatedUserId, resolveProjectAccess moved, plus resolveSessionPerson for Q6, AccessResult); `src/server/auth/index.ts` (re-exports only the S5 names); `src/app/api/v1/projects/[projectId]/members/route.ts`; `src/app/api/v1/projects/[projectId]/product-manager-transfer/route.ts`.
+  - Edited: `src/server/auth/project-authorization.ts` (helpers removed and imported from ./request-access; project stubs keep names and call handleProjectCreate/handleProjectRead; task stubs unchanged; round 1: unused 401 entry removed); `src/server/repositories/people-repository.ts` (findPeopleByGitHubUsername, `lower(github_username) = lower($1)`); `src/server/composition.ts` (one field, projectService). Existing project route files unchanged.
+- Visual diff path, or reason skill was unavailable: `present-changes-visually` skill not available; no visual diff.
+- Other generated artifacts / dependencies: none kept (`next-env.d.ts`, rewritten by `next build`, was reverted). No dependencies added.
+
+### Session `reviewer / a318d1e2d8adcc7c5`
+
+- Provider: `claude`
+- Provider session ID: not available (agent ID surfaced: `a318d1e2d8adcc7c5`)
+- Work ID: `projects-membership-4-1`
+- Agent: reviewer
+- Phase: round 1 (fresh session), round 2 (same reviewer resumed via SendMessage)
+
+#### Shared fields `[ALL]`
+
+- Platform and model (if surfaced): Claude Code (Agent SDK subagent); configured Sonnet / medium / 25 (Read, Grep, Glob) (from the Step 4 table, not re-verified from transcripts). Resolved model ID: not available.
+- Role: Reviewer
+- Human owner and assigned task scope: Developer B (thegrimbee); review of the 4.1 uncommitted changes against `dev`.
+- Source revision: HEAD `9c33dc46d6af9af888f0dd9ce76e002c55cfdff7` on `feat/projects-membership-4-1`, uncommitted changes on top.
+- Started / ended / elapsed `[ALL, optional when surfaced]`: Round 1 135,397 ms; round 2 39,061 ms; total 174,458 ms. Start/end timestamps not available.
+- Resource usage (provider-reported): tokens in / out / total; cache read / write; cost; tool calls or other surfaced metrics:
+  - Round 1 (fresh session): 101,509 tokens, 40 tool uses, 135,397 ms.
+  - Round 2 (same reviewer resumed via SendMessage): 115,466 tokens, 10 tool uses, 39,061 ms.
+  - Total: 216,975 tokens, 50 tool uses, 174,458 ms.
+- Unavailable resource metrics: Token in/out split, cache, cost: not available.
+- Work completed / findings: Round 1 verdict 0 must / 7 should / 9 nit. Round 2 verdict: all round 1 findings resolved or accepted by human decision; no must, no should, no regressions. Details under "Reviewer findings" in Consolidated outcome.
+- Files changed (use `none` if read-only): none
+- Checks run and exact results (use `none` if none were run): none (read-only tools; used the main session's check output).
+- Gaps / blockers (use `none` if none): none
+
+#### Reviewer fields `[REVIEWER]`
+
+- Acceptance-criteria status (met / unmet / unverified, with evidence): Round 1: every 4.1 scenario, including S7, has code and at least one test; integration unverified at that time. Round 2: resolved — should 1 (integration run by thegrimbee), should 4 (`projects-membership.test.ts:24, 120`, lookup tests `:125-161`), should 5 (strict evaluator `project-routes.test.ts:53-70`, `:246`), should 6 (`handlers.ts:67-93` shared helper `handleProductManagerUsernameRoute`; `:96-103`, `:106-115`), should 7 unused 401 (`project-authorization.ts:18`), next-env.d.ts reverted.
+- Code-quality findings (cohesion, coupling, abstractions, reuse): accepted by decision: should 2 (R1), should 3 (R2), should 7 rest (R8), lock timeout (R6), decisions 4 and 5 (R4, R5). New nit (1): the ~400-line SQL evaluator is copied in `tests/unit/project-routes.test.ts:133-` and `tests/unit/projects/project-service.test.ts:132-`; sharing it needs a file outside A2 — follow-up for a human decision.
+- Other findings by severity and evidence: R1–R8 text matches code; R3 messages match `errors.ts:10-19` character for character. New nit (2): No test pins R1 (astral characters) or R2 (`application/json; charset=utf-8`). Optional.
+- Review limits: Read, Grep and Glob only; checks run by the main session.
+
+### Session `security pass / main session`
+
+- Provider: `claude`
+- Provider session ID: not available
+- Work ID: `projects-membership-4-1`
+- Agent: main session via `/security-review`
+- Phase: security pass after reviewer round 2
+
+#### Shared fields `[ALL]`
+
+- Platform and model (if surfaced): main-session model Opus 5.5, `claude-opus-5-5`
+- Role: Security pass
+- Human owner and assigned task scope: Developer B (thegrimbee); task 4.1 code diffed against `dev`.
+- Source revision: HEAD `9c33dc46d6af9af888f0dd9ce76e002c55cfdff7`, uncommitted changes on top.
+- Started / ended / elapsed `[ALL, optional when surfaced]`: one sub-task 32,890 ms. Start/end timestamps not available.
+- Resource usage (provider-reported): tokens in / out / total; cache read / write; cost; tool calls or other surfaced metrics: one sub-task: 57,445 tokens, 6 tool uses, 32,890 ms.
+- Unavailable resource metrics: Token in/out split, cache, cost, and main-session usage for the pass: not available.
+- Work completed / findings: no vulnerabilities at or above the 80% confidence bar; no false-positive filtering needed. Details under "Reviewer findings" in Consolidated outcome. Security fix rounds used: 0 of 1.
+- Files changed (use `none` if read-only): none
+- Checks run and exact results (use `none` if none were run): none
+- Gaps / blockers (use `none` if none): none
 
 ## Human gate
 
@@ -512,16 +643,109 @@ Repeat one session block for each assigned agent session. Include the shared fie
 
 ## Consolidated outcome `[ORCH]`
 
-- Changed files and rationale:
-- Tests/checks and results:
-- Generated artifacts:
-- Dependencies added:
+- Changed files and rationale (uncommitted, on HEAD `9c33dc46d6af9af888f0dd9ce76e002c55cfdff7`; nothing is committed):
+  - M `openspec/changes/project-task-management/design.md` (R1–R8; main session)
+  - M `src/server/auth/project-authorization.ts` (helpers removed and imported from ./request-access; project stubs call handleProjectCreate/handleProjectRead; task stubs unchanged; unused 401 entry removed)
+  - M `src/server/composition.ts` (one field, projectService)
+  - M `src/server/repositories/people-repository.ts` (findPeopleByGitHubUsername, `lower(github_username) = lower($1)`)
+  - M `tests/unit/project-authorization-routes.test.ts` (A2: 4.1 project read/create and Q6 cases)
+  - M `workflow/handoffs/projects-membership-4-1.md` (this record)
+  - ?? `src/app/api/v1/projects/[projectId]/members/` and `src/app/api/v1/projects/[projectId]/product-manager-transfer/` (new D4 routes)
+  - ?? `src/server/auth/index.ts` (Q7 auth entry, S5 names only) and `src/server/auth/request-access.ts` (Q8 helper move plus resolveSessionPerson for Q6)
+  - ?? `src/server/projects/` (D9 module: index, types, errors, validation, repository, service, request-guard, handlers)
+  - ?? `tests/integration/db/projects-membership.test.ts`, `tests/unit/project-origin-check.test.ts`, `tests/unit/project-routes.test.ts`, `tests/unit/projects/` (A2 tests)
+- Tests/checks and results (main session, PowerShell, at 9c33dc4 on uncommitted changes):
+  - After A1 run 1: `npm run lint` exit 0; `npx tsc --noEmit` exit 0; `npm run build` exit 0 (members and product-manager-transfer routes listed); `npm test` 21/21 files, 888/888 tests.
+  - After round 1 fixes: `npm run lint` exit 0; `npx tsc --noEmit` exit 0; `npm run build` exit 0 ("Compiled successfully", both new routes listed); `npm test` 21/21 files, 888/888 tests (count unchanged: the 4 new tests are integration tests).
+  - `npm run test:integration`: run by thegrimbee against a disposable database on 6 November 2026, start 20:09:27 SGT, on the uncommitted round 1 changes: Test Files 14 passed (14); Tests 274 passed (274); Duration 19.28s. The database URL was not shared with or recorded by the agent. Note: vitest does not load `.env.local`; TEST_DATABASE_URL must be set in the shell.
+  - Note: under Git Bash `npm test` fails with "Vitest failed to find the runner" (drive-letter path); PowerShell works.
+  - Checks were not rerun after the design.md edit and the next-env.d.ts revert (neither touches code).
+  - `npx openspec validate project-task-management --strict` → "Change 'project-task-management' is valid".
+- Generated artifacts: none kept (`next-env.d.ts`, rewritten by `next build`, was reverted). Migrations: none.
+- Dependencies added: none
 - Known gaps and unverified items:
+  - Optional follow-ups: shared test SQL evaluator (needs a file outside A2); tests pinning R1 and R2.
+  - Not done yet: Lim-ZY cross-review of `src/server/auth/` changes (Q7); `logs/` session summary for this chat; yardstick reviewer run (X1) on the final diff; commit-pr agent only on explicit authorization for `feat/projects-membership-4-1`.
+  - Resolved model IDs for the workers: not available (configs from the Step 4 table, not re-verified from transcripts).
 - Reviewer findings:
+
+  **Round 1: reviewer `a318d1e2d8adcc7c5`** (Sonnet / medium; Read, Grep, Glob only)
+  - Scope: uncommitted 4.1 changes on HEAD `9c33dc46d6af9af888f0dd9ce76e002c55cfdff7`, diffed against `dev`. Input checks were run by the main session: lint, tsc, build and `npm test` passed (888/888 tests). `npm run test:integration` was not run because `TEST_DATABASE_URL` is unset.
+  - Usage (platform): 101,509 tokens, 40 tool uses, 135,397 ms.
+  - Verdict: no must findings. Every 4.1 scenario, including S7, has code and at least one test. All A1 must-follow rules, the S1–S7 seam, Q7 and Q8 are met. Only A1 and A2 paths changed, except `next-env.d.ts`.
+
+  Must: none.
+
+  Should:
+  1. **Integration suite not run** (`tests/integration/db/projects-membership.test.ts`). These behaviours are checked only by the in-memory fake, which models no locks or constraints:
+     - the D6 lock against the assignee trigger;
+     - S7 (`:367-395`);
+     - competing transfers;
+     - the A-3 atomic failure.
+
+     Run the suite on a disposable database before merge.
+  2. **Name length counts code points** (`src/server/projects/validation.ts:24`). D3 does not say what "1 to 100 characters" counts, and no test covers it. This is an unrecorded decision, not a defect.
+  3. **Content-type parameters ignored** (`src/server/projects/request-guard.ts:15`). `application/json; charset=utf-8` is accepted, the same as the existing stubs (`project-authorization.ts:70,81`). D8 is silent and no test covers it. This is an unrecorded decision.
+  4. **No PostgreSQL test of the username lookup SQL** (`src/server/repositories/people-repository.ts:30-39`). The integration test uses a stand-in lookup (`projects-membership.test.ts:118-126`). The real constructor is now known (`composition.ts:51`), so A2 could add a case that uses the real repository.
+  5. **Unit `pg` fake depends on SQL shape** (`tests/unit/project-routes.test.ts:19-23, 199-308`). Its heuristics fit the current SQL, but a later refactor could make it pass wrongly or fail spuriously.
+  6. **Near-duplicate handlers** (`src/server/projects/handlers.ts:68-86` vs `:89-110`). An optional private helper would reduce drift between the two PM-only routes.
+  7. **Duplication left by the helper move.**
+     - Three copies of the error table: `projects/errors.ts:6-23`, `auth/request-access.ts:21-25`, `auth/project-authorization.ts:21-28`.
+     - Three copies of the UUID pattern: `validation.ts:10`, `request-access.ts:10`, `project-authorization.ts:10`.
+     - An unused 401 entry remains in `project-authorization.ts`.
+
+  Nit:
+  - **Unused column:** `lockMemberships` selects an unused `id` (`repository.ts:83`).
+  - **Lookup before role check** (`service.ts:31,45`). Called directly, the service could reveal username existence to a non-PM. Over HTTP this is concealed because the handlers check the role first.
+  - **No lock timeout.** No `lock_timeout` is set, so a stuck lock could hang a request. Unrecorded decision.
+  - **`release()` without the error** (`repository.ts:152-163`). After a failed BEGIN or ROLLBACK, the error is not passed to `release()`. This matches the existing code.
+  - **No action needed:**
+    - unused `request` parameter in the replaced stubs (`project-authorization.ts:113-127`);
+    - dedupe at `service.ts:47`;
+    - one extra query on project read;
+    - whole-composition parameter (S1 mandates it);
+    - type-only import between `handlers.ts` and `composition.ts`, so no runtime cycle.
+
+  Boundary: `next-env.d.ts` was rewritten by `npm run build` and is outside the A1 and A2 paths. Revert it or leave it out of the commit.
+
+  Unrecorded decisions for the human (round 1):
+  1. Should the name limit count code points, UTF-16 units or graphemes?
+  2. Should `application/json; charset=utf-8` be accepted?
+  3. Accept the 409 message wording A1 chose (allowed by Q2)?
+  4. Keep NOT_FOUND for a caller with no membership inside the service transaction?
+  5. Keep the add-member `FOR SHARE` lock on the caller's membership?
+  6. Should lock waits have a timeout or retry?
+  7. Record the S6 result-row shapes the fake assumes, or leave the fake as is?
+  8. Keep, revert or exclude `next-env.d.ts`?
+
+  How thegrimbee resolved round 1:
+  - Test-writer gap 1 (S6 row shapes): accepted as R7 — S6 stays as recorded; the strict fake fails on unreadable statements; locks verified only by integration tests.
+  - Test-writer gap 2 (PeopleRepository constructor): resolved in round 1 (real repository used in integration tests).
+  - Test-writer gap 3 / review should 3 (charset): R2 — parameters after `;` ignored; `application/json; charset=utf-8` accepted.
+  - Implementer unrecorded decisions: R1 (code points), R3 (the five 409 messages, word for word), R4 (NOT_FOUND for caller without membership in service), R5 (add-member FOR SHARE), R6 (no lock_timeout or retry).
+  - Finding 7 seam conflict: thegrimbee chose "Accept duplication" — R8.
+  - `next-env.d.ts`: thegrimbee chose "Revert it now"; reverted with `git checkout -- next-env.d.ts` by the main session.
+  - All recorded in `openspec/changes/project-task-management/design.md` "Review decisions R1 to R8", approved by thegrimbee on 6 November 2026; `npx openspec validate project-task-management --strict` → "Change 'project-task-management' is valid".
+  - Disputed tests: none from either worker.
+
+  **Round 2: reviewer `a318d1e2d8adcc7c5`** (same reviewer resumed via SendMessage)
+  - Usage (platform): 115,466 tokens, 10 tool uses, 39,061 ms.
+  - Verdict: all round 1 findings resolved or accepted by human decision; no must, no should, no regressions.
+  - Resolved: should 1 (integration run by thegrimbee), should 4 (`projects-membership.test.ts:24, 120`, lookup tests `:125-161`), should 5 (strict evaluator `project-routes.test.ts:53-70`, `:246`), should 6 (`handlers.ts:67-93` shared helper `handleProductManagerUsernameRoute`; `:96-103`, `:106-115`), should 7 unused 401 (`project-authorization.ts:18`), next-env.d.ts reverted.
+  - Accepted by decision: should 2 (R1), should 3 (R2), should 7 rest (R8), lock timeout (R6), decisions 4 and 5 (R4, R5). R1–R8 text matches code; R3 messages match `errors.ts:10-19` character for character.
+  - Remaining round 1 nits still present and harmless or mandated by S1 (unused request param, unused `id` at `repository.ts:83`, lookup before in-transaction role check `service.ts:31,45`, release without error, extra round trip `handlers.ts:58-61`, whole composition, type-only import cycle).
+  - New nits: (1) the ~400-line SQL evaluator is copied in `tests/unit/project-routes.test.ts:133-` and `tests/unit/projects/project-service.test.ts:132-`; sharing it needs a file outside A2 — follow-up for a human decision. (2) No test pins R1 (astral characters) or R2 (`application/json; charset=utf-8`). Optional.
+
+  **Security pass** (main session, `/security-review`, Opus 5.5 `claude-opus-5-5`)
+  - Scope: the task 4.1 code diffed against `dev`; one sub-task: 57,445 tokens, 6 tool uses, 32,890 ms.
+  - Result: no vulnerabilities at or above the 80% confidence bar; no false-positive filtering needed.
+  - Properties verified: exact Origin match (`request-guard.ts:12`); media type check (`:15`); Q4 order (`handlers.ts:37-43`, `:80-87`; GET `:59-62` no Origin); PM-only checked in handler (`handlers.ts:87`) and again in the transaction (`service.ts:32-37`, `:47-51`, `:73-77`; `repository.ts:72-82`); no cross-project access (`validation.ts:10,38-40`; `repository.ts` project_id filters; `service.ts:52`); 404 concealment (`request-access.ts:70-73`, `service.ts:24-28`); parameterized SQL; strict bodies (`validation.ts:12-16`); safe errors (`errors.ts:44-50`, `repository.ts:19-28`); no-store everywhere; transfer FOR UPDATE then open-task check in one transaction (`repository.ts:88-99,123-132,157-171`); helper move unchanged for task stubs; create requires a people row.
+  - Reviewed, not flagged: username enumeration by a PM (accepted by D5); lookup before in-service role check (handler already enforces PM).
+  - Security fix rounds used: 0 of 1.
 - Frontend UI findings and requested screen/component changes (include only when frontend agent was assigned):
 - Branch inventory, scoped commits, and PR draft (include only when commit/PR agent was assigned):
 - Suggested skills / references for the next worker `[ORCH, when applicable]`:
-- Next action and responsible human:
+- Next action and responsible human: thegrimbee reviews the consolidated handoff, arranges Lim-ZY's cross-review of `src/server/auth/`, then authorizes commits.
 
 ## Change log `[ORCH]`
 
@@ -533,3 +757,7 @@ Repeat one session block for each assigned agent session. Include the shared fie
 | 2026-11-06 18:10 | orchestrator / 4-1-plan-2 | Re-plan at `68a12fb`: A1/A2 refreshed for Q1–Q6 (handlers and Origin helper in `src/server/projects/`, stubs replaced in place); Q1–Q6 must-follow items and test targets added. New open questions Q7 (no auth public entry) and Q8 (possible import cycle). Worker order recorded as an open conflict with three alternatives, no recommendation. Step 4 fields added: model/effort, X1 and yardstick reviewer config, context plan, parallelism plan, 2-round loop table, flat dispatch, security pass. Corrected: reviewer cannot run checks; the main session runs them. Task record, Source and scope, Context references and Decisions updated. |
 | 2026-11-06 | main session | Recorded the usage for `4-1-plan-2`. The human chose test-writer first (worker-order conflict resolved) and approved Q7, Q8, the security-pass budget and the not-applicable merge point as the agent recommended. Q7 and Q8 are recorded in design.md "Planning decisions Q7 and Q8". A1 lists `src/server/auth/index.ts` and `request-access.ts`; A2 runs first. Still open before A2 starts: the remaining unfixed seam items (the `@/server/projects` export names, composition fields, service signatures, the SQL text for the `pg` mock, and the `PeopleRepository` method name). Under alternative 1, the human records them, or A2 reports the tests it cannot write without guessing as gaps. |
 | 2026-11-06 | main session | The human chose to record the seam (option a) and approved the agent's draft as is: `design.md` "Planning decisions S1 to S7". It also adds the task-management scenario "Losing a competing transfer" (S7: 403 `FORBIDDEN`, no change). `validation.ts` is added to A1. The unfixed seam items are now fixed, and A2 can start. |
+| 2026-11-06 | main session | Review round 1 logged under "Reviewer findings": reviewer `a318d1e2d8adcc7c5`, 0 must / 7 should / 9 nit, 8 unrecorded decisions for the human. Integration tests unverified. |
+| 2026-11-06 | main session | Round 1 fixes: A1 (`ad038f9c88bcc9f5f`: 220,115 tokens, 6 tool uses, 113,983 ms) merged the PM-only handlers and removed the unused 401 entry. A2 (`aac2443f6cc3948a8`: 282,655 tokens, 19 tool uses, 347,784 ms) used the real `PeopleRepository` in integration tests (+4 lookup tests) and replaced the unit `pg` fake with a strict evaluator. Main-session checks at `9c33dc4` on uncommitted changes: lint, tsc, build pass; `npm test` 888/888. thegrimbee ran `npm run test:integration` on a disposable database at 20:09 SGT: 14/14 files, 274/274 tests. The human approved decisions 1–8 as-is (recorded as design.md "Review decisions R1 to R8", `openspec validate --strict` valid), accepted the finding 7 duplication, and had `next-env.d.ts` reverted. |
+| 2026-11-06 | orchestrator / 4-1-consolidation | Consolidated from main-session data at `9c33dc4` (uncommitted changes): session blocks added for test-writer `aac2443f6cc3948a8`, implementer `ad038f9c88bcc9f5f`, reviewer `a318d1e2d8adcc7c5` and the security pass. Loop table round 2 (0 / 0 / 2) and re-review choices recorded. Consolidated outcome filled: changed files, checks (lint, tsc, build pass; `npm test` 888/888; integration 274/274 by thegrimbee), no generated artifacts or dependencies, round 2 and security-pass findings (no vulnerabilities; 0 of 1 security fix rounds). Next: thegrimbee reviews, arranges Lim-ZY's cross-review of `src/server/auth/`, then authorizes commits. |
+| 2026-11-06 | orchestrator / 4-1-temp-removal | Removed every dependency on the untracked notes folder at thegrimbee's request; no decision, assignment, path, model, effort or maxTurns value changed. L59 (Context references, workflow evidence): the notes citation replaced by the in-repo sources (2.4, 6.2 and 6.3 handoffs; worker-order lines in four earlier handoffs; `workflow/agents/README.md` "Who orchestrates" and Enforcement table; `.claude/agents/*.md`; `.claude/settings.json`) and a pointer to the inline human's-notes facts. L385 (worker-order conflict): the notes citation replaced by "Implementer: assigned after the test-writer" in `data-persistence-schema.md` L178, `environment-configuration.md` L158, `llm-gateway-soc-adapter.md` L169, `llm-gateway-secret-redaction.md` L182. L410 (test-writer row): replaced by `data-persistence-schema.md` L359 (out 64,148), `llm-gateway-core.md` L167 (out 67,033, responses 45), the README 2× rule, and the maxTurns decision and observed maxima quoted from the human's notes. L411 (implementer row): replaced by `data-persistence-schema.md` L191 (out 67,496, responses 59). L412 (reviewer row): the reviewer response range and the reviewer-effort decision quoted from the human's notes, `llm-gateway-secret-redaction.md` L297 (out 34,243, thinking 26,060), and X2 defined inline from the human's notes. L413 (commit-pr row): the commit-pr reason quoted from the human's notes. L417 (X1 record): X1 defined inline from the human's notes, with `logs/2026-11-06-reflection-open-items-resolution.md` prompt 1 cited for the 4.1/4.2 split. L432 (parallelism alternative 3): the worktree-isolation decision and reason quoted from the human's notes. |
