@@ -11,22 +11,23 @@
 - Requirement IDs: None. No formal IDs exist and none are constructed. Workers cite requirements by name:
   - task-management: "Signed-in people create projects", "Project membership and roles", "Product manager transfers the role", "Transfer targets are identified by GitHub username", and "Projects and tasks have readable IDs" (only the "Project key cannot change" scenario).
   - identity-and-access: "Protected route authorization stubs" (only the "Project details require membership" and "Project creation is functional" scenarios), "Mutating project routes check the request origin", and "Protected API errors use stable safe responses".
-- Status: planned. No workers have been launched.
-- Next human action: thegrimbee answers open questions Q1–Q6 below (Decisions and open questions). The answers must be recorded in `design.md` "Project and Membership Decisions" or in the spec delta. thegrimbee also confirms or changes the sequence: implementer, then test-writer, then reviewer. After that, thegrimbee launches the implementer (assignment A1).
+- Status: planned (revised in `orchestrator / 4-1-plan-2`). Q1–Q6 are approved and recorded. No workers have been launched.
+- Next human action: thegrimbee decided the worker order (test-writer first) and approved Q7, Q8 and the two process points as recommended, on 6 November 2026. Next, the main session launches A2 (test-writer), then A1 (implementer). The plan is in `orchestrator / 4-1-plan-2`.
 
 ## Source and scope `[ORCH]`
 
-- Repository / branch / worktree: `CS3227-2610-MP4`, branch `feat/projects-membership-4-1`, primary checkout `D:/Education/CS3227/CS3227-2610-MP4`. The two workers run one after the other in this checkout, so they do not need separate worktrees. If the human decides to run them in parallel, each needs its own worktree from the same revision.
-- Source revision: `d3ce36218749794f43be9e2910420f95772ed982`, plus one uncommitted edit to `openspec/changes/project-task-management/design.md`. That edit is the C5 "Risks / Trade-offs" correction and does not affect 4.1. Workers must not edit, revert or commit it.
-- Permitted paths and actions: see the Orchestrator fields in the orchestrator session block below. Assignment A1 is the implementer and A2 is the test-writer. Their write paths do not overlap.
+- Repository / branch / worktree: `CS3227-2610-MP4`, branch `feat/projects-membership-4-1`, primary checkout `D:/Education/CS3227/CS3227-2610-MP4`. If the workers run in sequence, they share this checkout. If the human chooses parallel, the test-writer gets a manual worktree (commands in `orchestrator / 4-1-plan-2`, "Parallelism plan").
+- Source revision: `68a12fb` (HEAD of `feat/projects-membership-4-1`, clean tree). The C5 `design.md` correction and the Q1–Q6 record are committed.
+- Permitted paths and actions: see the Orchestrator fields in `orchestrator / 4-1-plan-2`, which supersede those in `4-1-plan`. Assignment A1 is the implementer and A2 is the test-writer. Their write paths do not overlap.
 - Prohibited paths and actions:
-  - Do not edit OpenSpec: `openspec/**`, including the uncommitted `design.md` edit.
+  - Do not edit OpenSpec: `openspec/**`.
   - Do not edit `specs/ui-spec.md`. Do not add a migration or edit `supabase/migrations/**` (D10).
   - Do not add UI (C4). Do not add listing routes (D4).
   - Do not add member-removal or role-change logic (D7).
   - Do not edit the task stub functions in `src/server/auth/project-authorization.ts`. These are `handleTaskCreationStub`, `handleTaskReadStub`, `handleTaskEditStub` and `handleTaskStateStub`, and they belong to 4.2 and 4.3.
   - Do not edit the task route files under `src/app/api/v1/projects/[projectId]/tasks/**`.
-  - Do not edit the github-repository route or its spec (D8). Do not edit other `src/server/*` modules.
+  - Do not edit the github-repository route or its spec (D8). Do not edit other `src/server/*` modules, and no other file in `src/server/auth/` than those A1 lists (Q7, Q8).
+  - Do not change existing imports of `@/server/auth/*` files elsewhere in `src/`.
   - Do not edit `.env*`, `package.json` or `package-lock.json`. No new dependencies.
   - Do not edit the existing tests and fixtures in `tests/integration/db/`, except where A2 allows it.
   - Do not touch AI security evaluation paths (Developer A).
@@ -42,7 +43,7 @@
   - `openspec/changes/project-task-management/specs/task-management/spec.md:9-131`
   - `openspec/changes/project-task-management/specs/identity-and-access/spec.md:78-87`, `:142-152` and `:168-181`
 - Decisions:
-  - `openspec/changes/project-task-management/design.md`: "Project and Membership Decisions" (D1–D10, C4), "API Error Contract" (new 409 codes), and "Data Persistence Decisions" (D-C transfer, D-D keys, D-E open tasks).
+  - `openspec/changes/project-task-management/design.md`: "Project and Membership Decisions" (D1–D10, C4), its "Planning decisions Q1 to Q6" bullet (`design.md:179-185`), "API Error Contract" (new 409 codes), and "Data Persistence Decisions" (D-C transfer, D-D keys, D-E open tasks).
 - Task line: `openspec/changes/project-task-management/tasks.md:31`
 - Schema (read-only):
   - `supabase/migrations/20261030144500_create_app_schema.sql`: assignee trigger with a `FOR SHARE` membership lock at L102-120 and L435-437; `people.github_username`, which is not unique, at L135-142; project key check and immutability at L152-179; partial unique index for one PM at L188-205.
@@ -53,6 +54,9 @@
   - `src/app/api/v1/projects/route.ts` and `src/app/api/v1/projects/[projectId]/route.ts`
   - Module layout precedent: `src/server/github-evidence/` (service, repository, types, errors and `index.ts`).
   - Origin check precedent: `src/app/api/v1/projects/[projectId]/github-repository/route.ts:12`.
+  - `APP_ORIGIN` is read as `config.appOrigin` in `src/server/config/index.ts`.
+  - Auth module layout: `src/server/auth/` has `auth-port.ts`, `auth-service.ts`, `project-authorization.ts`, `session-identity.ts` and `supabase-auth.ts`. It has no `index.ts`; callers import these files directly.
+- Workflow evidence for the Step 4 plan: `temp/reflection-notes.md` §1, §2, §3 (D2, D5, D6, D8, D9) and §6 (X1, X2); `.claude/agents/*.md`; `.claude/settings.json`.
 - Tests to change or reuse:
   - `tests/unit/project-authorization-routes.test.ts`: the real handlers run with `pg` and Supabase mocked; 501 is asserted at L215-222.
   - `tests/integration/db/support/harness.ts` and `tests/integration/db/support/fixtures.ts` (`createPerson`, `createProject`, `addMembership`, `createTask`, `runtimePool`).
@@ -62,13 +66,16 @@
 
 ## Decisions and open questions `[ORCH]`
 
-- Current state: Planned. Requirements and decisions were approved and committed in `07974b9`. The two assignments are defined below. Workers are waiting for the human to answer Q1–Q6 and launch them.
+- Current state: Planned. Requirements and decisions were approved and committed in `07974b9`; Q1–Q6 were approved and recorded in `design.md:179-185` and the spec delta. A1 and A2 were refreshed in `orchestrator / 4-1-plan-2`. On 6 November 2026 the human chose test-writer first and approved Q7 and Q8 (recorded in `design.md` "Planning decisions Q7 and Q8"). Ready to launch A2.
 - Human-approved decisions:
   - D1–D10 and C1–C5, as recorded under "Human gate" below and in `design.md` "Project and Membership Decisions".
+  - Q1–Q6, approved 2026-11-06 by thegrimbee as recommended (`design.md:179-185`): Q1 success bodies; Q2 code-only assertions with fixed server messages; Q3 `githubUsername` body rules; Q4 check order; Q5 handlers and Origin helper in `src/server/projects/`, project stubs replaced in place with thin calls, helpers exposed through the auth module's public entry (A-1 rejected); Q6 no `people` row on `POST /api/v1/projects` → 401 `UNAUTHENTICATED`.
+  - PR base: `dev` (main session, Change log).
   - Error codes: 409 `PROJECT_KEY_TAKEN`, 409 `GITHUB_USERNAME_AMBIGUOUS`, 409 `ALREADY_MEMBER`, 409 `TRANSFER_TARGET_NOT_DEVELOPER`, 409 `TRANSFER_BLOCKED_OPEN_TASKS`, and 404 `NOT_FOUND` for an unmatched username. These are recorded in the "API Error Contract".
   - Developer B (thegrimbee) owns all 4.1 paths, and Lim-ZY cross-reviews.
 - Orchestrator decisions (coordination only; the human may override):
-  - Sequence: A1 implementer, then A2 test-writer, then reviewer. The approved records do not fix the public seam the tests need: the composition field, the service interface and the module exports. The route tests mock `pg` by SQL text, and the integration tests drive the service against PostgreSQL. Writing tests first would mean guessing those names or the SQL.
+  - Sequence: withdrawn in `4-1-plan-2`. The earlier "A1, then A2" order conflicted with AGENTS.md. The human resolved the conflict: A2 runs first, then A1 ("Worker order" below).
+  - File names inside `src/server/projects/` (`handlers.ts`, `request-guard.ts`, and the D9 files) are coordination choices for write scope, not product decisions. The human may rename them.
   - Route file paths for the new routes follow D4 directly: `src/app/api/v1/projects/[projectId]/members/route.ts` and `src/app/api/v1/projects/[projectId]/product-manager-transfer/route.ts`.
 - Assumptions (identify unapproved assumptions):
   - A-1 (REJECTED 2026-11-06 by thegrimbee, see Q5 in design.md): the handlers for the members and transfer routes live in `src/server/auth/project-authorization.ts`, next to the replaced project stubs. So does the shared Origin and content-type helper (D8). This lets them reuse the file's private session and membership helpers. The module `src/server/projects/` stays limited to service, repository, types and errors, as D9 lists.
@@ -81,7 +88,12 @@
   - Q4 — RESOLVED 2026-11-06 (thegrimbee approved the agent's recommendation; recorded in design.md "Planning decisions Q1 to Q6" and the spec delta). Original question:: the order of checks on the three mutating routes is not fully recorded. The spec puts Origin and content-type before authentication. It does not record which comes first when both Origin and content-type are bad. It also does not record whether a bad body or path UUID (400) comes before authentication (401), membership (404) and role (403). The 3.2 stubs validate the body and UUID before authentication.
   - Q5 — RESOLVED 2026-11-06 (thegrimbee approved the agent's recommendation; recorded in design.md "Planning decisions Q1 to Q6" and the spec delta). Original question:: confirm or reject A-1, the handler and Origin-helper placement. D9 says `project-authorization.ts` gets "minimal edits", and adding two handlers plus a helper there may go beyond that. The alternative is a handler file inside `src/server/projects/`, which would need the session and membership helpers exported from `project-authorization.ts`.
   - Q6 — RESOLVED 2026-11-06 (thegrimbee approved the agent's recommendation; recorded in design.md "Planning decisions Q1 to Q6" and the spec delta). Original question:: `POST /api/v1/projects` from a signed-in user with no `people` row is not recorded. The 3.2 creation stub checked only authentication, and the project-scoped routes return 404 for an unmapped identity. D2 needs a person ID to create the membership.
-  - Conflicts: none found between the approved specs, design.md and the code.
+  - Q7 — RESOLVED 2026-11-06. thegrimbee approved the agent's recommendation: (a) create `src/server/auth/index.ts`, exporting only the moved helpers. Lim-ZY cross-reviews the auth changes. Recorded in design.md "Planning decisions Q7 and Q8". Original question: Q5 says the session and membership helpers are "exposed through the auth module's public entry". The auth module has no public entry: there is no `src/server/auth/index.ts`, and all callers import `@/server/auth/<file>` directly. Not recorded: (a) whether A1 creates `src/server/auth/index.ts` exporting only those helpers, or (b) whether the helpers are exported from `project-authorization.ts` and that file counts as the entry, or (c) something else. Ownership is also unrecorded: C3 gives Developer B the project stubs in `project-authorization.ts`, but a new auth entry file is in Developer A's identity-and-access area (AGENTS.md "Agent Workflow and Roles").
+  - Q8 — RESOLVED 2026-11-06. thegrimbee approved the agent's recommendation: move the helpers, without copying them, to `src/server/auth/request-access.ts`, which also gets the Q6 session-to-person step. There is no cycle. Recorded in design.md "Planning decisions Q7 and Q8". Original question: The helpers `getAuthenticatedUserId` and `resolveProjectAccess` are private functions in `project-authorization.ts`. Under Q5 that file's project stubs call into `src/server/projects/`, and the projects handlers call those helpers back. If the helpers stay in `project-authorization.ts`, the two modules import each other. Not recorded whether that cycle is accepted, or whether the helpers move to a separate auth file (a move, not a copy) that both import. Q6 also needs a "session to person, else 401" step that no helper provides today; where it lives follows from the same answer.
+  - Worker order — RESOLVED 2026-11-06. thegrimbee chose alternative 1, test-writer first (A2, then A1). See `orchestrator / 4-1-plan-2`, "Worker order".
+  - Security-pass findings and the loop limit — RESOLVED 2026-11-06 (thegrimbee approved the agent's recommendation). Security findings have their own budget of 1 fix round, then go to the human. They do not use up the 2 reviewer rounds.
+  - Combining a parallel test branch — NOT APPLICABLE. Workers run in sequence in the primary checkout.
+  - Conflicts: none open. None found between the approved specs, design.md and the code.
 
 ## Worker session reports
 
@@ -278,6 +290,182 @@ Repeat one session block for each assigned agent session. Include the shared fie
   A1 and A2 never write the same path. Task 4.2 should wait for 4.1 to merge before editing `composition.ts`, `project-authorization.ts` or `tests/unit/project-authorization-routes.test.ts`.
 - Consolidation notes: There are no worker reports to consolidate yet. Reusable sessions: the analyst session `a4c7d9e33d08ddc74` has the 4.1 context. No earlier implementer or test-writer session exists for 4.1.
 
+### Session `orchestrator / 4-1-plan-2`
+
+- Provider: `claude`
+- Provider session ID: subagent `a0f9bb0c9f47eaba8`
+- Work ID: `projects-membership-4-1`
+- Agent: orchestrator
+- Phase: re-planning after Q1–Q6 approval (no workers launched). Supersedes the A1/A2 lists and the sequence in `4-1-plan`.
+
+#### Shared fields `[ALL]`
+
+- Platform and model (if surfaced): Claude Code (Agent SDK subagent), Opus 5.5 (`claude-opus-5-5`)
+- Role: Orchestrator
+- Human owner and assigned task scope: Developer B (thegrimbee). Refresh A1/A2 for Q1–Q6, add the Step 4 plan fields, record the worker-order conflict. Edit this handoff only.
+- Source revision: `68a12fb` (clean tree)
+- Started / ended / elapsed `[ALL, optional when surfaced]`: 2026-11-06 18:08:57 to 18:13:05 SGT (from the subagent transcript); 248,060 ms reported by the platform.
+- Resource usage (provider-reported): tokens in / out / total; cache read / write; cost; tool calls or other surfaced metrics:
+  - Agent result (recorded by the main session): 107,080 tokens, 25 tool uses, 248,060 ms.
+  - Per-response usage summed from the subagent transcript `subagents/agent-a0f9bb0c9f47eaba8.jsonl`, 15 responses: input 30, output 24,656, cache read 1,130,284, cache write 103,529.
+  - The agent counted 23 tool calls itself; the platform figure is 25.
+- Unavailable resource metrics: cost: not available
+- Work completed / findings:
+  - Refreshed A1 and A2 for Q1, Q3, Q4, Q5 and Q6.
+  - Found that the auth module has no public entry (Q7) and that Q5 can create an import cycle (Q8). Both are recorded as open.
+  - Found that the reviewer agent has only Read, Grep and Glob (`.claude/agents/reviewer.md`), so it cannot run checks. `4-1-plan` step 4 said the reviewer runs lint, tsc, build and tests; in this plan the main session runs them and gives the output to the reviewer.
+  - Added the Step 4 plan fields and recorded the worker order as an open conflict.
+- Files changed (use `none` if read-only): `workflow/handoffs/projects-membership-4-1.md`
+- Checks run and exact results (use `none` if none were run): none
+- Gaps / blockers (use `none` if none): worker order (open conflict); Q7 and Q8 block the A1 auth paths.
+
+#### Orchestrator fields `[ORCH]`
+
+- Assignments, dependencies, and handoff decisions:
+
+  **A1: implementer** (owner thegrimbee; position in the order is open)
+  - Scope: the 4.1 behavior in the approved specs, D1–D10 and Q1–Q6. Only the 4.1 project routes.
+  - New files, may create:
+    - `src/server/projects/index.ts`: the public entry; export only what composition, the route files and `project-authorization.ts` need.
+    - `src/server/projects/service.ts`
+    - `src/server/projects/repository.ts`
+    - `src/server/projects/types.ts`
+    - `src/server/projects/errors.ts`
+    - `src/server/projects/handlers.ts`: the members and transfer handlers, and the create and read logic that the project stubs now call (Q5).
+    - `src/server/projects/request-guard.ts`: the shared Origin and content-type helper (D8, Q5).
+    - `src/app/api/v1/projects/[projectId]/members/route.ts`
+    - `src/app/api/v1/projects/[projectId]/product-manager-transfer/route.ts`
+    - `src/server/auth/index.ts` (Q7): the auth public entry. It exports only the `request-access.ts` helpers and their result types, and must not re-export `project-authorization.ts`.
+    - `src/server/auth/request-access.ts` (Q8): `getAuthenticatedUserId`, `resolveProjectAccess`, and the private code they need, all moved here from `project-authorization.ts` rather than copied. Also the new Q6 function, which maps the session to a person ID or returns 401.
+  - Existing files, may edit:
+    - `src/server/auth/project-authorization.ts`:
+      - Replace `handleProjectCreationStub` and `handleProjectReadStub` in place with thin calls into `@/server/projects` (Q5).
+      - Remove the moved helpers and import them from `./request-access` (Q8).
+      - Do not change the task stub functions or their behaviour. The existing task-stub tests must still pass.
+    - Do not change the existing direct `@/server/auth/*` imports elsewhere (Q7). Lim-ZY cross-reviews the `src/server/auth/` changes.
+    - `src/server/repositories/people-repository.ts`: add the exact, case-insensitive GitHub-username lookup (D5).
+    - `src/server/composition.ts`: wire the new repository and service; add only the fields needed.
+    - `src/app/api/v1/projects/route.ts` and `src/app/api/v1/projects/[projectId]/route.ts`: only if the stub function names change; otherwise leave them.
+  - Must follow:
+    - Q1: `POST .../members` → 201 `{personId, githubUsername, role: "developer"}`, with the stored username. `POST .../product-manager-transfer` → 200 `{id, key, name, role: "developer"}`, the caller's new role.
+    - Q2: one fixed server-chosen message per new 409 code; never include user input in a message.
+    - Q3: members and transfer bodies are exactly `{githubUsername}`; the value is a string, trimmed, then 1–39 characters of `[A-Za-z0-9-]`; anything else is 400 `INVALID_REQUEST`.
+    - Q4: on the three mutating routes, check in order: Origin (403), then content type, body and path ID (400), then session (401), membership (404), role (403), then domain errors (404 or 409). Bad Origin plus bad content type → 403. `GET /api/v1/projects/{projectId}` has no Origin check and starts with the path ID.
+    - Q6: `POST /api/v1/projects` with a valid session but no `people` row → 401 `UNAUTHENTICATED`. Project-scoped routes keep 404 for that case.
+    - D6: lock both membership rows `FOR UPDATE`, then run the open-task check in the same transaction.
+    - D2 and D10: create the project and the PM membership in one transaction.
+    - Map unique violations to `PROJECT_KEY_TAKEN` or `ALREADY_MEMBER`.
+    - Use parameterized SQL, send `Cache-Control: no-store`, and follow the "API Error Contract".
+    - Do not hold a transaction open across anything other than database calls.
+  - Must not edit tests, OpenSpec, migrations or dependencies. Use the `present-changes-visually` skill if it is available.
+  - Checks: `npm run lint`, `npx tsc --noEmit`, `npm run build`, and `npm test`. If A1 runs before A2, the 501 assertions in `tests/unit/project-authorization-routes.test.ts` are expected to fail; report that and do not fix it.
+
+  **A2: test-writer** (owner thegrimbee; runs FIRST, per the human's 2026-11-06 order decision)
+  - Scope: tests for every 4.1 scenario listed under Requirement IDs. A2 works from the specs, `design.md` and this handoff only, with no implementation files (see "Worker order").
+  - May edit: `tests/unit/project-authorization-routes.test.ts`. Replace the 501 project read and create assertions (L215-222) and their unmapped-identity exemption with the approved 200 and 201 behavior, and add the Q6 case (no `people` row on create → 401). Keep all task-stub assertions.
+  - May create:
+    - `tests/unit/project-routes.test.ts`: route tests for create, read, members and transfer. Cover 401, non-member 404, developer 403, the 409 codes, unmatched username 404 `NOT_FOUND`, case-insensitive match, no state change on any denied request, and the Q1 success bodies.
+    - `tests/unit/project-origin-check.test.ts`: on all three mutating routes, missing or different Origin → 403 `FORBIDDEN`; wrong content type → 400 `INVALID_REQUEST`; both bad → 403; bad Origin with no session → 403, not 401; a match proceeds to authorization.
+    - `tests/unit/projects/project-service.test.ts`: validation and service unit tests (key format without normalization, name trim and 1–100 characters, exact fields, error mapping).
+    - `tests/integration/db/projects-membership.test.ts`: the PostgreSQL cases listed in `4-1-plan` A2 (creation transaction and A-3 atomic failure, creator keeps other roles, add-member including concurrent duplicates, transfer success, open-task block, competing transfers, transfer racing an assignment, key immutability per A-2).
+  - Test targets added by Q1–Q6:
+    - Q1: assert the exact success bodies above, including the stored (not submitted) username casing.
+    - Q2: assert status and `code`; assert the message is non-empty and contains no submitted input. Do not assert exact text for the new 409 codes.
+    - Q3: extra field; non-string; empty after trim; 40 characters; a disallowed character; leading and trailing spaces trimmed then accepted. Each failure → 400 and no change.
+    - Q4: one case per adjacent pair in the order (e.g. bad body without session → 400, not 401; a non-member on a PM-only route → 404, not 403); GET read with a bad UUID → 400 and no Origin check.
+    - Q6: create with valid session and no `people` row → 401 `UNAUTHENTICATED`, no project row.
+  - Must not edit `tests/integration/db/support/**`, other existing tests, product code, OpenSpec, or AI security evaluation paths. If a shared fixture is needed, report it and do not add it.
+  - Checks: `npm test`. Run `npm run test:integration` only if `TEST_DATABASE_URL` points to a disposable database. Otherwise mark the integration tests unverified.
+
+  A1 and A2 never write the same path.
+
+  **Worker order — RESOLVED 2026-11-06: alternative 1, test-writer first (A2, then A1).** The record below is kept as it was presented. Q7 and Q8 now fix where the helpers are exposed: `@/server/auth`, via `request-access.ts`. The other "still unfixed" items remain; see the main-session note in the Change log. A1 receives A2's tests read-only, must make them pass, and reports any test it believes contradicts the specs without editing it.
+  - The conflict: `4-1-plan` put the implementer first. AGENTS.md "Agent Workflow and Roles" lists the test-writer (step 3) before the implementer (step 4). `workflow/agents/test-writer.md` says tests are created "from approved requirements and acceptance examples", and the past workflow ran test-writer before implementer (`temp/reflection-notes.md` §1).
+  - Now fixed for tests written first:
+    - Route paths and methods (D4) and the `GET`/`POST` exports of the route files under `src/app/api/v1/projects/`.
+    - Request bodies (D3, Q3), success statuses and bodies (D3, Q1, the read shape in the identity-and-access spec).
+    - Error status and `code` for every case (API Error Contract, Q2), the check order (Q4), Origin rules (D8) and the Q6 case.
+    - The handler location: `src/server/projects/` (Q5).
+    - The schema (migration) and the existing fixtures in `tests/integration/db/support/`.
+  - Still unfixed for tests written first:
+    - The exported names and signatures in `@/server/projects` (handlers, service, errors).
+    - The composition field names for the new service and repository.
+    - The service constructor and method signatures that the PostgreSQL integration tests call with `runtimePool`.
+    - The SQL text the `pg` mock must answer. The existing route test answers `Pool.query` by SQL text (`tests/unit/project-authorization-routes.test.ts`).
+    - The new `PeopleRepository` method name.
+    - Where the session and membership helpers are exposed (Q7, Q8), which decides what a route test can mock.
+  - Alternatives:
+    1. Test-writer first (A2, then A1). Matches the AGENTS.md order. A2 works from the specs and this handoff only. The unfixed items above must be recorded by the human before A2 starts, or A2 reports the tests it cannot write without guessing as gaps.
+    2. Implementer first (A1, then A2). The earlier plan. A2 reads A1's public seam and SQL, so the unfixed items are settled by the code. This departs from the AGENTS.md order, and the tests are written with the implementation in view.
+    3. Parallel in worktrees (A1 and A2 at the same time from `68a12fb`). The same unfixed items as alternative 1 apply to A2. A1 cannot run A2's tests until the two trees are combined, and combining them needs a git action that requires explicit human authorization.
+
+- Step 4 plan fields:
+
+  **Model and effort per role** (from `.claude/agents/*.md` at `68a12fb`; configs must not change during 4.1)
+
+  | Role | Model / effort / maxTurns | Config blob at `68a12fb` | Reason (project data) |
+  |---|---|---|---|
+  | test-writer | Opus / medium / 90 | `2792a18` | Test-writers were among the largest consumers (2.4: 64.1k output; 6.3: 67.0k); 90 is about 2× the largest observed run of 45 responses (reflection-notes §2, §3 D6). |
+  | implementer | Opus / medium / 120 | `06dcac5` | The 2.4 implementer was the largest single consumer (67.5k output, 59 responses); 120 is about 2× that (§2, §3 D6). |
+  | reviewer | Sonnet / medium / 25; tools Read, Grep, Glob | `92ce8a9` | Past Sonnet reviewers took 3–10 responses (§2). Medium effort is unproven (the 6.2 reviewer thought for 76% of its output); X2 on task 4.3 tests it, not 4.1 (§3 D5). |
+  | commit-pr | Sonnet / low / 20 | `df5d675` | Commit-pr ran on Opus for 3–9 responses of mechanical git work (§3 D5); 20 is about 2× the observed 9 (§3 D6). |
+  | frontend | Sonnet / medium | not used | 4.1 has no UI (C4). |
+  | security pass | main-session model (`/security-review` runs in the main session) | n/a | Record the main-session model when it runs; not available to this orchestrator. |
+
+  - X1 record: 4.1 is the full-pipeline arm of X1 and 4.2 the single-agent arm (`temp/reflection-notes.md` §6). The main session records in each worker's session block the resolved model ID (from the transcript, since `sonnet`/`opus` are aliases), effort and maxTurns actually used.
+  - Yardstick reviewer (for X1): one fresh `reviewer` agent session with the config above (Sonnet / medium / 25, Read/Grep/Glob, blob `92ce8a9`), run once on the final 4.1 diff and once on the final 4.2 diff with the same prompt. It is separate from 4.1's pipeline reviewer. 4.2 must use the same blob; if `.claude/agents/reviewer.md` changes before then, the comparison is not like-for-like and must say so. The diff base for both is `dev` (the PR base).
+
+  **Context plan**
+
+  | Worker | Given up front | May search on its own |
+  |---|---|---|
+  | Implementer | This handoff (A1); both spec files; `design.md` "Project and Membership Decisions" incl. Q1–Q6, "API Error Contract", D-C/D-D/D-E; `project-authorization.ts`; `composition.ts`; `people-repository.ts`; the two project route files; `src/server/github-evidence/` (layout precedent); github-repository `route.ts:12` (Origin precedent); `src/server/config/index.ts`; the migration line ranges in Context references. Under alternative 1 also A2's test files (read only). | `src/server/**` and `src/app/api/v1/**` (read); `node_modules/next/dist/docs/` (required by AGENTS.md); `tests/**` (read only). |
+  | Test-writer | This handoff (A2); both spec files; the same `design.md` blocks; `tests/unit/project-authorization-routes.test.ts`; `tests/integration/db/support/harness.ts` and `fixtures.ts`; the existing DB tests in Context references; `vitest.config.ts`; the migration. Under alternative 2 also A1's seam: `src/server/projects/index.ts`, the repository SQL and the new composition fields. | Alternatives 1 and 3: `tests/**`, `package.json` scripts, the migration; no `src/server/projects/` files (they do not exist yet). Alternative 2: also `src/server/projects/**` and `src/server/composition.ts` (read). |
+  | Reviewer | This handoff (A1, A2, must-follow and Q1–Q6 targets); both spec files; the `design.md` blocks; the list of changed files and the branch diff against `dev`; the main session's check output (lint, tsc, build, unit, integration or "unverified"). | Whole repository, read only. |
+  | Security pass | The branch diff against `dev`; identity-and-access "Mutating project routes check the request origin" and "Protected route authorization stubs"; AGENTS.md "Review Procedure" focus list. | Whole repository, read only. |
+
+  **Parallelism plan**
+  - Chosen (alternative 1): sequential in the primary checkout. No worktree. The alternative 3 commands below are kept for the record only.
+  - Alternatives 1 and 2: sequential in the primary checkout. No worktree.
+  - Alternative 3: the implementer stays in the primary checkout; the test-writer gets a manual worktree. Do not use `isolation: worktree`, because it branches from `master` (reflection-notes §3 D9) and this branch is cut from `dev`. A worktree cannot check out a branch that is already checked out, so it needs its own branch:
+
+    ```
+    git -C D:/Education/CS3227/CS3227-2610-MP4 worktree add -b feat/projects-membership-4-1-tests D:/Education/CS3227/wt-projects-membership-4-1-tests feat/projects-membership-4-1
+    cd D:/Education/CS3227/wt-projects-membership-4-1-tests && npm ci
+    ```
+
+    The branch name and directory are placeholders for the human to confirm. `.env.local` is not copied; unit tests need none, and integration tests need `TEST_DATABASE_URL`. How the test branch is combined back (commit then merge, or copying files) is not recorded and needs explicit human authorization. Removing the worktree afterwards also needs the human's permission (AGENTS.md rule 9).
+
+  **Loop limit**
+  - At most 2 reviewer fix rounds, then escalate to the human. Fixes go to the worker that owns the path (A1 for product code, A2 for tests).
+  - Re-review choice: to be recorded per round (resumed reviewer via SendMessage, or fresh reviewer). X2 compares the two on 4.3; 4.1 only records what was used.
+
+  | Round | Findings (must/should/nit) | Fixed by | Disputed? | How resolved |
+  |---|---|---|---|---|
+  | 1 | | | | |
+  | 2 | | | | |
+
+  - Re-review used: round 1 — to be recorded; round 2 — to be recorded.
+
+  **Who dispatches**
+  - `.claude/settings.json` sets `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`, so workers cannot launch workers. The main session dispatches every worker and sends fix rounds with SendMessage (flat). The orchestrator only plans and consolidates. E7 (nested dispatch) is not run.
+
+  **Security pass**
+  - 4.1 touches authorization (PM-only actions, non-member concealment) and CSRF/Origin. After the reviewer rounds close and before the commit-pr agent, the main session runs `/security-review` on the branch, confirming the diff base is `dev` (at `68a12fb` this branch is 86 commits ahead of `master` and 20 ahead of `dev`). Focus: PM-only checks in handlers and services, 404 concealment, the Q4 order (Origin before session), Q3 validation, parameterized SQL, the D6 locks against the assignee trigger, username lookup (D5 accepts that the PM may learn whether a username is registered), `no-store`, and no internal detail in errors.
+  - Loop limit for security findings (resolved 2026-11-06): they have their own budget of 1 fix round, separate from the 2 reviewer rounds. The fix goes to the owning worker, and the security pass is re-run once on the fixed diff. Anything still open after that goes to the human.
+  - Also add `src/server/auth/index.ts` and `request-access.ts` to the focus list. Check that the move kept the session and membership checks unchanged for the task stubs.
+
+  **Sequence after the first two workers** (any order alternative)
+  1. Main session runs `npm run lint`, `npx tsc --noEmit`, `npm run build`, `npm test`, and `npm run test:integration` only against a disposable database.
+  2. Reviewer checks every scenario, the boundaries and code quality, using that output. Up to 2 fix rounds.
+  3. Security pass.
+  4. Human resolves findings.
+  5. Commit-pr agent, only on explicit authorization for `feat/projects-membership-4-1`.
+  6. Yardstick reviewer run on the final 4.1 diff (X1), recorded here.
+
+  Task 4.2 should still wait for 4.1 to merge before editing `composition.ts`, `project-authorization.ts` or `tests/unit/project-authorization-routes.test.ts`.
+- Consolidation notes: No worker reports yet. The analyst session `a4c7d9e33d08ddc74` is still reusable for 4.1 context. The A1/A2 lists and sequence in `4-1-plan` are superseded by this block; `4-1-plan` is kept as history.
+
 ## Human gate
 
 - Approver: thegrimbee (Developer B), 2026-11-06. The human approved the analyst's draft spec delta and recommendations D1–D10, and chose resolutions for conflicts C2, C3, C5 and the D4 transfer-identifier gap.
@@ -340,3 +528,5 @@ Repeat one session block for each assigned agent session. Include the shared fie
 | 2026-11-06 | analyst / a4c7d9e33d08ddc74 | Context brief, D1–D10 and C1–C5 drafted. After the human gate, the spec delta was written and committed in `07974b9`. |
 | 2026-11-06 09:55 | orchestrator / 4-1-plan | Plan written: Task record set to planned. Scope, context, decisions and open questions Q1–Q6 filled. Assignments A1 (implementer) and A2 (test-writer) defined with paths that do not overlap; sequence A1, then A2, then reviewer. Gate open items marked resolved (design.md updated, error codes chosen, 501 test assigned to A2, C5 corrected at the human's request). |
 | 2026-11-06 | main session | Human approved Q1–Q6 as recommended (A-1 rejected); recorded in design.md "Planning decisions Q1 to Q6" and the spec delta, `openspec validate --strict` passes. PR base chosen: `dev`. Worker order (implementer-first plan vs AGENTS.md test-writer-first) awaits the human's decision. |
+| 2026-11-06 18:10 | orchestrator / 4-1-plan-2 | Re-plan at `68a12fb`: A1/A2 refreshed for Q1–Q6 (handlers and Origin helper in `src/server/projects/`, stubs replaced in place); Q1–Q6 must-follow items and test targets added. New open questions Q7 (no auth public entry) and Q8 (possible import cycle). Worker order recorded as an open conflict with three alternatives, no recommendation. Step 4 fields added: model/effort, X1 and yardstick reviewer config, context plan, parallelism plan, 2-round loop table, flat dispatch, security pass. Corrected: reviewer cannot run checks; the main session runs them. Task record, Source and scope, Context references and Decisions updated. |
+| 2026-11-06 | main session | Recorded the usage for `4-1-plan-2`. The human chose test-writer first (worker-order conflict resolved) and approved Q7, Q8, the security-pass budget and the not-applicable merge point as the agent recommended. Q7 and Q8 are recorded in design.md "Planning decisions Q7 and Q8". A1 lists `src/server/auth/index.ts` and `request-access.ts`; A2 runs first. Still open before A2 starts: the remaining unfixed seam items (the `@/server/projects` export names, composition fields, service signatures, the SQL text for the `pg` mock, and the `PeopleRepository` method name). Under alternative 1, the human records them, or A2 reports the tests it cannot write without guessing as gaps. |
