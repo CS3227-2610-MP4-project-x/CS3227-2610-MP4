@@ -29,4 +29,4 @@ Tool: Claude Code (VS Code extension), main session on Opus 5.5. Branch: `fix/au
 
 ## Human verification
 
-- Pending: Human has approved the changes.
+- Human has approved the changes.
