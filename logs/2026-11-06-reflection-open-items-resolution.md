@@ -22,9 +22,16 @@ Tool: Claude Code (VS Code extension), main session on Opus 5.5. Branch: `chore/
   - The dashboard role split: needs an OpenSpec change first.
   - The Codex items: Lim-ZY's.
 
+## Follow-up: fixing the write-scope hook
+
+- The human chose to leave the `.env.local` check, the dashboard archive, the ESLint rule, the dashboard role split and the 6.3 test gaps open. They asked Claude to fix the hook as it recommended.
+- The Claude Code hooks docs say frontmatter hooks in project subagents run only after the workspace trust dialog is accepted, while settings hooks also run for subagent tool calls and include `agent_type` in their input.
+- Moved the hook to `.claude/settings.json` and removed the five frontmatter `hooks:` blocks. `guard-write-scope.mjs` now reads the role from `agent_type`; the main session and roles without a scope are not restricted. Updated `tests/unit/guard-write-scope.test.ts` (23/23 pass) and `workflow/agents/README.md`.
+- Live re-check: a test-writer Write to `src/canary.ts` was blocked with the hook's message, and no file was created.
+
 ## Checks
 
-- No application code changed. `npm` checks were not run, because only agent configuration and Markdown files changed.
+- No application code changed. For the hook fix: `npx vitest run tests/unit/guard-write-scope.test.ts` 23/23 pass; `npx eslint` on the hook and its test is clean; `npx tsc --noEmit` passes. The full suite and build were not run (only the hook, its test, agent config and Markdown changed).
 
 ## Human verification
 
