@@ -18,6 +18,10 @@ The system SHALL allow any signed-in person to create a project with a key and a
 - **WHEN** a request without a valid session creates a project
 - **THEN** the system returns HTTP 401 and no project exists
 
+#### Scenario: Signed-in person without an application identity
+- **WHEN** a request with a valid session creates a project, but no registered person exists for that session's user
+- **THEN** the system returns HTTP 401 with code `UNAUTHENTICATED` and no project exists
+
 #### Scenario: Invalid key
 - **WHEN** the key does not match 2 to 10 uppercase letters and digits starting with a letter, including a lowercase key
 - **THEN** the system returns HTTP 400 with code `INVALID_REQUEST`, does not normalize the key, and creates nothing
@@ -51,7 +55,12 @@ The system SHALL allow a person to belong to multiple projects with one role per
 
 #### Scenario: Product manager adds a developer
 - **WHEN** the project's product manager adds the registered person with that GitHub username as a developer
-- **THEN** the system returns HTTP 201, that person becomes a developer, can see the project, and can be assigned its tasks
+- **THEN** the system returns HTTP 201 with the person's `personId`, stored `githubUsername`, and `role` of `developer`
+- **AND** that person becomes a developer, can see the project, and can be assigned its tasks
+
+#### Scenario: Invalid GitHub username body
+- **WHEN** the body has fields other than `githubUsername`, or the value is not a string, or after trimming is empty, longer than 39 characters, or contains characters other than letters, digits, and hyphens
+- **THEN** the system returns HTTP 400 with code `INVALID_REQUEST` and nothing changes
 
 #### Scenario: Unregistered person
 - **WHEN** the product manager adds a username that matches no registered person
@@ -74,7 +83,8 @@ The system SHALL allow only the project's current product manager to transfer th
 
 #### Scenario: Product manager transfers the role
 - **WHEN** the product manager transfers the role to a developer in the project who has no open assigned tasks
-- **THEN** that developer becomes the product manager, the previous product manager becomes a developer, and the project still has exactly one product manager
+- **THEN** the system returns HTTP 200 with the project's `id`, `key`, `name`, and the caller's new `role` of `developer`
+- **AND** that developer becomes the product manager, the previous product manager becomes a developer, and the project still has exactly one product manager
 
 #### Scenario: Incoming product manager has open tasks
 - **WHEN** the product manager tries to transfer the role to a developer who has an assigned task that is not Done and not deleted
@@ -110,6 +120,10 @@ The system SHALL accept a product manager transfer through `POST /api/v1/project
 #### Scenario: Target username is ambiguous
 - **WHEN** the target username matches more than one registered person
 - **THEN** the system returns HTTP 409 with code `GITHUB_USERNAME_AMBIGUOUS` and the roles are unchanged
+
+#### Scenario: Invalid transfer body
+- **WHEN** the transfer body breaks the same `githubUsername` rules as adding a member
+- **THEN** the system returns HTTP 400 with code `INVALID_REQUEST` and the roles are unchanged
 
 #### Scenario: Target found by username
 - **WHEN** the product manager submits the username of a developer in the project, in any letter case

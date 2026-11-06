@@ -176,6 +176,14 @@ Every state-changing project route SHALL require an `Origin` header equal to the
 - **WHEN** such a request does not have `Content-Type: application/json`
 - **THEN** the system returns HTTP 400 with code `INVALID_REQUEST` and nothing changes
 
+#### Scenario: Bad origin and wrong content type
+- **WHEN** such a request has both a bad `Origin` and a wrong content type
+- **THEN** the system returns HTTP 403 with code `FORBIDDEN`
+
+#### Scenario: Origin is checked before the session
+- **WHEN** such a request has a bad `Origin` and no valid session
+- **THEN** the system returns HTTP 403 with code `FORBIDDEN`, not HTTP 401
+
 #### Scenario: Matching origin proceeds to authorization
 - **WHEN** such a request has an `Origin` equal to `APP_ORIGIN` and a JSON content type
 - **THEN** the normal authentication, membership, and role checks apply

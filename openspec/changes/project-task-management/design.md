@@ -176,6 +176,13 @@ Approved by thegrimbee on 6 November 2026 for task 4.1. The human approved the a
 - **D9 Placement.** A new `src/server/projects/` module holds the service, repository, types and errors behind an `index.ts` entry. `composition.ts` and the stubs in `project-authorization.ts` get minimal edits (resolution of C3).
 - **D10 "Exactly one" product manager.** The database enforces at most one (partial unique index). At least one relies on the creation transaction and an integration test; no new migration.
 - **C4.** Task 4.1 has no UI. The members screen stays with task 4.4.
+- **Planning decisions Q1 to Q6.** Approved by thegrimbee on 6 November 2026, answering the orchestrator's questions in `workflow/handoffs/projects-membership-4-1.md` as the agent recommended.
+  - *Q1 Success bodies.* `POST /api/v1/projects/{projectId}/members` returns 201 `{personId, githubUsername, role: "developer"}`, where `githubUsername` is the stored username. `POST /api/v1/projects/{projectId}/product-manager-transfer` returns 200 `{id, key, name, role: "developer"}`, the caller's new role, in the same shape as `GET /api/v1/projects/{projectId}`.
+  - *Q2 Error messages.* No exact message text is recorded. Each code has a fixed server-chosen message in code. Tests assert the status and code, and that the message is non-empty and contains no user input.
+  - *Q3 `githubUsername` body.* The members and transfer bodies are exactly `{githubUsername}`; any other field is 400 `INVALID_REQUEST`. The value must be a string; it is trimmed and must then be 1 to 39 characters of `[A-Za-z0-9-]`. GitHub's stricter hyphen rules are not enforced, because older accounts may not follow them.
+  - *Q4 Check order.* Each mutating project route checks, in order: `Origin` (403 `FORBIDDEN`); content type, body and path ID (400 `INVALID_REQUEST`); session (401); membership (404); role (403); then domain errors (404 or 409). A request with both a bad `Origin` and a bad content type gets 403. `GET /api/v1/projects/{projectId}` has no Origin check and starts with the path ID.
+  - *Q5 Handler placement.* The orchestrator's assumption A-1 is rejected. The two project stubs in `src/server/auth/project-authorization.ts` are replaced in place with thin calls. The members and transfer handlers and the shared Origin helper live in `src/server/projects/`. The existing session and membership helpers are exposed through the auth module's public entry rather than copied.
+  - *Q6 Missing person row.* `POST /api/v1/projects` from a valid session with no `people` row returns 401 `UNAUTHENTICATED`, because the sign-in callback creates that row and without it the caller has no application identity. Project-scoped routes keep returning 404 in this case.
 
 ## GitHub App Repository-Link API Decision (Earlier Contract; Flow Superseded)
 
@@ -280,6 +287,7 @@ Recorded on 2 November 2026 during task 6.3. `AGENTS.md` refers to an API error 
 - **Codes.** Codes are stable `UPPER_SNAKE_CASE` strings that clients may depend on. A code is added by the task that first returns it, and recorded here. Existing codes:
   - `AUTHENTICATION_FAILED` (500 or 502).
   - `FORBIDDEN` (403).
+  - Shared by the existing Route Handlers and recorded during task 4.1: `INVALID_REQUEST` (400), `UNAUTHENTICATED` (401) and `NOT_FOUND` (404).
   - The LLM Gateway Decisions G3 codes: `RATE_LIMITED` (429), `QUOTA_EXCEEDED` (429), `AI_UNAVAILABLE` (503), `AI_ERROR` (502) and `INVALID_OUTPUT` (502).
   - `PROJECT_KEY_TAKEN` (409): a project key already exists (task 4.1).
   - `TRANSFER_BLOCKED_OPEN_TASKS` (409): the incoming product manager has open assigned tasks (task 4.1).
