@@ -256,6 +256,74 @@ Approved by thegrimbee on 6 November 2026 for task 4.1. The human approved the a
   - *R7 Mocked-test row shapes.* S6 stays as recorded: result-row shapes and statement forms are not fixed. The unit `pg` fake evaluates the statements it receives and fails on any it cannot read; locks are verified only by the PostgreSQL integration tests.
   - *R8 Duplicated constants.* The error table and the UUID pattern stay copied in `src/server/projects/`, `src/server/auth/request-access.ts` and `src/server/auth/project-authorization.ts`. Sharing them would widen the S5 and Q7 exports or add a file outside the 4.1 paths.
 
+## Task Management Decisions (4.2)
+
+Approved by thegrimbee on 7 November 2026 for task 4.2. The human approved the main session's draft spec delta and recommendations T1 to T17 as recommended, and asked the agent to choose an alternative for conflict C1 (recorded below). Developer B (thegrimbee) owns the task 4.2 paths; Lim-ZY cross-reviews the change to `src/server/auth/project-authorization.ts`.
+
+- **T1 Routes.** Task 4.2 approves only:
+  - `POST /api/v1/projects/{projectId}/tasks`: create, product manager only, 201;
+  - `GET /api/v1/projects/{projectId}/tasks/{taskId}`: read, any project member, 200;
+  - `PATCH /api/v1/projects/{projectId}/tasks/{taskId}`: edit fields and acceptance criteria, product manager only, 200;
+  - `PUT /api/v1/projects/{projectId}/tasks/{taskId}/assignee`: reassign, product manager only, 200;
+  - `DELETE /api/v1/projects/{projectId}/tasks/{taskId}`: soft delete, product manager only, 204 with no body.
+
+  Task listing (board) is left to task 4.4. The state route stays with task 4.3.
+- **T2 Create body.** Exactly `{title, description, assigneeId, dueDate, acceptanceCriteria}` plus an optional `branchName`. `acceptanceCriteria` is an array of strings. `branchName` may be absent, `null`, or a string. Any other field is 400 `INVALID_REQUEST`.
+- **T3 Task view.** Create, read, edit and reassign return `{id, taskKey, title, description, assignee: {personId, githubUsername}, dueDate, branchName, state, acceptanceCriteria: [{id, position, description}], version, createdAt, updatedAt}`. `taskKey` is `<project key>-<number>`, for example `WEB-12`. `dueDate` is `YYYY-MM-DD`. `branchName` is a string or `null`. `state` uses the state route's names: `To Do`, `In Progress`, `In Review`, `Done`. Criteria are ordered by position, then ID. `createdAt` and `updatedAt` are ISO 8601 UTC. Attached commits, progress updates, review feedback and `checkHistory` are added to the read by the tasks that own them (see C1).
+- **T4 Edit body and criteria.** `PATCH` requires `version` and at least one of `title`, `description`, `dueDate`, `branchName` and `acceptanceCriteria`; only the fields sent change. `assigneeId`, `state` and any other field are 400 `INVALID_REQUEST`. Acceptance criteria are editable: `acceptanceCriteria` is the full new list of `{id?, description}` objects. Array order sets positions from 1. An item with the `id` of one of the task's current criteria updates that criterion and keeps its ID; an item without `id` inserts a new criterion; current criteria left out are deleted (the table has no deletion marker, and stored check results keep the criterion text in their payload). An `id` that is not a current criterion of the task, or appears twice, is 400 `INVALID_REQUEST`.
+- **T5 Limits.** Text is trimmed, stored as plain text, and counted in Unicode code points (R1).
+  - `title`: 1 to 200 characters, no line breaks (CR or LF).
+  - `description`: 1 to 5,000 characters.
+  - `acceptanceCriteria`: 1 to 20 items, each 1 to 500 characters. 20 × 500 = 10,000 characters keeps criteria well inside the 48,000-character check budget.
+  - `dueDate`: a string `YYYY-MM-DD` that is a real calendar date. Past dates are allowed.
+  - `branchName`: after trimming, 1 to 255 characters of `[A-Za-z0-9._/-]`; must not contain `..` or `//`, start with `/` or `-`, or end with `/`, `.` or `.lock`. `null` clears it. An empty string after trimming is 400.
+  - `assigneeId` and criterion `id`: UUIDs, using the same pattern as path IDs. `version`: an integer of at least 1.
+- **T6 Version guard.** `PATCH`, `PUT .../assignee` and `DELETE` require the task's current `version`. The update uses `WHERE version = $n`; no match on a live task is 409 `VERSION_CONFLICT` and nothing changes. A successful edit increases `tasks.version` by exactly 1, including an edit that changes only criteria. `DELETE` therefore takes the JSON body exactly `{version}`, which also satisfies "Mutating project routes check the request origin" (JSON content type).
+- **T7 Error codes.** New codes, with fixed messages (Q2):
+  - 400 `ACCEPTANCE_CRITERIA_REQUIRED`: "At least one acceptance criterion is required". Returned when `acceptanceCriteria` is absent on create, or is an empty array on create or edit. Any other body error takes precedence and returns `INVALID_REQUEST`.
+  - 409 `ASSIGNEE_NOT_DEVELOPER`: "The assignee must be a developer in this project". Returned when `assigneeId` is not a developer membership in the project: a non-member, the product manager, a member of another project only, or an unknown person UUID. The service checks first; the database trigger's SQLSTATE `23503` with constraint `tasks_assignee_is_project_developer` maps to the same code.
+  - 409 `VERSION_CONFLICT`: "The task was changed by someone else. Reload and try again".
+
+  A deleted task, or a task in another project, is 404 `NOT_FOUND` on every task route.
+- **T8 Check order.** Q4 applies to the four task mutation routes, with the task lookup of the 3.2 stubs: `Origin` (403 `FORBIDDEN`); content type, body and path IDs (400); session (401); membership (404); task exists, is in the path project and is not deleted (404); role (403); then domain errors (409). `GET` has no `Origin` check and starts with the path IDs. `POST .../tasks` has no task lookup.
+- **T9 Reassignment.** The body is exactly `{assigneeId, version}`. Reassignment is allowed in every state and leaves the state unchanged. In the same transaction it writes one `assignment_change` task event with the actor, previous assignee and new assignee. Reassigning to the current assignee with the current version returns 200 with the current view, writes no event, and does not change the version.
+- **T10 Task events.** Create, edit and delete write no task event; the allowed event types (D-F) have none for them, and adding one would need a migration. The first assignment at creation is not an assignment change.
+- **T11 States.** Edit, reassign and delete are allowed in every task state. Task 4.3 may restrict this through its own spec change.
+- **T12 Report invalidation on delete (D-E).** Task 4.2 sets `deleted_at` to the current UTC time and increases the version; it does not write `app.reports`. Task 8.2 treats a task's deletion time as new activity when it decides whether a stored report is still valid.
+- **T13 Task number allocation (D-D).** The create transaction runs `UPDATE app.projects SET last_task_number = last_task_number + 1 ... RETURNING last_task_number` before inserting the task. The row lock serializes concurrent creates in a project. The `projects.version` increase this causes is accepted. If any later statement fails, the transaction rolls back and the number is not used.
+- **T14 Origin helper.** `refuseUnsafeMutation` is exported from `src/server/projects/index.ts` (one export added to S1). The tasks module imports it from `@/server/projects`.
+- **T15 Assignee identity and reads.** Requests identify the assignee by person UUID (`assigneeId`), the `personId` the members route returns. Every project member can read every non-deleted task in the project.
+- **T16 Placement.** A new `src/server/tasks/` module holds the service, repository, types, errors (its own `TaskError` table, as R8), validation and handlers behind `index.ts`. `composition.ts` gets one new field, `taskService`. The create, read and edit stubs in `src/server/auth/project-authorization.ts` are replaced in place with thin calls (Q5 pattern); the state stub and `TaskAccessRepository` are unchanged and stay with task 4.3. The new `PUT .../assignee` and `DELETE` routes call the tasks handlers directly.
+- **T17 Unit SQL fake.** The in-memory SQL evaluator copied in `tests/unit/project-routes.test.ts` and `tests/unit/projects/project-service.test.ts` moves to `tests/unit/support/sql-fake.ts`. Both files import it with their assertions unchanged. Task 4.2 extends it for the statements it needs, and it keeps throwing on statements it cannot evaluate (R7).
+- **C1 `checkHistory` on task-detail reads (agent's choice, delegated by thegrimbee).** Alternative (c): task 4.2's `GET` does not include `checkHistory`. Task 7.3 (Developer A) adds a read-only check-history read on the `completion-assessment` public entry and adds `checkHistory` to the task-detail read, with the role rule in "Task completion requires product-manager approval". Until then, the "Submission history remains readable" scenario remains unmet for task-detail reads. Which response an unassigned developer gets (no field or an empty list) is left to task 7.3. Rationale: `check_results` and the check service belong to Developer A, and task 7.3 already coordinates this exposure with 4.2, so 4.2 adds no second reader of Group 7 data.
+- **Implementation decisions U1 to U13 (task 4.2).** Approved by thegrimbee on 7 November 2026 as the main session made them during the 4.2 implementation (`workflow/handoffs/tasks-crud-4-2.md`, "Consolidated outcome").
+  - *U1 Public seam.* `src/server/tasks/index.ts` exports:
+    - `TaskService`, `TaskRepository`, `TaskError`, `taskErrorResponse`;
+    - the parsers `parseCreateTaskBody`, `parseEditTaskBody`, `parseReassignTaskBody` and `parseDeleteTaskBody`, each returning `{ok: true, value}` or `{ok: false, code}`, where `code` is `INVALID_REQUEST` or `ACCEPTANCE_CRITERIA_REQUIRED`;
+    - the handlers `handleTaskCreate`, `handleTaskRead`, `handleTaskEdit`, `handleTaskReassign` and `handleTaskDelete`;
+    - the view and input types.
+
+    The service is `new TaskService(repository)`. Its methods are `createTask(projectId, actorPersonId, input)`, `getTask(projectId, taskId)`, `editTask(projectId, taskId, actorPersonId, input)`, `reassignTask(projectId, taskId, actorPersonId, {assigneeId, version})` and `deleteTask(projectId, taskId, actorPersonId, version)`.
+  - *U2 Upper limits.* `version` is at most 2,147,483,647, the `integer` column maximum; a larger value is 400 `INVALID_REQUEST`. A `dueDate` in year `0000` is invalid, because PostgreSQL has no year 0.
+  - *U3 Lock order.* Create and reassign share-lock the actor's and the assignee's memberships in one statement, ordered by person ID (`FOR SHARE`). Edit and delete share-lock the actor's membership. The order matches the transfer's `FOR UPDATE … ORDER BY person_id` (D6), so a task write and a transfer wait for each other instead of deadlocking.
+  - *U4 Consistent read.* `getTask` reads the task and its criteria in one read-only `REPEATABLE READ` transaction.
+  - *U5 UUID case.* `assigneeId` and criterion `id` in request bodies are lowercased after validation. Path IDs are unchanged.
+  - *U6 Unchanged criteria.* A kept criterion whose text and position do not change is not written, so its own version is unchanged. The task's version still increases once (T6).
+  - *U7 Service invariants.* The service also refuses an empty criteria list (`ACCEPTANCE_CRITERIA_REQUIRED`). It checks, inside the edit transaction, that every sent criterion `id` is a current criterion of the task (`INVALID_REQUEST`, T4).
+  - *U8 Path ID first.* A malformed path ID is `INVALID_REQUEST` even when the body also lacks criteria.
+  - *U9 Task lookup.* The handlers' "task exists" step (T8) reuses `TaskAccessRepository.findTaskInProject` read-only. That file stays with task 4.3.
+  - *U10 Reassignment order.* The version check runs before the same-assignee no-op, so a stale version to the current assignee is 409 `VERSION_CONFLICT`. The no-op does not recheck the current assignee's role.
+  - *U11 Task 3.2 test file.* In `tests/unit/project-authorization-routes.test.ts`:
+    - the task create and edit default bodies are valid bodies;
+    - the three "reaches the stub (501)" cases for task create, read and edit are removed, and their success coverage is in `tests/unit/task-routes.test.ts`;
+    - the task-state stub assertions are unchanged.
+  - *U12 Shared unit fake.* `tests/unit/support/sql-fake.ts` now:
+    - applies `ORDER BY` and `LIMIT`;
+    - returns `null` for a column a row lacks;
+    - models updates on every application table except `people`, with the version and `updated_at` trigger;
+    - models the task triggers and the `app_runtime` grants.
+  - *U13 Edit write order.* The version-guarded task `UPDATE` runs before any criteria write, so a conflicting edit writes no criteria.
+
 ## GitHub App Repository-Link API Decision (Earlier Contract; Flow Superseded)
 
 Approved by Lim-ZY on 3 November 2026 for task 5.1. The human's subsequent approval of verification-before-listing on 3 November 2026 supersedes the route sequence in the first three bullets below. Preserve them as history only; use the current approved behavior and route contracts in `specs/github-evidence/spec.md`.
@@ -367,6 +435,9 @@ Recorded on 2 November 2026 during task 6.3. `AGENTS.md` refers to an API error 
   - `GITHUB_USERNAME_AMBIGUOUS` (409): a GitHub username matches more than one registered person (task 4.1).
   - `ALREADY_MEMBER` (409): the person already has a role in the project (task 4.1).
   - `TRANSFER_TARGET_NOT_DEVELOPER` (409): the transfer target is not a developer in the project, or is the product manager (task 4.1).
+  - `ACCEPTANCE_CRITERIA_REQUIRED` (400): a task has no acceptance criteria (task 4.2, T7).
+  - `ASSIGNEE_NOT_DEVELOPER` (409): a task assignee is not a developer in the project (task 4.2, T7).
+  - `VERSION_CONFLICT` (409): a task write used a version that is no longer current (task 4.2, T6, T7).
 - **Message.** A fixed, human-readable message chosen by the server. It never contains a stack trace, SQL, a provider message or body, a credential, or user-supplied text.
 - **Headers.** Error responses send `Cache-Control: no-store`.
 - **Unexpected errors.** Errors not mapped to a specific code return 500 with a generic message, and their details are not exposed.
