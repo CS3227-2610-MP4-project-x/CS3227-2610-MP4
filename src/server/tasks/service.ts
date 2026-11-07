@@ -49,6 +49,23 @@ function requireCriteria(count: number): void {
   if (count === 0) throw new TaskError("ACCEPTANCE_CRITERIA_REQUIRED");
 }
 
+/**
+ * Share-locks the actor's and the other people's memberships in one statement, in person-ID
+ * order (U3), then requires the actor to be the project's product manager (R4, R5). Returns
+ * the locked roles. Every task write starts here, so the lock order and the role rule live in
+ * one place.
+ */
+async function lockRolesAsManager(
+  transaction: TaskTransaction,
+  projectId: string,
+  actorPersonId: string,
+  otherPersonIds: readonly string[],
+): Promise<ReadonlyMap<string, ProjectRole>> {
+  const roles = await transaction.lockRoles(projectId, [...new Set([actorPersonId, ...otherPersonIds])]);
+  requireProductManager(roles.get(actorPersonId));
+  return roles;
+}
+
 /** Locks the actor's membership and the live task, then checks role, existence and version. */
 async function lockForWrite(
   transaction: TaskTransaction,
@@ -58,8 +75,7 @@ async function lockForWrite(
   expectedVersion: number,
   otherPersonIds: readonly string[] = [],
 ): Promise<{ task: LockedTask; roles: ReadonlyMap<string, ProjectRole> }> {
-  const roles = await transaction.lockRoles(projectId, [...new Set([actorPersonId, ...otherPersonIds])]);
-  requireProductManager(roles.get(actorPersonId));
+  const roles = await lockRolesAsManager(transaction, projectId, actorPersonId, otherPersonIds);
   const task = await transaction.lockTask(projectId, taskId);
   if (!task) throw new TaskError("NOT_FOUND");
   if (task.version !== expectedVersion) throw new TaskError("VERSION_CONFLICT");
@@ -102,8 +118,7 @@ export class TaskService {
   async createTask(projectId: string, actorPersonId: string, input: CreateTaskInput): Promise<TaskView> {
     requireCriteria(input.acceptanceCriteria.length);
     return this.tasks.transaction(async (transaction) => {
-      const roles = await transaction.lockRoles(projectId, [...new Set([actorPersonId, input.assigneeId])]);
-      requireProductManager(roles.get(actorPersonId));
+      const roles = await lockRolesAsManager(transaction, projectId, actorPersonId, [input.assigneeId]);
       if (roles.get(input.assigneeId) !== "developer") throw new TaskError("ASSIGNEE_NOT_DEVELOPER");
       const number = await transaction.allocateTaskNumber(projectId);
       const taskId = await transaction.insertTask(projectId, number, input);

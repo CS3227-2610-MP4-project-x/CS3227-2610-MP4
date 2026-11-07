@@ -31,9 +31,36 @@ async function readJsonBody(request: Request): Promise<unknown> {
   }
 }
 
+/** Runs a handler's service call and maps any error to the safe task error response. */
+async function respond(work: () => Promise<Response>): Promise<Response> {
+  try {
+    return await work();
+  } catch (error) {
+    return taskErrorResponse(error);
+  }
+}
+
 /**
- * The shared checks before a product manager's write to one task: request guard, body, path
- * IDs, session, membership, task lookup, then role. Returns the validated write or a refusal.
+ * The checks before the session, in T8 order: request guard (403), then path IDs and body
+ * (400). Returns the parsed body or a refusal.
+ */
+async function admitWrite<T>(
+  request: Request,
+  composition: ServerComposition,
+  pathIds: readonly (string | undefined)[],
+  parseBody: (body: unknown) => ParseResult<T>,
+): Promise<{ input: T } | Response> {
+  const guard = refuseUnsafeMutation(request, composition.config.appOrigin);
+  if (guard) return guard;
+  const parsed = parseBody(await readJsonBody(request));
+  if (!pathIds.every(isUuid)) return refusal("INVALID_REQUEST");
+  if (!parsed.ok) return refusal(parsed.code);
+  return { input: parsed.value };
+}
+
+/**
+ * The shared checks before a product manager's write to one task: the admission checks,
+ * session, membership, task lookup, then role. Returns the validated write or a refusal.
  */
 async function authorizeTaskWrite<T>(
   request: Request,
@@ -41,12 +68,11 @@ async function authorizeTaskWrite<T>(
   composition: ServerComposition,
   parseBody: (body: unknown) => ParseResult<T>,
 ): Promise<TaskWrite<T> | Response> {
-  const guard = refuseUnsafeMutation(request, composition.config.appOrigin);
-  if (guard) return guard;
-  const parsed = parseBody(await readJsonBody(request));
   const { projectId, taskId } = await context.params;
-  if (!isUuid(projectId) || !isUuid(taskId)) return refusal("INVALID_REQUEST");
-  if (!parsed.ok) return refusal(parsed.code);
+  const admitted = await admitWrite(request, composition, [projectId, taskId], parseBody);
+  if (admitted instanceof Response) return admitted;
+  // Only narrows the type: admitWrite has already refused a missing or malformed task ID.
+  if (taskId === undefined) return refusal("INVALID_REQUEST");
   const access = await resolveProjectAccess(composition, projectId);
   if (access instanceof Response) return access;
   try {
@@ -55,7 +81,7 @@ async function authorizeTaskWrite<T>(
     return taskErrorResponse(error);
   }
   if (access.role !== "product_manager") return refusal("FORBIDDEN");
-  return { projectId, taskId, personId: access.personId, input: parsed.value };
+  return { projectId, taskId, personId: access.personId, input: admitted.input };
 }
 
 /** `POST /api/v1/projects/{projectId}/tasks`: the PM creates a task (design.md T1, T2). */
@@ -64,20 +90,13 @@ export async function handleTaskCreate(
   context: TaskRouteContext,
   composition: ServerComposition,
 ): Promise<Response> {
-  const guard = refuseUnsafeMutation(request, composition.config.appOrigin);
-  if (guard) return guard;
-  const parsed = parseCreateTaskBody(await readJsonBody(request));
   const { projectId } = await context.params;
-  if (!isUuid(projectId)) return refusal("INVALID_REQUEST");
-  if (!parsed.ok) return refusal(parsed.code);
+  const admitted = await admitWrite(request, composition, [projectId], parseCreateTaskBody);
+  if (admitted instanceof Response) return admitted;
   const access = await resolveProjectAccess(composition, projectId);
   if (access instanceof Response) return access;
   if (access.role !== "product_manager") return refusal("FORBIDDEN");
-  try {
-    return json(await composition.taskService.createTask(projectId, access.personId, parsed.value), 201);
-  } catch (error) {
-    return taskErrorResponse(error);
-  }
+  return respond(async () => json(await composition.taskService.createTask(projectId, access.personId, admitted.input), 201));
 }
 
 /** `GET /api/v1/projects/{projectId}/tasks/{taskId}`: any member reads a live task (design.md T15). */
@@ -90,11 +109,7 @@ export async function handleTaskRead(
   if (!isUuid(projectId) || !isUuid(taskId)) return refusal("INVALID_REQUEST");
   const access = await resolveProjectAccess(composition, projectId);
   if (access instanceof Response) return access;
-  try {
-    return json(await composition.taskService.getTask(projectId, taskId), 200);
-  } catch (error) {
-    return taskErrorResponse(error);
-  }
+  return respond(async () => json(await composition.taskService.getTask(projectId, taskId), 200));
 }
 
 /** `PATCH /api/v1/projects/{projectId}/tasks/{taskId}`: the PM edits fields and criteria (design.md T4). */
@@ -105,11 +120,8 @@ export async function handleTaskEdit(
 ): Promise<Response> {
   const write = await authorizeTaskWrite(request, context, composition, parseEditTaskBody);
   if (write instanceof Response) return write;
-  try {
-    return json(await composition.taskService.editTask(write.projectId, write.taskId, write.personId, write.input), 200);
-  } catch (error) {
-    return taskErrorResponse(error);
-  }
+  return respond(async () =>
+    json(await composition.taskService.editTask(write.projectId, write.taskId, write.personId, write.input), 200));
 }
 
 /** `PUT /api/v1/projects/{projectId}/tasks/{taskId}/assignee`: the PM reassigns (design.md T9). */
@@ -120,11 +132,8 @@ export async function handleTaskReassign(
 ): Promise<Response> {
   const write = await authorizeTaskWrite(request, context, composition, parseReassignTaskBody);
   if (write instanceof Response) return write;
-  try {
-    return json(await composition.taskService.reassignTask(write.projectId, write.taskId, write.personId, write.input), 200);
-  } catch (error) {
-    return taskErrorResponse(error);
-  }
+  return respond(async () =>
+    json(await composition.taskService.reassignTask(write.projectId, write.taskId, write.personId, write.input), 200));
 }
 
 /** `DELETE /api/v1/projects/{projectId}/tasks/{taskId}`: the PM soft-deletes; 204 with no body (design.md T1, T12). */
@@ -135,10 +144,8 @@ export async function handleTaskDelete(
 ): Promise<Response> {
   const write = await authorizeTaskWrite(request, context, composition, parseDeleteTaskBody);
   if (write instanceof Response) return write;
-  try {
+  return respond(async () => {
     await composition.taskService.deleteTask(write.projectId, write.taskId, write.personId, write.input.version);
     return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
-  } catch (error) {
-    return taskErrorResponse(error);
-  }
+  });
 }
