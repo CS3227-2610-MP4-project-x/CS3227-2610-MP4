@@ -103,4 +103,42 @@ export class GitHubEvidenceService {
     if (!saved) evidenceFailure(403);
     return { attachedCommits: uniqueShas.map((sha) => ({ sha })) };
   }
+
+  private static evidenceUnavailable(): never { evidenceFailure(503); }
+
+  /** Reads the path configuration from the linked repository's current default-branch tip. */
+  async loadPathRules(repository: GitHubRepository): Promise<string> {
+    let branchResult;
+    try { branchResult = await this.github.getRepositoryDefaultBranch(repository); }
+    catch { return GitHubEvidenceService.evidenceUnavailable(); }
+    if (!branchResult.ok) return GitHubEvidenceService.evidenceUnavailable();
+    let branchesResult;
+    try { branchesResult = await this.github.listBranches(repository); }
+    catch { return GitHubEvidenceService.evidenceUnavailable(); }
+    if (!branchesResult.ok) return GitHubEvidenceService.evidenceUnavailable();
+    const tip = branchesResult.value.find((branch) => branch.name === branchResult.value)?.sha;
+    if (typeof tip !== "string" || !/^[0-9a-f]{40,64}$/i.test(tip)) return GitHubEvidenceService.evidenceUnavailable();
+    let fileResult;
+    try { fileResult = await this.github.fetchFileAtCommit(repository, ".acceptance-check.json", tip); }
+    catch { return GitHubEvidenceService.evidenceUnavailable(); }
+    if (!fileResult.ok) return GitHubEvidenceService.evidenceUnavailable();
+    return fileResult.value;
+  }
+
+  async fetchDiff(repository: GitHubRepository, commitSha: string): Promise<string> {
+    let result;
+    try { result = await this.github.fetchDiff(repository, commitSha); }
+    catch { return GitHubEvidenceService.evidenceUnavailable(); }
+    if (!result.ok) return GitHubEvidenceService.evidenceUnavailable();
+    return result.value;
+  }
+
+  async isAncestor(repository: GitHubRepository, ancestorSha: string, descendantSha: string): Promise<boolean> {
+    if (ancestorSha === descendantSha) return true;
+    let result;
+    try { result = await this.github.isAncestor(repository, ancestorSha, descendantSha); }
+    catch { return GitHubEvidenceService.evidenceUnavailable(); }
+    if (!result.ok) return GitHubEvidenceService.evidenceUnavailable();
+    return result.value;
+  }
 }
