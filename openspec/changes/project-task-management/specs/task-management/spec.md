@@ -303,7 +303,9 @@ The system SHALL change a task's state through `PATCH /api/v1/projects/{projectI
 
 #### Scenario: Competing transitions
 - **WHEN** two transition requests carrying the same `version` are sent for one task at the same time
-- **THEN** exactly one succeeds, the other returns HTTP 409 with code `VERSION_CONFLICT`, and the task records one state change
+- **THEN** exactly one succeeds, the other is refused with nothing written, and the task records one state change
+- **AND** the refused request returns HTTP 409 with code `VERSION_CONFLICT` when it reaches the version guard before the winning change is visible to it
+- **AND** the refused request returns HTTP 403 with code `FORBIDDEN` when the route's pre-read of the task already sees the winning change and the requested transition is no longer allowed from that state
 
 #### Scenario: Invalid state request
 - **WHEN** the body has no valid `state`, no integer `version` between 1 and 2,147,483,647, a field other than `state`, `version`, and `feedback`, or `feedback` together with a `state` other than `In Progress`
