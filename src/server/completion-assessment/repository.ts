@@ -22,6 +22,7 @@ export type StoredCheckResult = Readonly<{
   redacted: boolean;
   payload: CheckResultPayload;
 }>;
+export type CheckHistoryEntry = StoredCheckResult;
 export type SaveCheckInput = CheckCacheKey & Readonly<{
   payload: CheckResultPayload;
   model: string;
@@ -53,6 +54,17 @@ export class CompletionAssessmentRepository {
       [key.taskId, key.commitSetHash, key.criteriaHash, key.pathRulesHash],
     );
     return result.rows[0] ? checkFromRow(result.rows[0]) : null;
+  }
+
+  async listHistory(taskId: string): Promise<readonly CheckHistoryEntry[]> {
+    const result = await this.database.query<CheckRow>(
+      `SELECT id::text AS id, created_at, redacted, result
+         FROM app.check_results
+        WHERE task_id = $1::uuid
+        ORDER BY created_at DESC, id DESC`,
+      [taskId],
+    );
+    return result.rows.map(checkFromRow);
   }
 
   async save(input: SaveCheckInput): Promise<{ check: StoredCheckResult; created: boolean }> {

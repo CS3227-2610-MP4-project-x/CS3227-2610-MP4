@@ -167,9 +167,9 @@ The system SHALL allow a project's product manager to create, edit, reassign, an
 - **WHEN** the product manager creates a valid task in project `WEB`
 - **THEN** the system returns HTTP 201 with the task's `id`, `taskKey` (such as `WEB-12`), `title`, `description`, `assignee` (`personId` and `githubUsername`), `dueDate`, `branchName`, `state` of `To Do`, `acceptanceCriteria` (each with `id`, `position`, and `description`), `version`, `createdAt`, and `updatedAt`
 
-#### Scenario: Member reads a task
-- **WHEN** a member of the project reads a task that is not deleted
-- **THEN** the system returns HTTP 200 with the same task fields as creation returns
+#### Scenario: Task reads follow task detail
+- **WHEN** a person reads a task through `GET /api/v1/projects/{projectId}/tasks/{taskId}`
+- **THEN** the response and its access rules are those of "Authorized members read task detail"
 
 #### Scenario: Task without acceptance criteria is refused
 - **WHEN** the product manager saves a task with no acceptance criteria
@@ -224,7 +224,7 @@ The system SHALL allow a project's product manager to create, edit, reassign, an
 - **THEN** the system returns HTTP 403 and nothing changes, and a non-member receives HTTP 404
 
 ### Requirement: Task management routes
-The system SHALL let the product manager create a task through `POST /api/v1/projects/{projectId}/tasks`, edit its fields and acceptance criteria through `PATCH /api/v1/projects/{projectId}/tasks/{taskId}`, reassign it through `PUT /api/v1/projects/{projectId}/tasks/{taskId}/assignee`, and delete it through `DELETE /api/v1/projects/{projectId}/tasks/{taskId}`. Any project member SHALL read a task through `GET /api/v1/projects/{projectId}/tasks/{taskId}`.
+The system SHALL let the product manager create a task through `POST /api/v1/projects/{projectId}/tasks`, edit its fields and acceptance criteria through `PATCH /api/v1/projects/{projectId}/tasks/{taskId}`, reassign it through `PUT /api/v1/projects/{projectId}/tasks/{taskId}/assignee`, and delete it through `DELETE /api/v1/projects/{projectId}/tasks/{taskId}`. Reads through `GET /api/v1/projects/{projectId}/tasks/{taskId}` SHALL follow "Authorized members read task detail".
 
 #### Scenario: Task responses are not cached
 - **WHEN** any of these routes returns a response
@@ -233,6 +233,35 @@ The system SHALL let the product manager create a task through `POST /api/v1/pro
 #### Scenario: Task in another project is concealed
 - **WHEN** a request names a task that belongs to a different project than the one in the path
 - **THEN** the system returns HTTP 404 with code `NOT_FOUND`, and nothing changes
+
+### Requirement: Authorized members read task detail
+The system SHALL provide task detail through `GET /api/v1/projects/{projectId}/tasks/{taskId}` to the assigned developer and the project's product manager. The response SHALL be `{ "task": ..., "attachedCommits": [...], "progressUpdates": [...], "reviewFeedback": [...], "checkHistory": [...] }` and SHALL use `Cache-Control: no-store`.
+
+The `task` object SHALL contain `id` (task UUID), `projectKey`, `taskKey` (the readable key formed from the project key and task number, such as `WEB-12`), `title`, `description`, `status` (the stored task status), `assignee` (`{ "id", "githubUsername" }`), `dueDate` (an ISO calendar date), `branchName` (string or null), and `acceptanceCriteria` (objects containing `id`, `position`, and `description`, ordered by `position` ascending then `id` ascending).
+
+`attachedCommits` SHALL contain objects with `id`, `sha`, `attachedBy` (`{ "id", "githubUsername" }`), and `attachedAt`, ordered by `attachedAt` ascending then `id` ascending. `progressUpdates` SHALL contain objects with `id`, `author` (`{ "id", "githubUsername" }`), `body`, and `createdAt`, ordered by `createdAt` ascending then `id` ascending. `reviewFeedback` SHALL contain objects with `id`, `author` (`{ "id", "githubUsername" }`), `feedback`, and `createdAt`, ordered by `createdAt` ascending then `id` ascending. Timestamps SHALL be ISO 8601 UTC strings. The response SHALL contain only fields needed by the client and SHALL NOT expose auth-user IDs, GitHub numeric user IDs, credentials, tokens, or ORM-private fields.
+
+`checkHistory` SHALL contain one entry per distinct stored check result, ordered by `createdAt` descending then `id` descending, with each entry containing `id`, `anchorSha`, `createdAt`, `redacted`, and `payload`. The project manager's access is read-only.
+
+All collection fields SHALL be JSON arrays, including when no records exist. Task and child records SHALL be read-only in this response; this endpoint SHALL NOT mutate task state, attached commits, progress updates, review feedback, or check history.
+
+#### Scenario: Assigned developer reads task detail
+- **WHEN** the assigned developer requests task detail
+- **THEN** the response contains the task, attached commits, progress updates, review feedback, and distinct check history using the shapes and ordering above
+- **AND** the request changes no task or history state
+
+#### Scenario: Product manager reads task detail
+- **WHEN** the project's product manager requests task detail
+- **THEN** the response contains the same task detail and check history
+- **AND** the response exposes no action to initiate or alter an acceptance criteria check
+
+#### Scenario: Another project developer reads task detail
+- **WHEN** a project developer who is not assigned to the task requests task detail
+- **THEN** the system returns HTTP 403 and does not expose task or check data
+
+#### Scenario: Nonmember or missing task reads task detail
+- **WHEN** a nonmember requests task detail, or the task does not exist in the project or is deleted
+- **THEN** the system returns the existing safe HTTP 404 response without task or check data
 
 ### Requirement: Task lifecycle
 The system SHALL move tasks through the states To Do, In Progress, In Review, and Done. Only the assigned developer SHALL move a task from To Do to In Progress or from In Progress to In Review, and only the project's product manager SHALL move a task from In Review to Done or back to In Progress.

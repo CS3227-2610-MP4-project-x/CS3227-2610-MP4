@@ -266,6 +266,13 @@ describe("protected API authorization stubs", () => {
     expect(fixtures.created).toEqual([]);
   });
 
+  // Group 7.3 replaces the read stub; full DTO/history tests use their own
+  // richer database fixture in task-detail-read.test.ts.
+  it("refuses an unassigned project developer reading task detail", async () => {
+    fixtures.assigneeId = fixtures.otherPersonId;
+    await expectError(await requestEndpoint("taskRead"), 403);
+  });
+
   // Task 4.1: "Project details require membership" now returns 200 with the project.
   it.each(["developer", "product_manager"])("returns the project with the requester's %s role", async (role) => {
     fixtures.role = role;

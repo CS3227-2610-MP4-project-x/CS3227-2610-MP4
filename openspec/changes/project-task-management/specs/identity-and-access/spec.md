@@ -91,10 +91,10 @@ The system SHALL provide temporary project and task route stubs to verify server
 - **THEN** the endpoint is no longer a stub: a project product manager may create a task, a project developer receives HTTP 403, and a non-member receives HTTP 404
 - **AND** the task-management requirement "Product manager manages tasks" defines its payload and responses
 
-#### Scenario: Task read is functional
+#### Scenario: Task detail read enforces task access
 - **WHEN** a person requests `GET /api/v1/projects/{projectId}/tasks/{taskId}`
-- **THEN** the endpoint is no longer a stub: an authenticated project member receives the task, while an authenticated non-member receives HTTP 404
-- **AND** the task-management requirement "Product manager manages tasks" defines its response
+- **THEN** the assigned developer and the project's product manager receive task detail as defined by task-management's "Authorized members read task detail" requirement
+- **AND** another project developer receives HTTP 403, while a non-member or task outside the project receives HTTP 404
 
 #### Scenario: Task field edit is functional
 - **WHEN** a person requests a field edit using `PATCH /api/v1/projects/{projectId}/tasks/{taskId}`

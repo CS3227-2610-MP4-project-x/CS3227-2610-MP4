@@ -519,17 +519,20 @@ describe("POST /api/v1/projects/{projectId}/tasks (Product manager manages tasks
 // GET /api/v1/projects/{projectId}/tasks/{taskId}
 // ---------------------------------------------------------------------------
 
-describe("GET /api/v1/projects/{projectId}/tasks/{taskId} (Member reads a task)", () => {
-  it.each([
-    ["the product manager", people.pm],
-    ["the assigned developer", people.dev],
-    ["an unassigned developer", people.dev2],
-  ])("returns the task view to %s (T15)", async (_case, reader) => {
+// design.md M1: the GET route serves the Group 7.3 task-detail read, whose shape and access
+// rules are tested in task-detail-read.test.ts and project-authorization-routes.test.ts.
+// TaskService.getTask keeps the T3 view and is tested here at the service.
+async function getTaskView(taskId: string): Promise<TaskViewBody> {
+  const { getServerComposition } = await import("@/server/composition");
+  return getServerComposition().taskService.getTask(projectId, taskId) as Promise<TaskViewBody>;
+}
+
+describe("TaskService.getTask (T3 task view)", () => {
+  it("returns the task view", async () => {
     const task = addTask({ criteria: ["First", "Second"] });
     task.branch_name = "feature/stored";
     task.status = "in_progress";
-    signInAs(reader.auth_user_id);
-    const body = await expectSuccess(await call("read", { taskId: task.id }), 200);
+    const body = await getTaskView(task.id);
     expect(body).toEqual({
       id: task.id,
       taskKey: "WEB-1",
@@ -550,7 +553,7 @@ describe("GET /api/v1/projects/{projectId}/tasks/{taskId} (Member reads a task)"
   it.each([["to_do", "To Do"], ["in_progress", "In Progress"], ["in_review", "In Review"], ["done", "Done"]])(
     "shows stored state %s as %s", async (status, state) => {
       const task = addTask({ status });
-      expect((await expectSuccess(await call("read", { taskId: task.id }), 200)).state).toBe(state);
+      expect((await getTaskView(task.id)).state).toBe(state);
     },
   );
 
@@ -564,15 +567,12 @@ describe("GET /api/v1/projects/{projectId}/tasks/{taskId} (Member reads a task)"
     for (const row of rows) {
       fake.state.acceptance_criteria.push({ ...row, task_id: task.id, version: 1, created_at: STORED_TIME, updated_at: STORED_TIME });
     }
-    const body = await expectSuccess(await call("read", { taskId: task.id }), 200);
+    const body = await getTaskView(task.id);
     expect(body.acceptanceCriteria.map((criterion) => criterion.description)).toEqual(["first", "second", "third"]);
   });
+});
 
-  it("does not include checkHistory (C1: added by task 7.3)", async () => {
-    const task = addTask();
-    const body = await expectSuccess(await call("read", { taskId: task.id }), 200) as unknown as Record<string, unknown>;
-    expect(body).not.toHaveProperty("checkHistory");
-  });
+describe("GET /api/v1/projects/{projectId}/tasks/{taskId} (task-detail read, M1)", () => {
 
   it.each([
     ["a deleted task", () => addTask({ deleted: true }).id],
@@ -1083,9 +1083,9 @@ describe("implementation decisions U3 to U6", () => {
     expect(taskRow(task.id).version).toBe(2);
   });
 
-  it("reads the task and its criteria inside one read-only REPEATABLE READ transaction (U4)", async () => {
+  it("TaskService.getTask reads the task and its criteria inside one read-only REPEATABLE READ transaction (U4)", async () => {
     const task = addTask();
-    await expectSuccess(await call("read", { taskId: task.id }), 200);
+    await getTaskView(task.id);
     const statements = fake.log.map((entry) => entry.sql.replace(/\s+/g, " ").trim());
     const begin = statements.findIndex((sql) => /^BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY$/i.test(sql));
     const commit = statements.findIndex((sql, index) => index > begin && /^COMMIT$/i.test(sql));

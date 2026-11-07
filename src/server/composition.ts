@@ -23,6 +23,7 @@ import {
   TaskSnapshotRepository,
   TaskSnapshotService,
 } from "@/server/completion-assessment";
+import { TaskDetailReadRepository, TaskDetailService } from "@/server/task-detail";
 
 export type ServerComposition = Readonly<{
   authService: AuthService;
@@ -34,6 +35,7 @@ export type ServerComposition = Readonly<{
   githubRepositoryLinkService: GitHubRepositoryLinkService;
   githubEvidenceService: GitHubEvidenceService;
   completionAssessmentService: CompletionAssessmentService;
+  taskDetailService: TaskDetailService;
   config: ReturnType<typeof getServerConfig>;
   llmGateway: LlmGateway;
 }>;
@@ -90,6 +92,7 @@ export function getServerComposition(): ServerComposition {
     repository: new CompletionAssessmentRepository(pool),
     gateway: llmGateway,
   });
+  const taskDetailService = new TaskDetailService(new TaskDetailReadRepository(pool), completionAssessmentService);
   composition = Object.freeze({
     authService: new AuthService(config.appOrigin, peopleRepository),
     peopleRepository,
@@ -100,6 +103,7 @@ export function getServerComposition(): ServerComposition {
     githubRepositoryLinkService,
     githubEvidenceService,
     completionAssessmentService,
+    taskDetailService,
     config,
     llmGateway,
   });
