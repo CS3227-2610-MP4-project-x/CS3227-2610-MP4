@@ -193,6 +193,17 @@ The system SHALL let the assigned developer run checks and view their distinct s
 - **THEN** it uses the existing HTTP 429 `RATE_LIMITED` or `QUOTA_EXCEEDED`, HTTP 503 `AI_UNAVAILABLE`, or HTTP 502 `AI_ERROR` or `INVALID_OUTPUT` error as applicable
 - **AND** protected errors use `{ "error": { "code": "...", "message": "..." } }` without provider details
 
+### Requirement: Submission can look up the committed tip
+The system SHALL provide the task lifecycle a read-only lookup that returns the unique tip of a task's attached commits, or no tip when none can be determined. The lookup SHALL NOT start a check, call the LLM, or write task state, and a submission SHALL use it before its database transaction begins.
+
+#### Scenario: Unique tip found
+- **WHEN** one attached commit descends from every other attached commit
+- **THEN** the lookup returns that commit's SHA
+
+#### Scenario: No tip or unavailable evidence
+- **WHEN** the attached commits have no unique tip, there are none, or GitHub or the repository path rules are unavailable
+- **THEN** the lookup returns no tip, the submission proceeds without a check reference, and no check is started
+
 ### Requirement: AI check does not decide task completion
 The system SHALL NOT use a check result to approve, reject, submit, or change the state of a task. Only the project's product manager may approve or request changes on a submitted task.
 

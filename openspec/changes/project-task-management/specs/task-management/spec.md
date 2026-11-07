@@ -237,7 +237,7 @@ The system SHALL let the product manager create a task through `POST /api/v1/pro
 ### Requirement: Authorized members read task detail
 The system SHALL provide task detail through `GET /api/v1/projects/{projectId}/tasks/{taskId}` to the assigned developer and the project's product manager. The response SHALL be `{ "task": ..., "attachedCommits": [...], "progressUpdates": [...], "reviewFeedback": [...], "checkHistory": [...] }` and SHALL use `Cache-Control: no-store`.
 
-The `task` object SHALL contain `id` (task UUID), `projectKey`, `taskKey` (the readable key formed from the project key and task number, such as `WEB-12`), `title`, `description`, `status` (the stored task status), `assignee` (`{ "id", "githubUsername" }`), `dueDate` (an ISO calendar date), `branchName` (string or null), and `acceptanceCriteria` (objects containing `id`, `position`, and `description`, ordered by `position` ascending then `id` ascending).
+The `task` object SHALL contain `id` (task UUID), `projectKey`, `taskKey` (the readable key formed from the project key and task number, such as `WEB-12`), `title`, `description`, `status` (the stored task status), `version` (the task's current integer version, which the task write routes require), `assignee` (`{ "id", "githubUsername" }`), `dueDate` (an ISO calendar date), `branchName` (string or null), and `acceptanceCriteria` (objects containing `id`, `position`, and `description`, ordered by `position` ascending then `id` ascending).
 
 `attachedCommits` SHALL contain objects with `id`, `sha`, `attachedBy` (`{ "id", "githubUsername" }`), and `attachedAt`, ordered by `attachedAt` ascending then `id` ascending. `progressUpdates` SHALL contain objects with `id`, `author` (`{ "id", "githubUsername" }`), `body`, and `createdAt`, ordered by `createdAt` ascending then `id` ascending. `reviewFeedback` SHALL contain objects with `id`, `author` (`{ "id", "githubUsername" }`), `feedback`, and `createdAt`, ordered by `createdAt` ascending then `id` ascending. Timestamps SHALL be ISO 8601 UTC strings. The response SHALL contain only fields needed by the client and SHALL NOT expose auth-user IDs, GitHub numeric user IDs, credentials, tokens, or ORM-private fields.
 
@@ -249,6 +249,10 @@ All collection fields SHALL be JSON arrays, including when no records exist. Tas
 - **WHEN** the assigned developer requests task detail
 - **THEN** the response contains the task, attached commits, progress updates, review feedback, and distinct check history using the shapes and ordering above
 - **AND** the request changes no task or history state
+
+#### Scenario: Task detail exposes the current version
+- **WHEN** an authorized person requests task detail
+- **THEN** `task.version` equals the task's current version, so the person can send it with a state change, edit, reassignment, or deletion
 
 #### Scenario: Product manager reads task detail
 - **WHEN** the project's product manager requests task detail
@@ -264,7 +268,7 @@ All collection fields SHALL be JSON arrays, including when no records exist. Tas
 - **THEN** the system returns the existing safe HTTP 404 response without task or check data
 
 ### Requirement: Task lifecycle
-The system SHALL move tasks through the states To Do, In Progress, In Review, and Done. Only the assigned developer SHALL move a task from To Do to In Progress or from In Progress to In Review, and only the project's product manager SHALL move a task from In Review to Done or back to In Progress.
+The system SHALL move tasks through the states To Do, In Progress, In Review, and Done. Only the assigned developer SHALL move a task from To Do to In Progress or from In Progress to In Review, and only the project's product manager SHALL move a task from In Review to Done or back to In Progress. No other transition SHALL be performed, and Done has no outgoing transition.
 
 #### Scenario: Developer starts a task
 - **WHEN** the assigned developer starts a task in To Do
@@ -272,33 +276,53 @@ The system SHALL move tasks through the states To Do, In Progress, In Review, an
 
 #### Scenario: Developer cannot move another developer's task
 - **WHEN** a developer tries to change the state of a task assigned to someone else
-- **THEN** the system refuses the request and the task state is unchanged
+- **THEN** the system refuses the request with HTTP 403 and the task state is unchanged
 
-### Requirement: Developer submits task progress
-The system SHALL allow an assigned developer to post free-text progress updates on a task, and SHALL retain those updates for the product manager and for project reporting.
+#### Scenario: Product manager cannot start or submit a task
+- **WHEN** the product manager requests In Progress on a task in To Do, or In Review on a task in In Progress
+- **THEN** the system returns HTTP 403 and the task state is unchanged
 
-#### Scenario: Developer submits an update
-- **WHEN** an assigned developer posts a progress update on a task
-- **THEN** the update is associated with the task and visible to the project's product manager
+#### Scenario: Transition not allowed from the current state
+- **WHEN** a person requests a state that is not allowed for that person from the task's current state, including any request on a task in Done, a request for the task's current state, or the product manager requesting Done on a task that is not In Review
+- **THEN** the system returns HTTP 403 with code `FORBIDDEN`, and the task and its history are unchanged
+
+#### Scenario: Refused request writes nothing
+- **WHEN** a state change request is refused for any reason
+- **THEN** no task field, task event, or progress update is written
+
+### Requirement: Task state route
+The system SHALL change a task's state through `PATCH /api/v1/projects/{projectId}/tasks/{taskId}/state`. The JSON body SHALL contain `state` (`To Do`, `In Progress`, `In Review`, or `Done`) and the task's current `version`, and SHALL contain `feedback` only when the product manager requests changes. A change SHALL be applied only while the task still has that `version`.
+
+#### Scenario: State change returns the task
+- **WHEN** an authorized person requests an allowed transition with the task's current `version`
+- **THEN** the system returns HTTP 200 with the task view of "Product manager manages tasks", with the new `state` and a `version` increased by one
+
+#### Scenario: Stale version is refused
+- **WHEN** a person requests a transition using a `version` that is no longer current and the transition is otherwise permitted
+- **THEN** the system returns HTTP 409 with code `VERSION_CONFLICT`, and the task and its history are unchanged
+
+#### Scenario: Competing transitions
+- **WHEN** two transition requests carrying the same `version` are sent for one task at the same time
+- **THEN** exactly one succeeds, the other returns HTTP 409 with code `VERSION_CONFLICT`, and the task records one state change
+
+#### Scenario: Invalid state request
+- **WHEN** the body has no valid `state`, no integer `version` between 1 and 2,147,483,647, a field other than `state`, `version`, and `feedback`, or `feedback` together with a `state` other than `In Progress`
+- **THEN** the system returns HTTP 400 with code `INVALID_REQUEST`, and nothing changes
+
+#### Scenario: Task is concealed or missing
+- **WHEN** the task is deleted, belongs to a different project than the path, or the person is not a project member
+- **THEN** the system returns HTTP 404 with code `NOT_FOUND`, and nothing changes
+
+#### Scenario: State responses are not cached
+- **WHEN** the route returns any response
+- **THEN** the response sends `Cache-Control: no-store`
 
 ### Requirement: Task completion requires product-manager approval
-The system SHALL keep a submitted task in In Review until the project's product manager approves it or requests changes. A submission SHALL include the commits attached to the task. It SHALL reference a stored acceptance criteria check only when that check's anchor SHA matches the unique tip of the submitted commit history and its criteria hash matches the current acceptance criteria; otherwise the submission has no check reference. Task-detail reads for the assigned developer and project manager, and review reads for the product manager, SHALL expose `checkHistory` with one entry per distinct stored result in stable newest-first order. Each entry SHALL contain the result ID, anchor SHA, creation timestamp, redaction flag, and result payload. The project manager's check access is read-only.
+The system SHALL keep a submitted task in In Review until the project's product manager approves it or requests changes. Approval SHALL move the task to Done. Requesting changes SHALL require feedback and SHALL return the task to In Progress.
 
 #### Scenario: Developer submits work for review
 - **WHEN** the assigned developer submits a task in In Progress for review
 - **THEN** the task moves to In Review and appears in the product manager's review queue with its attached commits and the result referenced by that submission, if any
-
-#### Scenario: Submission has no matching check result
-- **WHEN** the assigned developer submits a task for review and no stored check matches both the unique submitted commit-history tip and current criteria hash
-- **THEN** the task moves to In Review with its attached commits and no check-result reference
-- **AND** the task's distinct stored check history remains available
-
-#### Scenario: Submission history remains readable
-- **WHEN** the assigned developer or product manager reads task detail, or the product manager reads the submitted task in the review queue
-- **THEN** each response presents `checkHistory` with one entry per distinct result in stable newest-first order, with result ID as the tie-breaker for equal creation timestamps
-- **AND** each entry includes result ID, anchor SHA, creation timestamp, redaction flag, and result payload
-- **AND** the review response also presents the check result referenced by that submission, if any
-- **AND** the product manager cannot initiate or alter a check
 
 #### Scenario: Product manager approves submitted work
 - **WHEN** the product manager approves a task in In Review
@@ -308,6 +332,119 @@ The system SHALL keep a submitted task in In Review until the project's product 
 - **WHEN** the product manager requests changes on a task in In Review and provides feedback
 - **THEN** the feedback is associated with the task, visible to the assigned developer, and the task returns to In Progress
 
+#### Scenario: Feedback is plain trimmed text
+- **WHEN** the product manager requests changes with `feedback` that trims to between 1 and 5,000 characters
+- **THEN** the system stores the trimmed text, which task detail returns in `reviewFeedback` with the product manager as its author
+
+#### Scenario: Missing or invalid feedback
+- **WHEN** the product manager requests In Progress on a task in In Review with no `feedback`, feedback that is blank after trimming, feedback that is not a string, or feedback longer than 5,000 characters
+- **THEN** the system returns HTTP 400 with code `INVALID_REQUEST`, and the task and its history are unchanged
+
+#### Scenario: Feedback on another transition
+- **WHEN** a request that is allowed for the person but is not In Review to In Progress carries `feedback`
+- **THEN** the system returns HTTP 400 with code `INVALID_REQUEST`, and nothing changes
+
+#### Scenario: Developer resubmits after changes were requested
+- **WHEN** the assigned developer submits a task that returned to In Progress after a request for changes
+- **THEN** the task moves to In Review again, earlier events and feedback are kept, and the submission is recorded as a new event
+
 #### Scenario: Developer cannot approve a submission
 - **WHEN** a developer tries to approve a task or move it to Done
 - **THEN** the system refuses the request and the task remains in In Review
+
+#### Scenario: Developer cannot request changes
+- **WHEN** a developer requests In Progress on a task in In Review, with or without feedback
+- **THEN** the system returns HTTP 403 and the task remains in In Review
+
+### Requirement: Submission records attached commits and a matching check
+A submission SHALL include the commits attached to the task, and a task with no attached commits MAY be submitted. It SHALL reference a stored acceptance criteria check only when that check's anchor SHA matches the unique tip of the submitted commit history and its criteria hash matches the current acceptance criteria; otherwise the submission has no check reference. The tip SHALL be resolved before the state change begins, with no database transaction open during the lookup.
+
+#### Scenario: Submission has no matching check result
+- **WHEN** the assigned developer submits a task for review and no stored check matches both the unique submitted commit-history tip and current criteria hash
+- **THEN** the task moves to In Review with its attached commits and no check-result reference
+- **AND** the task's distinct stored check history remains available
+
+#### Scenario: Submission references a matching check
+- **WHEN** the assigned developer submits a task and a stored check matches both the unique tip of the attached commits and the current criteria hash
+- **THEN** the submission event references that check result
+
+#### Scenario: Submission without attached commits
+- **WHEN** the assigned developer submits a task in In Progress that has no attached commits
+- **THEN** the task moves to In Review with no check-result reference
+
+#### Scenario: Evidence is unavailable at submission
+- **WHEN** the submitted tip cannot be resolved, or GitHub or the repository path rules are unavailable
+- **THEN** the task still moves to In Review with its attached commits and no check-result reference
+
+### Requirement: Submission rechecks its inputs before it is stored
+Inside the submission transaction the system SHALL recheck that the task's attached commit set and acceptance criteria hash are unchanged since the tip was resolved. If either changed, the submission SHALL proceed without a check reference.
+
+#### Scenario: Attached commits change during submission
+- **WHEN** the attached commit set or the criteria hash changes after the tip was resolved and before the submission is stored
+- **THEN** the task moves to In Review with no check-result reference, and no stale reference is stored
+
+#### Scenario: Check never changes state
+- **WHEN** a check result is stored or read during a submission
+- **THEN** the check itself does not approve, reject, submit, or change the task's state
+
+### Requirement: Review reads expose check history
+Task-detail reads for the assigned developer and project manager, and review reads for the product manager, SHALL expose `checkHistory` with one entry per distinct stored result in stable newest-first order. Each entry SHALL contain the result ID, anchor SHA, creation timestamp, redaction flag, and result payload. The project manager's check access is read-only.
+
+#### Scenario: Submission history remains readable
+- **WHEN** the assigned developer or product manager reads task detail, or the product manager reads the submitted task in the review queue
+- **THEN** each response presents `checkHistory` with one entry per distinct result in stable newest-first order, with result ID as the tie-breaker for equal creation timestamps
+- **AND** each entry includes result ID, anchor SHA, creation timestamp, redaction flag, and result payload
+- **AND** the review response also presents the check result referenced by that submission, if any
+- **AND** the product manager cannot initiate or alter a check
+
+### Requirement: Lifecycle changes are recorded as task events
+Each successful state change SHALL write exactly one append-only task event in the same transaction as the change. Starting a task and approving it SHALL write a `state_change` event, submitting SHALL write a `submission` event, and requesting changes SHALL write a `review_feedback` event. Each event SHALL record the actor and the from and to status.
+
+#### Scenario: Start and approve record state changes
+- **WHEN** a task is started or approved
+- **THEN** one `state_change` event records the actor and the from and to status
+
+#### Scenario: Submission records its check reference
+- **WHEN** a task is submitted for review
+- **THEN** one `submission` event records the actor, the from and to status, and the matching check result, if any
+
+#### Scenario: Request for changes records its feedback
+- **WHEN** the product manager requests changes
+- **THEN** one `review_feedback` event records the product manager, the from and to status, and the trimmed feedback
+
+#### Scenario: Failed change records no event
+- **WHEN** a state change is refused or its transaction fails
+- **THEN** the task keeps its previous state and version and no event is stored
+
+### Requirement: Developer submits task progress
+The system SHALL let the assigned developer post a free-text progress update through `POST /api/v1/projects/{projectId}/tasks/{taskId}/progress-updates`. The JSON body SHALL contain exactly `body`, plain text trimmed to 1 to 2,000 characters. The update SHALL be retained for the product manager and for project reporting, and posting SHALL NOT change the task.
+
+#### Scenario: Developer submits an update
+- **WHEN** an assigned developer posts a progress update on a task
+- **THEN** the system returns HTTP 201 with `id`, `author` (`id` and `githubUsername`), `body`, and `createdAt`, as in task detail `progressUpdates`
+- **AND** the update is associated with the task and visible to the project's product manager
+
+#### Scenario: Update in any state
+- **WHEN** the assigned developer posts a progress update on a task in any state that is not deleted
+- **THEN** the update is stored and the task's state and version are unchanged
+
+#### Scenario: Update is trimmed plain text
+- **WHEN** the body is a string that trims to between 1 and 2,000 characters
+- **THEN** the trimmed text is stored and later returned unchanged, never interpreted as markup
+
+#### Scenario: Invalid progress update
+- **WHEN** the body is blank after trimming, not a string, or longer than 2,000 characters, or the request has a field other than `body`
+- **THEN** the system returns HTTP 400 with code `INVALID_REQUEST`, and nothing is stored
+
+#### Scenario: Only the assigned developer posts
+- **WHEN** the product manager or a developer who is not assigned to the task posts a progress update
+- **THEN** the system returns HTTP 403 and nothing is stored
+- **AND** a nonmember, a deleted task, or a task in another project returns HTTP 404
+
+#### Scenario: Update racing with reassignment
+- **WHEN** a person posts a progress update while the task is reassigned to someone else and the reassignment is stored first
+- **THEN** the system returns HTTP 403 and no update is stored
+
+#### Scenario: Progress responses are not cached
+- **WHEN** the route returns any response
+- **THEN** the response sends `Cache-Control: no-store`
