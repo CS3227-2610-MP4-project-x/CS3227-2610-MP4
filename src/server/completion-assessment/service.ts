@@ -29,6 +29,7 @@ type EvidencePort = Readonly<{
 type AssessmentRepositoryPort = Readonly<{
   findReusable(key: CheckCacheKey): Promise<StoredCheckResult | null>;
   save(input: CheckCacheKey & Readonly<{ payload: CheckResultPayload; model: string; redacted: boolean }>): Promise<{ check: StoredCheckResult; created: boolean }>;
+  listHistory?(taskId: string): Promise<readonly StoredCheckResult[]>;
 }>;
 type GatewayPort = Pick<LlmGateway, "run" | "recordCacheHit">;
 type CompletionAssessmentOptions = Readonly<{
@@ -219,5 +220,13 @@ export class CompletionAssessmentService {
       const saved = await this.options.repository.save(input);
       return { check: saved.check, reused: !saved.created };
     } catch { throw new CompletionAssessmentError("INTERNAL_ERROR"); }
+  }
+
+  async listHistory(taskId: string): Promise<readonly StoredCheckResult[]> {
+    try {
+      if (!this.options.repository.listHistory) throw new Error("History read is unavailable.");
+      return await this.options.repository.listHistory(taskId);
+    }
+    catch { throw new CompletionAssessmentError("INTERNAL_ERROR"); }
   }
 }
