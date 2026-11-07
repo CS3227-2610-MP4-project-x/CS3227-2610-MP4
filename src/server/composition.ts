@@ -16,6 +16,12 @@ import {
   GitHubRepositoryLinkService,
 } from "@/server/github-repository-link";
 import { UsageRepository } from "@/server/repositories/usage-repository";
+import {
+  CompletionAssessmentRepository,
+  CompletionAssessmentService,
+  TaskSnapshotRepository,
+  TaskSnapshotService,
+} from "@/server/completion-assessment";
 
 export type ServerComposition = Readonly<{
   authService: AuthService;
@@ -25,6 +31,7 @@ export type ServerComposition = Readonly<{
   projectService: ProjectService;
   githubRepositoryLinkService: GitHubRepositoryLinkService;
   githubEvidenceService: GitHubEvidenceService;
+  completionAssessmentService: CompletionAssessmentService;
   config: ReturnType<typeof getServerConfig>;
   llmGateway: LlmGateway;
 }>;
@@ -73,6 +80,13 @@ export function getServerComposition(): ServerComposition {
     environment: config.appEnvironment,
     limits: AI_LIMITS[config.appEnvironment],
   });
+  const taskSnapshotService = new TaskSnapshotService(new TaskSnapshotRepository(pool));
+  const completionAssessmentService = new CompletionAssessmentService({
+    snapshots: taskSnapshotService,
+    evidence: githubEvidenceService,
+    repository: new CompletionAssessmentRepository(pool),
+    gateway: llmGateway,
+  });
   composition = Object.freeze({
     authService: new AuthService(config.appOrigin, peopleRepository),
     peopleRepository,
@@ -81,6 +95,7 @@ export function getServerComposition(): ServerComposition {
     projectService,
     githubRepositoryLinkService,
     githubEvidenceService,
+    completionAssessmentService,
     config,
     llmGateway,
   });
