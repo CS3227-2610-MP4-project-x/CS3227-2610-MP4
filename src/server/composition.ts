@@ -10,6 +10,7 @@ import { TaskAccessRepository } from "@/server/repositories/task-access-reposito
 import { GitHubAppAdapter } from "@/server/github";
 import { GitHubEvidenceRepository, GitHubEvidenceService } from "@/server/github-evidence";
 import { ProjectRepository, ProjectService } from "@/server/projects";
+import { TaskRepository, TaskService } from "@/server/tasks";
 import {
   GitHubOAuthVerificationAdapter,
   GitHubRepositoryLinkRepository,
@@ -29,6 +30,7 @@ export type ServerComposition = Readonly<{
   projectAccessRepository: ProjectAccessRepository;
   taskAccessRepository: TaskAccessRepository;
   projectService: ProjectService;
+  taskService: TaskService;
   githubRepositoryLinkService: GitHubRepositoryLinkService;
   githubEvidenceService: GitHubEvidenceService;
   completionAssessmentService: CompletionAssessmentService;
@@ -59,6 +61,7 @@ export function getServerComposition(): ServerComposition {
   const projectAccessRepository = new ProjectAccessRepository(pool);
   const taskAccessRepository = new TaskAccessRepository(pool);
   const projectService = new ProjectService(new ProjectRepository(pool), peopleRepository);
+  const taskService = new TaskService(new TaskRepository(pool));
   const githubRepositoryLinkRepository = new GitHubRepositoryLinkRepository(pool);
   const githubOAuthVerificationAdapter = new GitHubOAuthVerificationAdapter({
     clientId: config.githubAppClientId,
@@ -93,6 +96,7 @@ export function getServerComposition(): ServerComposition {
     projectAccessRepository,
     taskAccessRepository,
     projectService,
+    taskService,
     githubRepositoryLinkService,
     githubEvidenceService,
     completionAssessmentService,
