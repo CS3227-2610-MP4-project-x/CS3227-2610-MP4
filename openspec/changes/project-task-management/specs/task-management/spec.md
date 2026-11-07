@@ -186,11 +186,23 @@ The system SHALL allow an assigned developer to post free-text progress updates 
 - **THEN** the update is associated with the task and visible to the project's product manager
 
 ### Requirement: Task completion requires product-manager approval
-The system SHALL keep a submitted task in In Review until the project's product manager approves it or requests changes. A submission SHALL include the commits attached to the task and the latest acceptance criteria check, if one was run.
+The system SHALL keep a submitted task in In Review until the project's product manager approves it or requests changes. A submission SHALL include the commits attached to the task. It SHALL reference a stored acceptance criteria check only when that check's anchor SHA matches the unique tip of the submitted commit history and its criteria hash matches the current acceptance criteria; otherwise the submission has no check reference. Task-detail reads for the assigned developer and project manager, and review reads for the product manager, SHALL expose `checkHistory` with one entry per distinct stored result in stable newest-first order. Each entry SHALL contain the result ID, anchor SHA, creation timestamp, redaction flag, and result payload. The project manager's check access is read-only.
 
 #### Scenario: Developer submits work for review
 - **WHEN** the assigned developer submits a task in In Progress for review
-- **THEN** the task moves to In Review and appears in the product manager's review queue with its attached commits and latest criteria check
+- **THEN** the task moves to In Review and appears in the product manager's review queue with its attached commits and the result referenced by that submission, if any
+
+#### Scenario: Submission has no matching check result
+- **WHEN** the assigned developer submits a task for review and no stored check matches both the unique submitted commit-history tip and current criteria hash
+- **THEN** the task moves to In Review with its attached commits and no check-result reference
+- **AND** the task's distinct stored check history remains available
+
+#### Scenario: Submission history remains readable
+- **WHEN** the assigned developer or product manager reads task detail, or the product manager reads the submitted task in the review queue
+- **THEN** each response presents `checkHistory` with one entry per distinct result in stable newest-first order, with result ID as the tie-breaker for equal creation timestamps
+- **AND** each entry includes result ID, anchor SHA, creation timestamp, redaction flag, and result payload
+- **AND** the review response also presents the check result referenced by that submission, if any
+- **AND** the product manager cannot initiate or alter a check
 
 #### Scenario: Product manager approves submitted work
 - **WHEN** the product manager approves a task in In Review

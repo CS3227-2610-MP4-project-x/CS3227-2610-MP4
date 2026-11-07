@@ -118,7 +118,7 @@ afterEach(() => {
 
 describe("public entry point (AC1, AC13)", () => {
   // Task 6.3 (llm-gateway-core) adds the gateway, the prompt builder and the limits table.
-  it("exports only the two adapter classes, redactSecrets, and the task 6.3 gateway exports at runtime", async () => {
+  it("exports only the adapters, redaction, approved prompt sanitizer, and gateway API at runtime", async () => {
     const entry = await import("../../../src/server/ai");
     expect(Object.keys(entry).sort()).toEqual([
       "AI_LIMITS",
@@ -127,6 +127,7 @@ describe("public entry point (AC1, AC13)", () => {
       "SoclaasAdapter",
       "buildPrompt",
       "redactSecrets",
+      "sanitizePromptData",
     ]);
   });
 
