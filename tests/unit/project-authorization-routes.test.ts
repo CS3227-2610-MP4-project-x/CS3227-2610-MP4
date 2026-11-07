@@ -10,9 +10,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 //
 // Task 4.1 replaced the project read and creation stubs: task-management "Signed-in
 // people create projects" and identity-and-access "Project details require membership"
-// and "Project creation is functional"; design.md Q4, Q6 and S1 to S6. The task-stub
-// assertions below are unchanged. Detailed project-route coverage lives in
-// tests/unit/project-routes.test.ts.
+// and "Project creation is functional"; design.md Q4, Q6 and S1 to S6. Detailed project-route
+// coverage lives in tests/unit/project-routes.test.ts.
+//
+// Task 4.2 replaced the task create, read and edit stubs: identity-and-access "Task creation is
+// functional", "Task read is functional" and "Task field edit is functional"; design.md T1, T8
+// and T16. Their default bodies below are now valid (T2, T4), because the body is validated
+// before the session (T8). The authorized-success cases for those routes, which write, live in
+// tests/unit/task-routes.test.ts; this file keeps the denial, concealment and safe-error
+// cases. The task-state stub assertions are unchanged (task 4.3).
 const fixtures = vi.hoisted(() => ({
   authId: "11111111-1111-4111-8111-111111111111",
   personId: "22222222-2222-4222-8222-222222222222",
@@ -95,7 +101,12 @@ async function requestEndpoint(endpoint: Endpoint, options: {
   // Task 4.1 (D3, Q4): project creation validates its body before the session, so the
   // default creation body is a valid {key, name}.
   const defaultBody = endpoint === "taskState" ? { state: "In Progress" }
-    : endpoint === "projectCreate" ? { key: "WEB", name: "Synthetic project" } : {};
+    : endpoint === "projectCreate" ? { key: "WEB", name: "Synthetic project" }
+      : endpoint === "taskCreate" ? {
+        title: "Synthetic task", description: "Synthetic description", assigneeId: fixtures.otherPersonId,
+        dueDate: "2026-11-30", acceptanceCriteria: ["Synthetic criterion"],
+      }
+        : endpoint === "taskEdit" ? { version: 1, title: "Synthetic edited title" } : {};
   const request = new NextRequest(`https://synthetic-app.example${path}`, {
     method,
     headers: { "content-type": "application/json", origin: "https://synthetic-app.example" },
@@ -255,11 +266,6 @@ describe("protected API authorization stubs", () => {
     expect(fixtures.created).toEqual([]);
   });
 
-  it.each(["developer", "product_manager"])("allows a %s to reach the task read stub", async (role) => {
-    fixtures.role = role;
-    await expectError(await requestEndpoint("taskRead"), 501);
-  });
-
   // Task 4.1: "Project details require membership" now returns 200 with the project.
   it.each(["developer", "product_manager"])("returns the project with the requester's %s role", async (role) => {
     fixtures.role = role;
@@ -291,11 +297,6 @@ describe("protected API authorization stubs", () => {
 
   it.each(["taskCreate", "taskEdit"] as Endpoint[])("refuses a developer calling %s directly", async (endpoint) => {
     await expectError(await requestEndpoint(endpoint), 403);
-  });
-
-  it.each(["taskCreate", "taskEdit"] as Endpoint[])("allows the project's PM to reach %s", async (endpoint) => {
-    fixtures.role = "product_manager";
-    await expectError(await requestEndpoint(endpoint), 501);
   });
 
   it.each(["projectRead", "taskRead", "taskEdit", "taskState"] as Endpoint[])("conceals missing projects on %s", async (endpoint) => {
