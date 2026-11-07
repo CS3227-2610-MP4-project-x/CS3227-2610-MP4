@@ -217,6 +217,24 @@ dbDescribe("task create, read, edit, reassign and soft delete (task 4.2)", () =>
     expect(rows[0].n).toBe(2);
   });
 
+  it("increases the version exactly once for a criteria-only edit and leaves unchanged criteria unwritten (T6, U6)", async () => {
+    const team = await createProjectWithTeam(runtime);
+    const task = await service.createTask(team.projectId, team.productManagerId, createInput(team.developerId, ["unchanged", "reworded"]));
+    const [unchanged, reworded] = task.acceptanceCriteria;
+    const edited = await service.editTask(team.projectId, task.id, team.productManagerId, {
+      version: 1,
+      acceptanceCriteria: [{ id: unchanged.id, description: "unchanged" }, { id: reworded.id, description: "reworded, edited" }],
+    });
+    expect(edited).toMatchObject({ title: task.title, description: task.description, version: 2 });
+    const { rows } = await runtime.query<{ version: number }>(`SELECT version FROM ${TASKS} WHERE id = $1`, [task.id]);
+    expect(rows[0].version).toBe(2);
+    const criteria = await runtime.query<{ id: string; version: number }>(
+      `SELECT id::text AS id, version FROM ${CRITERIA} WHERE task_id = $1 ORDER BY position`,
+      [task.id],
+    );
+    expect(criteria.rows).toEqual([{ id: unchanged.id, version: 1 }, { id: reworded.id, version: 2 }]);
+  });
+
   it("lets only one of two edits with the same version succeed (Concurrent edits to a task)", async () => {
     const team = await createProjectWithTeam(runtime);
     const task = await service.createTask(team.projectId, team.productManagerId, createInput(team.developerId));

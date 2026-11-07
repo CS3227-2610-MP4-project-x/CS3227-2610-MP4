@@ -1021,3 +1021,101 @@ describe("check order (T8, Q4)", () => {
     await expectError(await call("create", { body: validCreate({ assigneeId: people.outsider.id }) }), 403, "FORBIDDEN");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Implementation decisions U3 to U6 (X1 yardstick should 1)
+// ---------------------------------------------------------------------------
+
+describe("implementation decisions U3 to U6", () => {
+  // A developer whose person ID has hex letters (so its uppercase form differs) and sorts before
+  // the product manager's. It is added after the PM's membership, so storage order and person-ID
+  // order differ.
+  const letterDev = person("0aaaaaaa-2222-4222-8222-2222222222ab", "11111111-1111-4111-8111-111111111100", "1000", "synthetic-letter-dev");
+
+  function addLetterDev(): void {
+    fake.state.people.push({ ...letterDev });
+    fake.state.memberships.push({ id: randomUUID(), project_id: projectId, person_id: letterDev.id, role: "developer", version: 1 });
+  }
+
+  it("accepts an uppercase assigneeId on create and stores it lowercase (U5)", async () => {
+    addLetterDev();
+    const body = await expectSuccess(await call("create", { body: validCreate({ assigneeId: letterDev.id.toUpperCase() }) }), 201);
+    expect(body.assignee.personId).toBe(letterDev.id);
+    expect(taskRow(body.id).assignee_id).toBe(letterDev.id);
+  });
+
+  it("accepts an uppercase assigneeId on reassign and records it lowercase (U5)", async () => {
+    addLetterDev();
+    const task = addTask();
+    const body = await expectSuccess(await call("reassign", { taskId: task.id, body: { assigneeId: letterDev.id.toUpperCase(), version: 1 } }), 200);
+    expect(body.assignee.personId).toBe(letterDev.id);
+    expect(eventsOf(task.id)).toEqual([expect.objectContaining({ new_assignee_id: letterDev.id })]);
+  });
+
+  it("treats an uppercase assigneeId equal to the current assignee as a no-op (U5, U10)", async () => {
+    addLetterDev();
+    const task = addTask({ assigneeId: letterDev.id });
+    const before = snapshot();
+    await expectSuccess(await call("reassign", { taskId: task.id, body: { assigneeId: letterDev.id.toUpperCase(), version: 1 } }), 200);
+    expect(snapshot()).toBe(before);
+  });
+
+  it("keeps a criterion whose ID is sent in uppercase (U5)", async () => {
+    const task = addTask({ criteria: ["one"] });
+    const [one] = criteriaOf(task.id);
+    const body = await expectSuccess(await call("edit", { taskId: task.id, body: {
+      version: 1, acceptanceCriteria: [{ id: one.id.toUpperCase(), description: "one, edited" }],
+    } }), 200);
+    expect(body.acceptanceCriteria).toEqual([{ id: one.id, position: 1, description: "one, edited" }]);
+  });
+
+  it("does not rewrite a kept criterion whose text and position are unchanged (U6)", async () => {
+    const task = addTask({ criteria: ["unchanged", "reworded"] });
+    const [unchanged, reworded] = criteriaOf(task.id);
+    await expectSuccess(await call("edit", { taskId: task.id, body: {
+      version: 1,
+      acceptanceCriteria: [{ id: unchanged.id, description: "unchanged" }, { id: reworded.id, description: "reworded, edited" }],
+    } }), 200);
+    const [after1, after2] = criteriaOf(task.id);
+    expect(after1).toMatchObject({ id: unchanged.id, version: 1, updated_at: STORED_TIME });
+    expect(after2).toMatchObject({ id: reworded.id, version: 2 });
+    expect(fake.log.filter((entry) => entry.kind === "update" && entry.tables.includes("acceptance_criteria"))).toHaveLength(1);
+    expect(taskRow(task.id).version).toBe(2);
+  });
+
+  it("reads the task and its criteria inside one read-only REPEATABLE READ transaction (U4)", async () => {
+    const task = addTask();
+    await expectSuccess(await call("read", { taskId: task.id }), 200);
+    const statements = fake.log.map((entry) => entry.sql.replace(/\s+/g, " ").trim());
+    const begin = statements.findIndex((sql) => /^BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY$/i.test(sql));
+    const commit = statements.findIndex((sql, index) => index > begin && /^COMMIT$/i.test(sql));
+    expect(begin).toBeGreaterThanOrEqual(0);
+    expect(commit).toBeGreaterThan(begin);
+    const inside = statements.slice(begin + 1, commit);
+    expect(inside.some((sql) => /FROM app\.tasks t/i.test(sql))).toBe(true);
+    expect(inside.some((sql) => /FROM app\.acceptance_criteria/i.test(sql))).toBe(true);
+  });
+
+  function membershipLocks(): string[][] {
+    return fake.log
+      .filter((entry) => entry.tables.includes("memberships") && /FOR SHARE/i.test(entry.sql))
+      .map((entry) => entry.rows.map((row) => String(row.person_id)));
+  }
+
+  it.each(["create", "reassign"] as const)(
+    "share-locks the actor's and the assignee's memberships in one statement, in person-ID order, on %s (U3)",
+    async (route) => {
+      addLetterDev();
+      const task = addTask();
+      const body = route === "create" ? validCreate({ assigneeId: letterDev.id }) : { assigneeId: letterDev.id, version: 1 };
+      await expectSuccess(await call(route, { taskId: task.id, body }), route === "create" ? 201 : 200);
+      expect(membershipLocks()).toEqual([[letterDev.id, people.pm.id]]);
+    },
+  );
+
+  it.each(["edit", "delete"] as const)("share-locks only the actor's membership on %s (U3)", async (route) => {
+    const task = addTask();
+    await callValid(route, task);
+    expect(membershipLocks()).toEqual([[people.pm.id]]);
+  });
+});
