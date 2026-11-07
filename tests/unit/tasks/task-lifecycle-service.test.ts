@@ -224,6 +224,58 @@ describe("TaskLifecycleService submission tip lookup (L5)", () => {
     expect(eventsOf(task.id)).toEqual([expect.objectContaining({ event_type: "submission", check_result_id: null })]);
   });
 
+  // Fix round 2, F3: the rejected lookup is logged once, as a redacted category only.
+  it("logs one warning carrying only the error's class name, never its message, when the tip port fails", async () => {
+    const SECRET = "SELECT secret_column FROM x WHERE token='abc'";
+    class SyntheticLookupError extends Error {}
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const task = addTask("in_progress");
+      findSubmissionTip.mockRejectedValue(new SyntheticLookupError(SECRET));
+      expect((await service.submitTask(projectId, task.id, people.dev.id, 1)).state).toBe("In Review");
+      expect(warn).toHaveBeenCalledTimes(1);
+      const args = warn.mock.calls[0] as unknown[];
+      expect(args.filter((arg) => typeof arg === "object" && arg !== null)).toEqual([{ category: "SyntheticLookupError" }]);
+      expect(args.some((arg) => arg instanceof Error)).toBe(false);
+      const text = args.map((arg) => typeof arg === "string" ? arg : JSON.stringify(arg)).join(" ");
+      expect(text).not.toContain(SECRET);
+      expect(text).not.toContain("secret_column");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  // Fix round 2, F5: a stale submission is refused before the (possibly slow) tip lookup.
+  it("refuses a submission with a stale version with VERSION_CONFLICT without calling the tip port", async () => {
+    const task = addTask("in_progress", { version: 3 });
+    expect(await codeOf(service.submitTask(projectId, task.id, people.dev.id, 2))).toBe("VERSION_CONFLICT");
+    expect(findSubmissionTip).not.toHaveBeenCalled();
+    expect(stored(task.id)).toMatchObject({ status: "in_progress", version: 3 });
+    expect(fake.state.task_events).toEqual([]);
+  });
+
+  it("calls the tip port exactly once, with no transaction open, for a submission with the current version", async () => {
+    const task = addTask("in_progress", { version: 3 });
+    expect((await service.submitTask(projectId, task.id, people.dev.id, 3)).version).toBe(4);
+    expect(findSubmissionTip).toHaveBeenCalledTimes(1);
+    expect(tipCallOpenTransactions).toEqual([0]);
+  });
+
+  it("still refuses with VERSION_CONFLICT under the lock when the version changes during the tip lookup (race after the pre-read)", async () => {
+    const task = addTask("in_progress");
+    findSubmissionTip.mockImplementation(async () => {
+      tipCallOpenTransactions.push(openTransactions());
+      // Another request commits a change after the pre-read and before the submission's lock.
+      fake.applyCommitted((state) => { state.tasks.find((entry) => entry.id === task.id)!.version = 2; });
+      return null;
+    });
+    expect(await codeOf(service.submitTask(projectId, task.id, people.dev.id, 1))).toBe("VERSION_CONFLICT");
+    expect(findSubmissionTip).toHaveBeenCalledTimes(1);
+    expect(stored(task.id)).toMatchObject({ status: "in_progress", version: 2 });
+    expect(fake.state.task_events).toEqual([]);
+    expect(fake.connected).toBe(fake.released);
+  });
+
   it("does not call the tip port for start, approve or request changes", async () => {
     await service.startTask(projectId, addTask().id, people.dev.id, 1);
     await service.approveTask(projectId, addTask("in_review").id, people.pm.id, 1);

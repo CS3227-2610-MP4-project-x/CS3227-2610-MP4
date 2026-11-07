@@ -612,6 +612,29 @@ describe("version guard (Task state route, L1)", () => {
     expect(writes()).toEqual([]);
   });
 
+  // Fix round 2, F5: a stale submission is refused without waiting for the tip lookup.
+  it("refuses a submission with a stale version with 409 and does not look up a tip", async () => {
+    const task = addTask({ status: "in_progress", version: 3 });
+    signInAs(people.dev.auth_user_id);
+    const before = snapshot();
+    await expectError(await call("state", { taskId: task.id, body: { state: "In Review", version: 2 } }), 409, "VERSION_CONFLICT");
+    expect(boundary.findSubmissionTip).not.toHaveBeenCalled();
+    expect(snapshot()).toBe(before);
+  });
+
+  it("refuses a submission whose version changes during the tip lookup with 409 and writes nothing", async () => {
+    const task = addTask({ status: "in_progress" });
+    signInAs(people.dev.auth_user_id);
+    boundary.findSubmissionTip.mockImplementation(async () => {
+      fake.applyCommitted((state) => { state.tasks.find((entry) => entry.id === task.id)!.version = 2; });
+      return null;
+    });
+    await expectError(await call("state", { taskId: task.id, body: { state: "In Review", version: 1 } }), 409, "VERSION_CONFLICT");
+    expect(boundary.findSubmissionTip).toHaveBeenCalledTimes(1);
+    expect(taskRow(task.id)).toMatchObject({ status: "in_progress", version: 2 });
+    expect(eventsOf(task.id)).toEqual([]);
+  });
+
   it("refuses a start whose version was raised by a product manager edit (still To Do) with 409", async () => {
     const task = addTask({ version: 2 });
     signInAs(people.dev.auth_user_id);
