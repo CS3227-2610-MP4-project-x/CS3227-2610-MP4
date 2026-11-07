@@ -17,6 +17,8 @@ export type TaskDetailSnapshot = Readonly<{
     title: string;
     description: string;
     status: StoredTaskState;
+    /** The task's current integer version, which the task write routes require (design.md L1). */
+    version: number;
     assigneeId: string;
     assignee: Readonly<{ id: string; githubUsername: string }>;
     dueDate: string;
@@ -50,6 +52,7 @@ type DetailRow = Record<string, unknown> & {
   title: string;
   description: string;
   status: StoredTaskState;
+  version: unknown;
   assignee_id: string;
   assignee_github_username: string;
   due_date: string;
@@ -89,6 +92,7 @@ export class TaskDetailReadRepository {
               t.title,
               t.description,
               t.status,
+              t.version,
               t.assignee_id::text AS assignee_id,
               assignee.github_username AS assignee_github_username,
               t.due_date::text AS due_date,
@@ -157,6 +161,7 @@ export class TaskDetailReadRepository {
         title: row.title,
         description: row.description,
         status: row.status,
+        version: Number(row.version),
         assigneeId: row.assignee_id,
         assignee: { id: row.assignee_id, githubUsername: row.assignee_github_username },
         dueDate: row.due_date,
