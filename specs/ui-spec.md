@@ -94,7 +94,7 @@ Status colors on the board follow the Color System: monochrome for To Do, In Pro
 - Keep the check advisory. Approval and Request changes remain explicit product-manager actions in the review workflow.
 
 ### Visual references and human review
-The developer Acceptance Criteria Check and task-detail screens use the human-supplied `frontend_mockup_3.png` and `frontend_mockup_2.png` as accepted visual direction. `frontend_mockup_pm_review.png` is supplied for the product manager's review; it is not final UI approval. Pause UI implementation until the product manager mockup has been reviewed. The images guide visual styling and composition only; written requirements in OpenSpec govern behavior. The developer mockup that presents **Submit for review** directly on the check result screen depicts Task 4.3 lifecycle integration; Group 7 must not implement submission or change lifecycle behavior.
+The developer Acceptance Criteria Check and task-detail screens use the human-supplied `frontend_mockup_3.png` and `frontend_mockup_2.png` as accepted visual direction. The product manager review screen uses `frontend_mockup_pm_review.png` as accepted visual direction. The images guide visual styling and composition only; written requirements in OpenSpec govern behavior. The developer mockup that presents **Submit for review** directly on the check result screen depicts Task 4.3 lifecycle integration; Group 7 must not implement submission or change lifecycle behavior.
 
 ## Components
 

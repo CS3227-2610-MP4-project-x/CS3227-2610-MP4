@@ -90,9 +90,10 @@ The system SHALL provide temporary project and task route stubs to verify server
 - **WHEN** a person requests `POST /api/v1/projects/{projectId}/tasks`
 - **THEN** a project product manager reaches the stub, a project developer receives HTTP 403, and a non-member receives HTTP 404
 
-#### Scenario: Task read stub requires membership
+#### Scenario: Task detail read enforces task access
 - **WHEN** a person requests `GET /api/v1/projects/{projectId}/tasks/{taskId}`
-- **THEN** an authenticated project member reaches the stub, while an authenticated non-member receives HTTP 404
+- **THEN** the assigned developer and the project's product manager receive task detail as defined by task-management's "Authorized members read task detail" requirement
+- **AND** another project developer receives HTTP 403, while a non-member or task outside the project receives HTTP 404
 
 #### Scenario: Task field edit stub requires the product-manager role
 - **WHEN** a person requests a field edit using `PATCH /api/v1/projects/{projectId}/tasks/{taskId}`
