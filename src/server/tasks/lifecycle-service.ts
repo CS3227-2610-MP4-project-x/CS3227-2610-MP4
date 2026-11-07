@@ -27,6 +27,7 @@ async function lockForTransition(
   if (!role) throw new TaskError("NOT_FOUND");
   const task = await transaction.lockTask(projectId, taskId);
   if (!task) throw new TaskError("NOT_FOUND");
+  // The row is locked, so this is the effective version guard; updateStatus repeats it as a backstop.
   if (task.version !== expectedVersion) throw new TaskError("VERSION_CONFLICT");
   const target = TRANSITIONS[transition].to;
   if (permittedTransition({ personId: actorPersonId, role }, task, target) !== transition) throw new TaskError("FORBIDDEN");
@@ -110,7 +111,10 @@ export class TaskLifecycleService {
   private async lookUpTip(projectId: string, taskId: string): Promise<SubmissionTip | null> {
     try {
       return await this.tips.findSubmissionTip(projectId, taskId);
-    } catch {
+    } catch (error) {
+      // The port should never reject; log only the error's class name (fix round 1, F3).
+      const category = error instanceof Error ? error.constructor.name : typeof error;
+      console.warn("[task-lifecycle] submission tip lookup failed; submitting without a check reference", { category });
       return null;
     }
   }
@@ -126,6 +130,7 @@ export class TaskLifecycleService {
   ): Promise<TaskView> {
     return this.tasks.transaction(async (transaction) => {
       const task = await lockForTransition(transaction, projectId, taskId, actorPersonId, version, transition);
+      // Defense in depth: the locked version check above makes this branch unreachable today.
       if (!await transaction.updateStatus(taskId, version, TRANSITIONS[transition].to)) throw new TaskError("VERSION_CONFLICT");
       await recordEvent(transaction, task);
       return readWrittenTask(transaction, projectId, taskId);
