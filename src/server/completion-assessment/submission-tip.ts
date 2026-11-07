@@ -40,7 +40,35 @@ type EvidencePort = Readonly<{
   loadPathRules(repository: TaskSnapshotRepositoryBinding): Promise<string>;
   isAncestor(repository: TaskSnapshotRepositoryBinding, ancestorSha: string, descendantSha: string): Promise<boolean>;
 }>;
-type SubmissionTipOptions = Readonly<{ snapshots: SnapshotPort; evidence: EvidencePort }>;
+/**
+ * `timeoutMs` bounds the whole lookup, including the path-rules load and every ancestry query,
+ * because it runs before the submission's version check (fix round 1, F8).
+ */
+type SubmissionTipOptions = Readonly<{ snapshots: SnapshotPort; evidence: EvidencePort; timeoutMs?: number }>;
+
+/**
+ * The default budget: two GitHub adapter request timeouts (30 s each, github-adapter.ts), so the
+ * lookup plus the submission transaction fit well inside the state route's 150 s `maxDuration`,
+ * the duration already approved for the acceptance-criteria-check route (design.md G11).
+ */
+export const SUBMISSION_TIP_TIMEOUT_MS = 60_000;
+
+/** Set once the budget has expired, so the lookup stops making GitHub calls. */
+type Budget = { expired: boolean };
+
+class BudgetExpired extends Error {}
+
+/**
+ * Logs why a lookup gave no tip, as a redacted category only: an error class name or
+ * "timeout", never a message, SQL, SHA, task text or token (fix round 1, F3).
+ */
+function logTipLookupFailure(category: string): void {
+  console.warn("[submission-tip] lookup unavailable; submitting without a check reference", { category });
+}
+
+function errorCategory(error: unknown): string {
+  return error instanceof Error ? error.constructor.name : typeof error;
+}
 
 function compareText(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -59,23 +87,39 @@ function criteriaHash(ordered: readonly TaskSnapshotCriterion[]): string {
 export class SubmissionTipLookup {
   constructor(private readonly options: SubmissionTipOptions) {}
 
-  /** The unique tip of the task's attached commits, or null when there is none or evidence is unavailable. */
+  /**
+   * The unique tip of the task's attached commits, or null when there is none, evidence is
+   * unavailable, or the time budget expires. It never rejects.
+   */
   async findSubmissionTip(projectId: string, taskId: string): Promise<SubmissionTip | null> {
-    try {
-      return await this.resolve(projectId, taskId);
-    } catch {
+    const budget: Budget = { expired: false };
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const expiry = new Promise<null>((resolve) => {
+      timer = setTimeout(() => {
+        budget.expired = true;
+        logTipLookupFailure("timeout");
+        resolve(null);
+      }, this.options.timeoutMs ?? SUBMISSION_TIP_TIMEOUT_MS);
+    });
+    const lookup = this.resolve(projectId, taskId, budget).catch((error: unknown) => {
+      if (!budget.expired) logTipLookupFailure(errorCategory(error));
       return null;
+    });
+    try {
+      return await Promise.race([lookup, expiry]);
+    } finally {
+      clearTimeout(timer);
     }
   }
 
-  private async resolve(projectId: string, taskId: string): Promise<SubmissionTip | null> {
+  private async resolve(projectId: string, taskId: string, budget: Budget): Promise<SubmissionTip | null> {
     const snapshot = await this.options.snapshots.getSubmissionSnapshot(projectId, taskId);
     if (!snapshot) return null;
     const commitShas = [...new Set(snapshot.attachedCommitShas)].sort(compareText);
     if (commitShas.length === 0 || !snapshot.repository) return null;
     // The path rules must be readable, as for a check; unavailable rules mean no tip.
     if (!parseAcceptancePathRules(await this.options.evidence.loadPathRules(snapshot.repository)).ok) return null;
-    const anchorSha = await this.uniqueTip(snapshot.repository, commitShas);
+    const anchorSha = await this.uniqueTip(snapshot.repository, commitShas, budget);
     if (!anchorSha) return null;
     const criteria = criteriaInOrder(snapshot.criteria);
     return { anchorSha, commitShas, criteria, criteriaHash: criteriaHash(criteria) };
@@ -85,8 +129,11 @@ export class SubmissionTipLookup {
    * The commit that descends from every other commit, or null. One pass keeps the commit that
    * no later commit descends from; a unique tip must be that commit, which is then verified.
    */
-  private async uniqueTip(repository: TaskSnapshotRepositoryBinding, shas: readonly string[]): Promise<string | null> {
-    const isAncestor = (ancestor: string, descendant: string) => this.options.evidence.isAncestor(repository, ancestor, descendant);
+  private async uniqueTip(repository: TaskSnapshotRepositoryBinding, shas: readonly string[], budget: Budget): Promise<string | null> {
+    const isAncestor = (ancestor: string, descendant: string) => {
+      if (budget.expired) throw new BudgetExpired();
+      return this.options.evidence.isAncestor(repository, ancestor, descendant);
+    };
     let candidate = shas[0];
     for (const sha of shas.slice(1)) {
       if (!await isAncestor(sha, candidate)) candidate = sha;
