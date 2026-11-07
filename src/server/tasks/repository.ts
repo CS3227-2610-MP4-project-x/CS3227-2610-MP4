@@ -403,6 +403,25 @@ export class TaskRepository {
     return this.run("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY", (connection) => findTaskRecord(connection, projectId, taskId));
   }
 
+  /**
+   * An unlocked read of a live task's current version, returned only when `personId` is a
+   * member of the project; null otherwise. No transaction is held (fix round 2, F5).
+   */
+  async findVersionForMember(projectId: string, taskId: string, personId: string): Promise<number | null> {
+    const result = await this.database.query<{ version: number }>(
+      `SELECT t.version
+         FROM app.tasks t
+         JOIN app.memberships m ON m.project_id = t.project_id
+        WHERE t.id = $1::uuid
+          AND t.project_id = $2::uuid
+          AND t.deleted_at IS NULL
+          AND m.person_id = $3::uuid`,
+      [taskId, projectId, personId],
+    );
+    const row = result.rows[0];
+    return row ? Number(row.version) : null;
+  }
+
   /** Runs `work` in one transaction on one connection; rolls back on any error. */
   async transaction<T>(work: (transaction: TaskTransaction) => Promise<T>): Promise<T> {
     return this.run("BEGIN", (connection) => work(new TaskTransaction(connection)));

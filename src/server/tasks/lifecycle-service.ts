@@ -73,6 +73,11 @@ export class TaskLifecycleService {
    * with no transaction open (L5); any failure there submits without a check reference.
    */
   async submitTask(projectId: string, taskId: string, actorPersonId: string, version: number): Promise<TaskView> {
+    // A version that is already stale is refused before the lookup, which can take up to 60 s
+    // (fix round 2, F5). A missing membership or task falls through to the locked path, which
+    // keeps its 404-before-409 order; a race after this read is still 409 under the lock.
+    const current = await this.tasks.findVersionForMember(projectId, taskId, actorPersonId);
+    if (current !== null && current !== version) throw new TaskError("VERSION_CONFLICT");
     const tip = await this.lookUpTip(projectId, taskId);
     return this.apply(projectId, taskId, actorPersonId, version, "submit", async (transaction, task) =>
       transaction.insertSubmission(taskId, actorPersonId, task.status, TRANSITIONS.submit.to, await matchingCheck(transaction, taskId, tip)));
