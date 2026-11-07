@@ -7,6 +7,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // “Access is enforced by project role on the server”. No formal IDs exist.
 // Exercise real handlers/services/repositories with only external boundaries
 // replaced. Fixtures are synthetic; no network, credentials, or database is used.
+//
+// Task 4.1 replaced the project read and creation stubs: task-management "Signed-in
+// people create projects" and identity-and-access "Project details require membership"
+// and "Project creation is functional"; design.md Q4, Q6 and S1 to S6. The task-stub
+// assertions below are unchanged. Detailed project-route coverage lives in
+// tests/unit/project-routes.test.ts.
 const fixtures = vi.hoisted(() => ({
   authId: "11111111-1111-4111-8111-111111111111",
   personId: "22222222-2222-4222-8222-222222222222",
@@ -26,6 +32,12 @@ const fixtures = vi.hoisted(() => ({
   assigneeId: "22222222-2222-4222-8222-222222222222",
   status: "to_do",
   failure: "" as "" | "people" | "projects" | "memberships" | "tasks",
+  // Task 4.1: only project creation may write, and only to projects and memberships.
+  allowProjectCreation: false,
+  created: [] as { table: string; values: readonly unknown[] }[],
+  transaction: [] as string[],
+  projectKey: "WEB",
+  projectName: "Synthetic project",
 }));
 
 vi.mock("server-only", () => ({}));
@@ -48,6 +60,8 @@ vi.mock("@/server/auth/supabase-auth", () => ({
 vi.mock("pg", () => {
   class Pool {
     query = fixtures.query;
+    // Task 4.1 (design.md S6): transactions use pool.connect(), then BEGIN/COMMIT/ROLLBACK.
+    async connect() { return { query: fixtures.query, release: () => undefined }; }
   }
   return { Pool, default: { Pool } };
 });
@@ -78,10 +92,14 @@ async function requestEndpoint(endpoint: Endpoint, options: {
     : endpoint === "projectRead" ? projectPath
       : endpoint === "taskCreate" ? `${projectPath}/tasks`
         : endpoint === "taskState" ? `${taskPath}/state` : taskPath;
+  // Task 4.1 (D3, Q4): project creation validates its body before the session, so the
+  // default creation body is a valid {key, name}.
+  const defaultBody = endpoint === "taskState" ? { state: "In Progress" }
+    : endpoint === "projectCreate" ? { key: "WEB", name: "Synthetic project" } : {};
   const request = new NextRequest(`https://synthetic-app.example${path}`, {
     method,
     headers: { "content-type": "application/json", origin: "https://synthetic-app.example" },
-    ...(method === "GET" ? {} : { body: options.body ?? JSON.stringify(endpoint === "taskState" ? { state: "In Progress" } : {}) }),
+    ...(method === "GET" ? {} : { body: options.body ?? JSON.stringify(defaultBody) }),
   });
   const context = { params: Promise.resolve({ projectId, taskId }) };
   switch (endpoint) {
@@ -111,6 +129,9 @@ beforeEach(() => {
   fixtures.assigneeId = fixtures.personId;
   fixtures.status = "to_do";
   fixtures.failure = "";
+  fixtures.allowProjectCreation = false;
+  fixtures.created.length = 0;
+  fixtures.transaction.length = 0;
   fixtures.getUser.mockResolvedValue({
     data: { user: {
       id: fixtures.authId,
@@ -121,6 +142,18 @@ beforeEach(() => {
   fixtures.query.mockImplementation(async (statement: string | { text: string; values?: readonly unknown[] }, values?: readonly unknown[]) => {
     const sql = typeof statement === "string" ? statement : statement.text;
     const parameters = values ?? (typeof statement === "string" ? [] : statement.values ?? []);
+    if (/^\s*(begin|start transaction|commit|rollback)\b/i.test(sql)) {
+      fixtures.transaction.push(sql.trim().split(/\s+/)[0].toUpperCase());
+      return { rows: [], rowCount: 0 };
+    }
+    const insertTable = /^\s*insert\s+into\s+"?app"?\."?(projects|memberships)"?/i.exec(sql)?.[1]?.toLowerCase();
+    if (fixtures.allowProjectCreation && insertTable) {
+      fixtures.created.push({ table: insertTable, values: parameters });
+      const row = insertTable === "projects"
+        ? { id: fixtures.otherProjectId, key: fixtures.projectKey, name: fixtures.projectName, last_task_number: 0 }
+        : { id: "88888888-8888-4888-8888-888888888888", project_id: fixtures.otherProjectId, person_id: fixtures.personId, role: "product_manager" };
+      return { rows: [row], rowCount: 1 };
+    }
     if (/\b(insert|update|delete|merge|truncate|call)\b/i.test(sql)) {
       fixtures.writes.push(sql);
       throw new Error("Authorization stubs must never issue writes");
@@ -136,10 +169,14 @@ beforeEach(() => {
         assignee_id: fixtures.assigneeId, status: fixtures.status,
       }] : [];
     } else if (/\bapp\.memberships\b/i.test(sql)) {
+      // A statement joining projects (task 4.1 project read) gets the project's columns.
+      const project = /\bapp\.projects\b/i.test(sql)
+        ? { id: fixtures.projectId, key: fixtures.projectKey, name: fixtures.projectName } : {};
       rows = fixtures.member && fixtures.projectExists && parameters.includes(fixtures.personId) && parameters.includes(fixtures.projectId)
-        ? [{ id: "77777777-7777-4777-8777-777777777777", person_id: fixtures.personId, project_id: fixtures.projectId, role: fixtures.role }] : [];
+        ? [{ id: "77777777-7777-4777-8777-777777777777", person_id: fixtures.personId, project_id: fixtures.projectId, role: fixtures.role, ...project }] : [];
     } else if (/\bapp\.projects\b/i.test(sql)) {
-      rows = fixtures.projectExists && parameters.includes(fixtures.projectId) ? [{ id: fixtures.projectId }] : [];
+      rows = fixtures.projectExists && parameters.includes(fixtures.projectId)
+        ? [{ id: fixtures.projectId, key: fixtures.projectKey, name: fixtures.projectName }] : [];
     } else if (/\bapp\.people\b/i.test(sql)) {
       rows = fixtures.personExists && parameters.includes(fixtures.authId) ? [{ id: fixtures.personId, auth_user_id: fixtures.authId }] : [];
     } else {
@@ -210,16 +247,46 @@ describe("protected API authorization stubs", () => {
     await expectError(await requestEndpoint(endpoint), 404);
   });
 
-  it.each(["developer", "product_manager"])("allows a %s to reach project and task read stubs", async (role) => {
+  // Task 4.1, Q6: creation from a valid session with no people row is 401, not 404.
+  it("refuses project creation with 401 when the session has no registered person, creating nothing", async () => {
+    fixtures.personExists = false;
+    fixtures.allowProjectCreation = true;
+    await expectError(await requestEndpoint("projectCreate"), 401);
+    expect(fixtures.created).toEqual([]);
+  });
+
+  it.each(["developer", "product_manager"])("allows a %s to reach the task read stub", async (role) => {
     fixtures.role = role;
-    await expectError(await requestEndpoint("projectRead"), 501);
     await expectError(await requestEndpoint("taskRead"), 501);
   });
 
-  it("requires only authentication for the project creation stub", async () => {
+  // Task 4.1: "Project details require membership" now returns 200 with the project.
+  it.each(["developer", "product_manager"])("returns the project with the requester's %s role", async (role) => {
+    fixtures.role = role;
+    const response = await requestEndpoint("projectRead");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(await response.json()).toEqual({
+      id: fixtures.projectId, key: fixtures.projectKey, name: fixtures.projectName, role,
+    });
+  });
+
+  // Task 4.1: "Project creation is functional"; any signed-in person may create (D1),
+  // and the creator becomes the product manager (D2, D3).
+  it("creates a project for a signed-in person who belongs to no project", async () => {
     fixtures.member = false;
-    fixtures.personExists = false;
-    await expectError(await requestEndpoint("projectCreate"), 501);
+    fixtures.allowProjectCreation = true;
+    const response = await requestEndpoint("projectCreate");
+    expect(response.status).toBe(201);
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(await response.json()).toEqual({
+      id: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
+      key: "WEB",
+      name: "Synthetic project",
+      role: "product_manager",
+    });
+    expect(fixtures.created.map((write) => write.table)).toEqual(["projects", "memberships"]);
+    expect(fixtures.transaction).toEqual(["BEGIN", "COMMIT"]);
   });
 
   it.each(["taskCreate", "taskEdit"] as Endpoint[])("refuses a developer calling %s directly", async (endpoint) => {

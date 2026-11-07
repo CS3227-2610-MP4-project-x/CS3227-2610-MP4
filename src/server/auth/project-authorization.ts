@@ -1,17 +1,13 @@
 import "server-only";
 
 import type { NextRequest } from "next/server";
-import { createRequestSupabaseClient } from "@/server/auth/supabase-auth";
 import type { ServerComposition } from "@/server/composition";
+import { handleProjectCreate, handleProjectRead } from "@/server/projects";
 import type { ProjectRole } from "@/server/repositories/project-access-repository";
 import type { StoredTaskState, TaskAccessRecord } from "@/server/repositories/task-access-repository";
+import { resolveProjectAccess, type AccessResult } from "./request-access";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const INVALID_SESSION_AUTH_CODES: ReadonlySet<string> = new Set([
-  "refresh_token_not_found",
-  "refresh_token_already_used",
-  "session_expired",
-]);
 const STATE_TO_STORAGE: ReadonlyMap<string, StoredTaskState> = new Map([
   ["To Do", "to_do"],
   ["In Progress", "in_progress"],
@@ -19,13 +15,11 @@ const STATE_TO_STORAGE: ReadonlyMap<string, StoredTaskState> = new Map([
   ["Done", "done"],
 ]);
 
-type ErrorStatus = 400 | 401 | 403 | 404 | 500 | 501;
+type ErrorStatus = 400 | 403 | 404 | 500 | 501;
 type RouteContext = Readonly<{ params: Promise<{ projectId: string; taskId?: string }> }>;
-type AccessResult = Readonly<{ personId: string; role: ProjectRole }>;
 
 const ERRORS: Readonly<Record<ErrorStatus, Readonly<{ code: string; message: string }>>> = {
   400: { code: "INVALID_REQUEST", message: "Invalid request" },
-  401: { code: "UNAUTHENTICATED", message: "Authentication required" },
   403: { code: "FORBIDDEN", message: "Insufficient permissions" },
   404: { code: "NOT_FOUND", message: "Resource not found" },
   500: { code: "INTERNAL_ERROR", message: "Internal server error" },
@@ -41,49 +35,6 @@ function response(status: ErrorStatus): Response {
 
 function invalidRequest(): Response {
   return response(400);
-}
-
-function isUnauthenticatedAuthError(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) return false;
-  const authError = error as { name?: unknown; status?: unknown; code?: unknown };
-  return authError.name === "AuthSessionMissingError" ||
-    (authError.name === "AuthApiError" && (
-      authError.status === 401 ||
-      (typeof authError.code === "string" && INVALID_SESSION_AUTH_CODES.has(authError.code))
-    ));
-}
-
-async function getAuthenticatedUserId(
-  composition: ServerComposition,
-): Promise<string | Response> {
-  try {
-    const client = await createRequestSupabaseClient(composition.config);
-    const { data, error } = await client.auth.getUser();
-    if (error) return response(isUnauthenticatedAuthError(error) ? 401 : 500);
-    if (!data.user) return response(401);
-    if (!UUID_PATTERN.test(data.user.id)) return response(401);
-    return data.user.id;
-  } catch (error) {
-    return response(isUnauthenticatedAuthError(error) ? 401 : 500);
-  }
-}
-
-async function resolveProjectAccess(
-  composition: ServerComposition,
-  projectId: string,
-): Promise<AccessResult | Response> {
-  const authUserId = await getAuthenticatedUserId(composition);
-  if (authUserId instanceof Response) return authUserId;
-  try {
-    const personId = await composition.peopleRepository.findPersonIdByAuthUserId(authUserId);
-    if (!personId) return response(404);
-    if (!await composition.projectAccessRepository.projectExists(projectId)) return response(404);
-    const role = await composition.projectAccessRepository.findProjectRole(projectId, personId);
-    if (!role) return response(404);
-    return { personId, role };
-  } catch {
-    return response(500);
-  }
 }
 
 async function projectIdFrom(context: RouteContext): Promise<string | Response> {
@@ -157,26 +108,21 @@ function isResponse(value: unknown): value is Response {
   return value instanceof Response;
 }
 
-/** Authenticated users may reach the project-creation stub; creation is not implemented here. */
+/** Project creation is functional (task 4.1); delegates to the projects module (design.md Q5). */
 export async function handleProjectCreationStub(
   request: NextRequest,
   composition: ServerComposition,
 ): Promise<Response> {
-  if (!await hasJsonObjectBody(request)) return invalidRequest();
-  const authUserId = await getAuthenticatedUserId(composition);
-  return isResponse(authUserId) ? authUserId : response(501);
+  return handleProjectCreate(request, composition);
 }
 
-/** Runs the project read stub after verifying session, person mapping, and membership. */
+/** Project read is functional (task 4.1); delegates to the projects module (design.md Q5). */
 export async function handleProjectReadStub(
   request: NextRequest,
   context: RouteContext,
   composition: ServerComposition,
 ): Promise<Response> {
-  const projectId = await projectIdFrom(context);
-  if (isResponse(projectId)) return projectId;
-  const access = await resolveProjectAccess(composition, projectId);
-  return isResponse(access) ? access : response(501);
+  return handleProjectRead(request, context, composition);
 }
 
 /** Runs the task creation stub only for a product manager in the path project. */

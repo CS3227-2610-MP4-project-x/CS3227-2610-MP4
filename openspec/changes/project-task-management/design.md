@@ -156,6 +156,83 @@ Approved by Lim-ZY on 2 November 2026 for task 3.2. Project and task route paths
 - **Temporary behavior.** A permitted request to any approved stub returns HTTP 501 using the safe error envelope and performs no state change. The feature tasks replace each stub with its functional API and include route-level authorization tests. Stubs do not accept or promise feature payload or success-response schemas beyond the transition target field.
 - **Public authentication routes.** `GET /api/v1/auth/sign-in`, `GET /api/v1/auth/callback`, and `POST /api/v1/auth/sign-out` remain outside project membership and role authorization. They retain their authentication-flow-specific protections. The Next.js Proxy remains limited to session refresh; it does not authorize project access.
 
+## Project and Membership Decisions
+
+Approved by thegrimbee on 6 November 2026 for task 4.1. The human approved the analyst's draft spec delta and recommendations D1 to D10, with the resolutions noted below. Developer B (thegrimbee) owns all task 4.1 paths, including the project route files and the project stubs in `src/server/auth/project-authorization.ts`; Lim-ZY cross-reviews.
+
+- **D1 Who may create a project.** Any signed-in person.
+- **D2 Initial product manager.** The creator becomes the project's only product manager, in the same transaction that creates the project. Handing the project over later uses the D-C transfer.
+- **D3 Creation payload.** `POST /api/v1/projects` accepts exactly `{key, name}`. A key that fails `^[A-Z][A-Z0-9]{1,9}$` is rejected, not normalized. The name is trimmed, 1 to 100 characters, plain text. Success is 201 with `{id, key, name, role: "product_manager"}`. Bad input is 400 `INVALID_REQUEST`. A duplicate key is 409 `PROJECT_KEY_TAKEN`.
+- **D4 Routes.** Task 4.1 approves only:
+  - `GET /api/v1/projects/{projectId}` returning `{id, key, name, role}`;
+  - `POST /api/v1/projects/{projectId}/members` with `{githubUsername}`, product manager only, 201;
+  - `POST /api/v1/projects/{projectId}/product-manager-transfer` with `{githubUsername}`, product manager only, 200.
+
+  Project and member listing are left to task 4.4.
+- **D5 Identifying a person.** GitHub username, matched exactly and case-insensitively against registered people. More than one match is 409 `GITHUB_USERNAME_AMBIGUOUS`. Any non-match returns 404 `NOT_FOUND` with a generic message; the product manager may learn whether a username is registered. The same rule serves both the members and transfer routes. Adding a person who already has a role in the project is 409 `ALREADY_MEMBER`. Transferring to a person who is not a developer in the project, including the product manager themselves, is 409 `TRANSFER_TARGET_NOT_DEVELOPER` (error codes chosen by thegrimbee on 6 November 2026 as the agent recommended).
+- **D6 Open tasks and refusal.** Only non-deleted, non-Done tasks block a transfer, consistent with D-E. A blocked transfer is 409 `TRANSFER_BLOCKED_OPEN_TASKS`. The check runs inside the transfer transaction after locking both membership rows `FOR UPDATE`, so a concurrent assignment (which share-locks the developer membership) cannot slip in.
+- **D7 Out of scope.** Member removal and role change are not part of task 4.1. The reassignment rule in "Assignees after membership changes" stays pending until they are specified.
+- **D8 Origin check.** The three mutating routes share one helper: `Origin` must equal `APP_ORIGIN` and `Content-Type` must be `application/json`. A bad Origin returns 403 `FORBIDDEN` (resolution of conflict C2); a wrong content type returns 400 `INVALID_REQUEST`. The existing github-repository route and spec are unchanged, so the two behaviors differ until a later task aligns them.
+- **D9 Placement.** A new `src/server/projects/` module holds the service, repository, types and errors behind an `index.ts` entry. `composition.ts` and the stubs in `project-authorization.ts` get minimal edits (resolution of C3).
+- **D10 "Exactly one" product manager.** The database enforces at most one (partial unique index). At least one relies on the creation transaction and an integration test; no new migration.
+- **C4.** Task 4.1 has no UI. The members screen stays with task 4.4.
+- **Planning decisions Q1 to Q6.** Approved by thegrimbee on 6 November 2026, answering the orchestrator's questions in `workflow/handoffs/projects-membership-4-1.md` as the agent recommended.
+  - *Q1 Success bodies.* `POST /api/v1/projects/{projectId}/members` returns 201 `{personId, githubUsername, role: "developer"}`, where `githubUsername` is the stored username. `POST /api/v1/projects/{projectId}/product-manager-transfer` returns 200 `{id, key, name, role: "developer"}`, the caller's new role, in the same shape as `GET /api/v1/projects/{projectId}`.
+  - *Q2 Error messages.* No exact message text is recorded. Each code has a fixed server-chosen message in code. Tests assert the status and code, and that the message is non-empty and contains no user input.
+  - *Q3 `githubUsername` body.* The members and transfer bodies are exactly `{githubUsername}`; any other field is 400 `INVALID_REQUEST`. The value must be a string; it is trimmed and must then be 1 to 39 characters of `[A-Za-z0-9-]`. GitHub's stricter hyphen rules are not enforced, because older accounts may not follow them.
+  - *Q4 Check order.* Each mutating project route checks, in order: `Origin` (403 `FORBIDDEN`); content type, body and path ID (400 `INVALID_REQUEST`); session (401); membership (404); role (403); then domain errors (404 or 409). A request with both a bad `Origin` and a bad content type gets 403. `GET /api/v1/projects/{projectId}` has no Origin check and starts with the path ID.
+  - *Q5 Handler placement.* The orchestrator's assumption A-1 is rejected. The two project stubs in `src/server/auth/project-authorization.ts` are replaced in place with thin calls. The members and transfer handlers and the shared Origin helper live in `src/server/projects/`. The existing session and membership helpers are exposed through the auth module's public entry rather than copied.
+  - *Q6 Missing person row.* `POST /api/v1/projects` from a valid session with no `people` row returns 401 `UNAUTHENTICATED`, because the sign-in callback creates that row and without it the caller has no application identity. Project-scoped routes keep returning 404 in this case.
+- **Planning decisions Q7 and Q8.** Approved by thegrimbee on 6 November 2026 as the agent recommended, answering the orchestrator's questions in `workflow/handoffs/projects-membership-4-1.md`.
+  - *Q7 Auth public entry.* Task 4.1 creates `src/server/auth/index.ts` as the auth module's public entry for the Q5 helpers. It exports only those helpers and their result types, and must not re-export `project-authorization.ts`. Existing direct imports of other `src/server/auth/*` files are left unchanged. The auth files are in Developer A's identity-and-access area, so Lim-ZY cross-reviews the 4.1 changes to `src/server/auth/` before merge.
+  - *Q8 No import cycle.* The session and membership helpers in `project-authorization.ts` (`getAuthenticatedUserId`, `resolveProjectAccess`, and the private code they depend on) move to a new file, `src/server/auth/request-access.ts`. They are moved, not copied. `project-authorization.ts` imports them from there, and the task stubs keep their behaviour. The Q6 step, which maps the session to a person or returns 401, is a new function in the same file. Dependencies run one way: `src/server/projects` imports `@/server/auth`, which resolves to `index.ts` and then `request-access.ts`; `project-authorization.ts` imports `@/server/projects` and `request-access.ts`. The auth entry never imports `src/server/projects`.
+- **Planning decisions S1 to S7 (public seam for test-first work).** Approved by thegrimbee on 6 November 2026 as the agent drafted them, so that the task 4.1 test-writer can run before the implementer without guessing names.
+  - *S1 Projects module exports.* `src/server/projects/index.ts` exports only the following:
+    - `ProjectService`;
+    - `ProjectRepository`: constructed with a database exposing `query()` and `connect()`, as `GitHubEvidenceRepository` is;
+    - `ProjectError`, keyed by error `code`, and `projectErrorResponse(error: unknown): Response`;
+    - the validators `parseCreateProjectBody(body: unknown)`, which returns `{key, name}` or `null`, and `parseGitHubUsernameBody(body: unknown)`, which returns the trimmed username or `null`. They live in `src/server/projects/validation.ts`;
+    - the handlers `handleProjectCreate(request, composition)`, `handleProjectRead(request, context, composition)`, `handleMemberAdd(request, context, composition)` and `handleProductManagerTransfer(request, context, composition)`;
+    - the types `ProjectView` = `{id, key, name, role}`, `MemberView` = `{personId, githubUsername, role: "developer"}`, and `PersonLookup`.
+
+    The project stubs in `project-authorization.ts` keep their names and call these handlers.
+  - *S2 Service methods.* The constructor is `new ProjectService(projects: ProjectRepository, people: PersonLookup)`. Its methods:
+    - `createProject(personId, {key, name})` returns `ProjectView`;
+    - `getProject(projectId, personId)` returns `ProjectView`;
+    - `addMember(projectId, actorPersonId, githubUsername)` returns `MemberView`;
+    - `transferProductManager(projectId, actorPersonId, githubUsername)` returns the caller's new `ProjectView`, with role `developer`.
+
+    Failures throw `ProjectError(code)`. The service checks the actor's product manager role inside the transaction, as well as the handler's earlier check. Repository method names are the implementer's choice.
+  - *S3 Composition.* One new field, `projectService: ProjectService`.
+  - *S4 Username lookup.* `PeopleRepository.findPeopleByGitHubUsername(githubUsername)` returns every exact, case-insensitive match as `{id, githubUsername}`. `PersonLookup`, defined in `src/server/projects/types.ts`, is that one method.
+  - *S5 Auth helpers.* `src/server/auth/request-access.ts` exports:
+    - `getAuthenticatedUserId(composition)`;
+    - `resolveProjectAccess(composition, projectId)`;
+    - `resolveSessionPerson(composition)`, which returns a person ID or a 401 `Response` (Q6);
+    - the `AccessResult` type.
+
+    `src/server/auth/index.ts` re-exports these.
+  - *S6 Database seam for mocked tests.* Exact SQL text is not fixed. Tests identify a statement by table (`app.projects`, `app.memberships`, `app.people`, `app.tasks`) and kind (SELECT, INSERT, UPDATE).
+    - Single reads use `pool.query`.
+    - Transactions use `pool.connect()`, then `BEGIN`, `COMMIT`, or `ROLLBACK` on any error, then `release()`.
+    - The transfer's membership lock statement contains `FOR UPDATE`.
+    - Unique violations are recognised by SQLSTATE `23505` and the constraint name: `projects_key_key` becomes `PROJECT_KEY_TAKEN`, and `memberships_project_person_key` becomes `ALREADY_MEMBER`.
+  - *S7 Losing a competing transfer.* When two transfers compete, the one that waits on the membership locks finds that the caller is no longer the product manager. It returns 403 `FORBIDDEN` and changes nothing.
+- **Review decisions R1 to R8 (task 4.1, review round 1).** Approved by thegrimbee on 6 November 2026. Each records the behaviour the 4.1 implementation already has; no code change follows from them.
+  - *R1 Name length.* The 1–100 character limit on a project name (D3) counts Unicode code points after trimming.
+  - *R2 Content-type parameters.* For the D8 check, `Content-Type` parameters after `;` are ignored, and the media type is compared after trimming and lowercasing. `application/json; charset=utf-8` is accepted. This matches the existing project-authorization stubs.
+  - *R3 Conflict messages.* The fixed messages for the new 409 codes (Q2) are:
+    - `PROJECT_KEY_TAKEN`: "A project with this key already exists"
+    - `GITHUB_USERNAME_AMBIGUOUS`: "The GitHub username matches more than one person"
+    - `ALREADY_MEMBER`: "The person is already a member of this project"
+    - `TRANSFER_TARGET_NOT_DEVELOPER`: "The product manager role can only be transferred to a developer in this project"
+    - `TRANSFER_BLOCKED_OPEN_TASKS`: "Reassign the developer's open tasks before transferring the product manager role"
+  - *R4 Caller without membership in the service.* If the service's in-transaction role check finds no membership for the caller, it fails with `NOT_FOUND`, the same as the non-member rule. The handler's earlier check already conceals this case over HTTP.
+  - *R5 Add-member lock.* Adding a member takes a `FOR SHARE` lock on the caller's membership row inside the transaction. It therefore waits for a concurrent transfer's `FOR UPDATE`, and a product manager demoted by that transfer cannot add a member.
+  - *R6 Lock waits.* No `lock_timeout` or retry is set for the transfer and add-member lock waits.
+  - *R7 Mocked-test row shapes.* S6 stays as recorded: result-row shapes and statement forms are not fixed. The unit `pg` fake evaluates the statements it receives and fails on any it cannot read; locks are verified only by the PostgreSQL integration tests.
+  - *R8 Duplicated constants.* The error table and the UUID pattern stay copied in `src/server/projects/`, `src/server/auth/request-access.ts` and `src/server/auth/project-authorization.ts`. Sharing them would widen the S5 and Q7 exports or add a file outside the 4.1 paths.
+
 ## GitHub App Repository-Link API Decision (Earlier Contract; Flow Superseded)
 
 Approved by Lim-ZY on 3 November 2026 for task 5.1. The human's subsequent approval of verification-before-listing on 3 November 2026 supersedes the route sequence in the first three bullets below. Preserve them as history only; use the current approved behavior and route contracts in `specs/github-evidence/spec.md`.
@@ -259,14 +336,20 @@ Recorded on 2 November 2026 during task 6.3. `AGENTS.md` refers to an API error 
 - **Codes.** Codes are stable `UPPER_SNAKE_CASE` strings that clients may depend on. A code is added by the task that first returns it, and recorded here. Existing codes:
   - `AUTHENTICATION_FAILED` (500 or 502).
   - `FORBIDDEN` (403).
+  - Shared by the existing Route Handlers and recorded during task 4.1: `INVALID_REQUEST` (400), `UNAUTHENTICATED` (401) and `NOT_FOUND` (404).
   - The LLM Gateway Decisions G3 codes: `RATE_LIMITED` (429), `QUOTA_EXCEEDED` (429), `AI_UNAVAILABLE` (503), `AI_ERROR` (502) and `INVALID_OUTPUT` (502).
+  - `PROJECT_KEY_TAKEN` (409): a project key already exists (task 4.1).
+  - `TRANSFER_BLOCKED_OPEN_TASKS` (409): the incoming product manager has open assigned tasks (task 4.1).
+  - `GITHUB_USERNAME_AMBIGUOUS` (409): a GitHub username matches more than one registered person (task 4.1).
+  - `ALREADY_MEMBER` (409): the person already has a role in the project (task 4.1).
+  - `TRANSFER_TARGET_NOT_DEVELOPER` (409): the transfer target is not a developer in the project, or is the product manager (task 4.1).
 - **Message.** A fixed, human-readable message chosen by the server. It never contains a stack trace, SQL, a provider message or body, a credential, or user-supplied text.
 - **Headers.** Error responses send `Cache-Control: no-store`.
 - **Unexpected errors.** Errors not mapped to a specific code return 500 with a generic message, and their details are not exposed.
 
 ## Risks / Trade-offs
 
-- **The GitHub token gives access to the whole repository.** It is limited to read-only access for one repository, encrypted, and never exposed. The product manager can replace or remove it.
+- **The GitHub App can read the whole linked repository.** Each installation access token is short-lived and restricted to the one linked repository with read-only Contents and Metadata permissions. Tokens are never returned to clients, logged, or persisted, and the App private key stays in server-side environment variables (see "Repository-scoped installation tokens"). This bullet replaces an earlier one that described an encrypted personal access token, which the GitHub App change retired (corrected 6 November 2026 during task 4.1).
 - **Developers commit with an email that is not linked to their GitHub account.** Those commits won't match the author filter. The commit picker explains this when no commits are found.
 - **The model may judge criteria wrongly.** Results are advisory, evidence is verified against the diff, and only the product manager can approve.
 - **Prompt injection through commits or task text.** This is mitigated by separating untrusted content, validating against the schema and evidence rules, and giving AI no ability to change state. Adversarial fixtures check it.
@@ -278,7 +361,7 @@ Recorded on 2 November 2026 during task 6.3. `AGENTS.md` refers to an API error 
 ## Open Questions
 
 - Tester accounts for the deployed environments.
-- Task 4.1 must decide who may create a project and how its initial product manager is selected. The task 3.2 project-creation stub does not settle this.
+- Resolved 6 November 2026 (task 4.1): who may create a project and how its initial product manager is selected. See "Project and Membership Decisions".
 
 ## Migration Plan
 
