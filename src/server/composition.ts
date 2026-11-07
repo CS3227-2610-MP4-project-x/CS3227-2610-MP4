@@ -10,7 +10,7 @@ import { TaskAccessRepository } from "@/server/repositories/task-access-reposito
 import { GitHubAppAdapter } from "@/server/github";
 import { GitHubEvidenceRepository, GitHubEvidenceService } from "@/server/github-evidence";
 import { ProjectRepository, ProjectService } from "@/server/projects";
-import { TaskRepository, TaskService } from "@/server/tasks";
+import { TaskLifecycleService, TaskRepository, TaskService } from "@/server/tasks";
 import {
   GitHubOAuthVerificationAdapter,
   GitHubRepositoryLinkRepository,
@@ -20,6 +20,8 @@ import { UsageRepository } from "@/server/repositories/usage-repository";
 import {
   CompletionAssessmentRepository,
   CompletionAssessmentService,
+  SubmissionSnapshotRepository,
+  SubmissionTipLookup,
   TaskSnapshotRepository,
   TaskSnapshotService,
 } from "@/server/completion-assessment";
@@ -32,6 +34,7 @@ export type ServerComposition = Readonly<{
   taskAccessRepository: TaskAccessRepository;
   projectService: ProjectService;
   taskService: TaskService;
+  taskLifecycleService: TaskLifecycleService;
   githubRepositoryLinkService: GitHubRepositoryLinkService;
   githubEvidenceService: GitHubEvidenceService;
   completionAssessmentService: CompletionAssessmentService;
@@ -63,7 +66,8 @@ export function getServerComposition(): ServerComposition {
   const projectAccessRepository = new ProjectAccessRepository(pool);
   const taskAccessRepository = new TaskAccessRepository(pool);
   const projectService = new ProjectService(new ProjectRepository(pool), peopleRepository);
-  const taskService = new TaskService(new TaskRepository(pool));
+  const taskRepository = new TaskRepository(pool);
+  const taskService = new TaskService(taskRepository);
   const githubRepositoryLinkRepository = new GitHubRepositoryLinkRepository(pool);
   const githubOAuthVerificationAdapter = new GitHubOAuthVerificationAdapter({
     clientId: config.githubAppClientId,
@@ -92,6 +96,12 @@ export function getServerComposition(): ServerComposition {
     repository: new CompletionAssessmentRepository(pool),
     gateway: llmGateway,
   });
+  // design.md L5: the submission tip is looked up before the lifecycle transaction begins.
+  const submissionTipLookup = new SubmissionTipLookup({
+    snapshots: new SubmissionSnapshotRepository(pool),
+    evidence: githubEvidenceService,
+  });
+  const taskLifecycleService = new TaskLifecycleService(taskRepository, submissionTipLookup);
   const taskDetailService = new TaskDetailService(new TaskDetailReadRepository(pool), completionAssessmentService);
   composition = Object.freeze({
     authService: new AuthService(config.appOrigin, peopleRepository),
@@ -100,6 +110,7 @@ export function getServerComposition(): ServerComposition {
     taskAccessRepository,
     projectService,
     taskService,
+    taskLifecycleService,
     githubRepositoryLinkService,
     githubEvidenceService,
     completionAssessmentService,

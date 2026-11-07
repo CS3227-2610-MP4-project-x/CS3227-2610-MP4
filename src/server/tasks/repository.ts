@@ -1,7 +1,7 @@
 import "server-only";
 
 import { TaskError } from "./errors";
-import type { CreateTaskInput, CriterionView, EditTaskInput, ProjectRole, StoredTaskState } from "./types";
+import type { CreateTaskInput, CriterionView, EditTaskInput, ProgressUpdateView, ProjectRole, StoredTaskState } from "./types";
 
 type Query = Readonly<{
   query<T extends Record<string, unknown> = Record<string, unknown>>(
@@ -30,8 +30,8 @@ export type TaskRecord = Readonly<{
   criteria: readonly CriterionView[];
 }>;
 
-/** The locked fields of a live task that a write checks (design.md T6, T9). */
-export type LockedTask = Readonly<{ assigneeId: string; version: number }>;
+/** The locked fields of a live task that a write checks (design.md T6, T9, L1, L2). */
+export type LockedTask = Readonly<{ assigneeId: string; status: StoredTaskState; version: number }>;
 
 /** The editable task columns, in a fixed order (design.md T4). Column names are never user input. */
 const EDITABLE_COLUMNS = [
@@ -174,10 +174,13 @@ export class TaskTransaction {
     );
   }
 
-  /** Locks a live task of the project for update (design.md T6). */
+  /**
+   * Locks a live task of the project for update (design.md T6). The lock also makes a
+   * concurrent commit attachment, criteria edit or reassignment wait for this transaction.
+   */
   async lockTask(projectId: string, taskId: string): Promise<LockedTask | null> {
-    const result = await this.connection.query<{ assignee_id: string; version: number }>(
-      `SELECT assignee_id::text AS assignee_id, version
+    const result = await this.connection.query<{ assignee_id: string; status: StoredTaskState; version: number }>(
+      `SELECT assignee_id::text AS assignee_id, status, version
          FROM app.tasks
         WHERE id = $1::uuid
           AND project_id = $2::uuid
@@ -186,7 +189,7 @@ export class TaskTransaction {
       [taskId, projectId],
     );
     const row = result.rows[0];
-    return row ? { assigneeId: String(row.assignee_id), version: Number(row.version) } : null;
+    return row ? { assigneeId: String(row.assignee_id), status: row.status, version: Number(row.version) } : null;
   }
 
   async listCriteria(taskId: string): Promise<readonly CriterionView[]> {
@@ -280,6 +283,112 @@ export class TaskTransaction {
 
   async findTask(projectId: string, taskId: string): Promise<TaskRecord | null> {
     return findTaskRecord(this.connection, projectId, taskId);
+  }
+
+  /** Moves the task to `status` under the version guard (design.md L1); false on a mismatch. */
+  async updateStatus(taskId: string, expectedVersion: number, status: StoredTaskState): Promise<boolean> {
+    const result = await this.connection.query(
+      `UPDATE app.tasks
+          SET status = $3
+        WHERE id = $1::uuid
+          AND version = $2
+          AND deleted_at IS NULL`,
+      [taskId, expectedVersion, status],
+    );
+    return result.rowCount === 1;
+  }
+
+  /** Appends a start or approval to the task's history (design.md L6). */
+  async insertStateChange(taskId: string, actorPersonId: string, fromStatus: StoredTaskState, toStatus: StoredTaskState): Promise<void> {
+    await this.connection.query(
+      `INSERT INTO app.task_events (task_id, actor_id, event_type, from_status, to_status)
+       VALUES ($1::uuid, $2::uuid, 'state_change', $3, $4)`,
+      [taskId, actorPersonId, fromStatus, toStatus],
+    );
+  }
+
+  /** Appends a submission, with the matching check result if any (design.md L5, L6). */
+  async insertSubmission(
+    taskId: string,
+    actorPersonId: string,
+    fromStatus: StoredTaskState,
+    toStatus: StoredTaskState,
+    checkResultId: string | null,
+  ): Promise<void> {
+    await this.connection.query(
+      `INSERT INTO app.task_events (task_id, actor_id, event_type, from_status, to_status, check_result_id)
+       VALUES ($1::uuid, $2::uuid, 'submission', $3, $4, $5::uuid)`,
+      [taskId, actorPersonId, fromStatus, toStatus, checkResultId],
+    );
+  }
+
+  /** Appends a request for changes with its trimmed feedback (design.md L3, L6). */
+  async insertReviewFeedback(
+    taskId: string,
+    actorPersonId: string,
+    fromStatus: StoredTaskState,
+    toStatus: StoredTaskState,
+    feedback: string,
+  ): Promise<void> {
+    await this.connection.query(
+      `INSERT INTO app.task_events (task_id, actor_id, event_type, from_status, to_status, feedback)
+       VALUES ($1::uuid, $2::uuid, 'review_feedback', $3, $4, $5)`,
+      [taskId, actorPersonId, fromStatus, toStatus, feedback],
+    );
+  }
+
+  /** The task's attached commit SHAs, for the submission recheck (design.md L5). */
+  async listAttachedCommitShas(taskId: string): Promise<readonly string[]> {
+    const result = await this.connection.query<{ commit_sha: string }>(
+      `SELECT commit_sha
+         FROM app.attached_commits
+        WHERE task_id = $1::uuid`,
+      [taskId],
+    );
+    return result.rows.map((row) => String(row.commit_sha));
+  }
+
+  /**
+   * The newest stored check of the task whose anchor is `anchorSha` and whose criteria hash is
+   * `criteriaHash` (design.md L5; completion-assessment stores the anchor in `result`).
+   */
+  async findMatchingCheck(taskId: string, anchorSha: string, criteriaHash: string): Promise<string | null> {
+    const result = await this.connection.query<{ id: string }>(
+      `SELECT id::text AS id
+         FROM app.check_results
+        WHERE task_id = $1::uuid
+          AND result ->> 'anchorSha' = $2
+          AND criteria_hash = $3
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1`,
+      [taskId, anchorSha, criteriaHash],
+    );
+    return result.rows[0] ? String(result.rows[0].id) : null;
+  }
+
+  /** Stores a progress update and returns it as task detail shows it (design.md L4). */
+  async insertProgressUpdate(taskId: string, authorPersonId: string, body: string): Promise<ProgressUpdateView> {
+    const inserted = await this.connection.query<{ id: string; body: string; created_at: unknown }>(
+      `INSERT INTO app.progress_updates (task_id, author_id, body)
+       VALUES ($1::uuid, $2::uuid, $3)
+       RETURNING id::text AS id, body, created_at`,
+      [taskId, authorPersonId, body],
+    );
+    const author = await this.connection.query<{ github_username: string }>(
+      `SELECT github_username
+         FROM app.people
+        WHERE id = $1::uuid`,
+      [authorPersonId],
+    );
+    const row = inserted.rows[0];
+    const username = author.rows[0];
+    if (!row || !username) throw new Error("Progress update or its author is missing.");
+    return {
+      id: String(row.id),
+      author: { id: authorPersonId, githubUsername: String(username.github_username) },
+      body: String(row.body),
+      createdAt: isoTimestamp(row.created_at),
+    };
   }
 }
 
