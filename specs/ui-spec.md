@@ -77,14 +77,24 @@ Recommended spacing:
 |---|---|---|
 | Project dashboard | Both | Header, Project Progress, Action Buttons (product manager only), Task Summary Card, Task Allocation |
 | Task board | Both | Four columns: To Do, In Progress, In Review, Done. Product managers see all tasks; developers see their own tasks. Moving a card uses a status menu; drag-and-drop is optional. |
-| Task detail | Both | Title, description, acceptance criteria, assignee, due date, branch, progress updates, attached commits, latest Acceptance Criteria Check, review feedback |
+| Task detail | Both | Title, description, acceptance criteria, assignee, due date, branch, progress updates, attached commits, distinct Acceptance Criteria Check history, review feedback. The assigned developer can run a check; the product manager can read history only. |
 | Commit picker | Developer | Dialog opened from task detail: date range and branch filters, checklist of the developer's commits (message, short SHA, time), with commits mentioning the task ID pre-selected |
-| Acceptance Criteria Check | Developer (product manager read-only) | One row per criterion with status (addressed / not addressed / unclear) and expandable diff evidence, then a list of possible gaps. No numeric score. |
-| Review queue | Product manager | Tasks in In Review, each with commits and the latest check; Approve and Request changes (with required feedback) actions |
+| Acceptance Criteria Check | Developer (product manager read-only) | One row per criterion with status (addressed / not addressed / unclear) and expandable diff evidence, then a list of possible gaps. No numeric score. Provide access to distinct check history; exact-set reuse displays the existing result with a brief notice. Show a brief redaction note only when secrets were redacted before assessment. |
+| Review queue | Product manager | Tasks in In Review, each with commits, the result referenced by the submission, and distinct check history; Approve and Request changes (with required feedback) actions. Check access is read-only. |
 | Progress Report | Product manager | Date range picker (default: today, SGT), report grouped by developer, task-ID citations that link to the tasks |
 | Project settings | Product manager | Linked repository, token status (never the token itself), members, AI usage per feature per day |
 
 Status colors on the board follow the Color System: monochrome for To Do, In Progress, and In Review, and the green accent only for Done.
+
+### Acceptance Criteria Check behavior
+- Place the developer's **Run check** action with the task's attached commits on task detail. The product manager can open results and history but has no run or edit action.
+- Show one entry per distinct stored result in newest-first order. Each entry shows its anchor SHA and timestamp; opening it shows its result content and whether redaction occurred. Reuse a result only when the commit set, acceptance criteria, and repository path rules are identical; show a concise notice that the existing result is being shown and do not add a duplicate history entry. A developer can run a new check after repository path rules change.
+- A submission in the review queue opens the check result it references, while keeping the task's distinct check history available.
+- Show a concise note that secrets were redacted before assessment only when redaction occurred. Never show the redacted value or secret text.
+- Keep the check advisory. Approval and Request changes remain explicit product-manager actions in the review workflow.
+
+### Visual references and human review
+The developer Acceptance Criteria Check and task-detail screens use the human-supplied `frontend_mockup_3.png` and `frontend_mockup_2.png` as accepted visual direction. `frontend_mockup_pm_review.png` is supplied for the product manager's review; it is not final UI approval. Pause UI implementation until the product manager mockup has been reviewed. The images guide visual styling and composition only; written requirements in OpenSpec govern behavior. The developer mockup that presents **Submit for review** directly on the check result screen depicts Task 4.3 lifecycle integration; Group 7 must not implement submission or change lifecycle behavior.
 
 ## Components
 
