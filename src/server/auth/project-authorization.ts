@@ -3,6 +3,7 @@ import "server-only";
 import type { NextRequest } from "next/server";
 import type { ServerComposition } from "@/server/composition";
 import { handleProjectCreate, handleProjectRead } from "@/server/projects";
+import { handleTaskCreate, handleTaskEdit, handleTaskRead } from "@/server/tasks";
 import type { ProjectRole } from "@/server/repositories/project-access-repository";
 import type { StoredTaskState, TaskAccessRecord } from "@/server/repositories/task-access-repository";
 import { resolveProjectAccess, type AccessResult } from "./request-access";
@@ -37,11 +38,6 @@ function invalidRequest(): Response {
   return response(400);
 }
 
-async function projectIdFrom(context: RouteContext): Promise<string | Response> {
-  const { projectId } = await context.params;
-  return UUID_PATTERN.test(projectId) ? projectId : invalidRequest();
-}
-
 async function taskAccess(
   composition: ServerComposition,
   projectId: string,
@@ -62,17 +58,6 @@ async function taskIdsFrom(context: RouteContext): Promise<{ projectId: string; 
   const { projectId, taskId } = await context.params;
   if (!UUID_PATTERN.test(projectId) || !taskId || !UUID_PATTERN.test(taskId)) return invalidRequest();
   return { projectId, taskId };
-}
-
-async function hasJsonObjectBody(request: NextRequest): Promise<boolean> {
-  try {
-    const contentType = request.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase();
-    if (contentType !== "application/json") return false;
-    const body: unknown = await request.json();
-    return typeof body === "object" && body !== null && !Array.isArray(body);
-  } catch {
-    return false;
-  }
 }
 
 async function requestedState(request: NextRequest): Promise<StoredTaskState | null> {
@@ -125,44 +110,31 @@ export async function handleProjectReadStub(
   return handleProjectRead(request, context, composition);
 }
 
-/** Runs the task creation stub only for a product manager in the path project. */
+/** Task creation is functional (task 4.2); delegates to the tasks module (design.md T16). */
 export async function handleTaskCreationStub(
   request: NextRequest,
   context: RouteContext,
   composition: ServerComposition,
 ): Promise<Response> {
-  const projectId = await projectIdFrom(context);
-  if (isResponse(projectId)) return projectId;
-  if (!await hasJsonObjectBody(request)) return invalidRequest();
-  const access = await resolveProjectAccess(composition, projectId);
-  if (isResponse(access)) return access;
-  return access.role === "product_manager" ? response(501) : response(403);
+  return handleTaskCreate(request, context, composition);
 }
 
-/** Runs the task read stub only after membership and path-scoped task lookup. */
+/** Task read is functional (task 4.2); delegates to the tasks module (design.md T16). */
 export async function handleTaskReadStub(
   request: NextRequest,
   context: RouteContext,
   composition: ServerComposition,
 ): Promise<Response> {
-  const ids = await taskIdsFrom(context);
-  if (isResponse(ids)) return ids;
-  const access = await taskAccess(composition, ids.projectId, ids.taskId);
-  return isResponse(access) ? access : response(501);
+  return handleTaskRead(request, context, composition);
 }
 
-/** Runs the task field-edit stub only for a project manager. */
+/** Task field edit is functional (task 4.2); delegates to the tasks module (design.md T16). */
 export async function handleTaskEditStub(
   request: NextRequest,
   context: RouteContext,
   composition: ServerComposition,
 ): Promise<Response> {
-  const ids = await taskIdsFrom(context);
-  if (isResponse(ids)) return ids;
-  if (!await hasJsonObjectBody(request)) return invalidRequest();
-  const access = await taskAccess(composition, ids.projectId, ids.taskId);
-  if (isResponse(access)) return access;
-  return access.role === "product_manager" ? response(501) : response(403);
+  return handleTaskEdit(request, context, composition);
 }
 
 /** Validates transition vocabulary and role/assignment authorization without mutation. */
