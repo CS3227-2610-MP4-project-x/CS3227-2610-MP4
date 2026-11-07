@@ -658,7 +658,7 @@ Findings grouped **must / should / nit**, each with `file:line` evidence, the re
 - Started / ended / elapsed `[ALL, optional when surfaced]`: first transcript record 2026-11-06 21:25:50 SGT, last 21:26:22 SGT (transcript-derived); 32,140 ms (platform-reported).
 - Resource usage (provider-reported): tokens in / out / total; cache read / write; cost; tool calls or other surfaced metrics:
   - Platform-reported (task notification `<usage>`): 47,690 subagent tokens, 5 tool uses, 32,140 ms.
-  - Transcript-derived (`subagents/agent-a1971cf38e4284473.jsonl`, de-duplicated by message ID with `temp/handoff-backfill/inventory_lib.py`): 4 responses; input 8; output 3,885; cache read 119,676; cache write 45,331; 5 tool calls.
+  - Transcript-derived (`subagents/agent-a1971cf38e4284473.jsonl`, de-duplicated by message ID with `workflow/scripts/handoff-backfill/inventory_lib.py`): 4 responses; input 8; output 3,885; cache read 119,676; cache write 45,331; 5 tool calls.
   - The agent itself reported "Resource usage: not available (the platform did not surface any metrics)"; the figures above were recovered afterwards by the main session.
 - Unavailable resource metrics: cost: not available.
 - Work completed / findings: Made four scoped commits of the approved 4.1 changes on `feat/projects-membership-4-1` and drafted the PR title and description against `dev`. Details under "Branch inventory, scoped commits, and PR draft" in Consolidated outcome.
@@ -959,7 +959,7 @@ Review: 2 rounds. Round 1 had 0 must, 7 should and 9 nit findings. Round 2 had 0
 
 - Suggested skills / references for the next worker `[ORCH, when applicable]`:
 
-**X1 totals (4.1, pipeline arm)** (computed 2026-11-07 by the main session from local Claude Code transcripts with `temp/handoff-backfill/inventory_lib.py` `usage_of`, run with `python -I`; usage de-duplicated by message ID; no message ID appears in more than one transcript file)
+**X1 totals (4.1, pipeline arm)** (computed 2026-11-07 by the main session from local Claude Code transcripts with `workflow/scripts/handoff-backfill/inventory_lib.py` `usage_of`, run with `python -I`; usage de-duplicated by message ID; no message ID appears in more than one transcript file)
 
 - Sessions counted: the three main sessions that ran 4.1, one after another (each later one started with `/clear`):
   - `e452eaa6-3ea9-4335-86cc-4cd66ba83f76`: analyst, human gate, handoff seed, first plan, commits.
