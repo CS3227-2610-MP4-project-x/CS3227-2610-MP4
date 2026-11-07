@@ -8,6 +8,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // The real route handlers run. Supabase Auth, server config and `pg` are replaced; the `pg`
 // fake records every call and answers nothing, so a refused request is shown to reach
 // neither the session lookup nor the database. All values are synthetic.
+//
+// Task 4.3 adds `PATCH .../tasks/{taskId}/state` and `POST .../tasks/{taskId}/progress-updates`,
+// which the approved delta adds to the requirement's route list ("Origin list" conflict
+// resolution; design.md "Task Lifecycle Decisions (4.3)" check order). Their bodies are valid
+// ({state, version} and {body}), so a matching Origin proceeds to the session check (401).
 const boundary = vi.hoisted(() => ({
   getUser: vi.fn(),
   query: vi.fn(),
@@ -41,14 +46,17 @@ vi.mock("pg", () => {
 
 const appOrigin = "https://synthetic-app.example";
 const projectId = "33333333-3333-4333-8333-333333333333";
+const taskId = "44444444-4444-4444-8444-444444444444";
 
-type MutatingRoute = "create" | "members" | "transfer";
-const routes: MutatingRoute[] = ["create", "members", "transfer"];
+type MutatingRoute = "create" | "members" | "transfer" | "taskState" | "progressUpdate";
+const routes: MutatingRoute[] = ["create", "members", "transfer", "taskState", "progressUpdate"];
 
 const validBodies: Record<MutatingRoute, unknown> = {
   create: { key: "WEB", name: "Synthetic project" },
   members: { githubUsername: "synthetic-target" },
   transfer: { githubUsername: "synthetic-target" },
+  taskState: { state: "In Progress", version: 1 },
+  progressUpdate: { body: "Synthetic progress update" },
 };
 
 interface RequestOptions {
@@ -57,9 +65,13 @@ interface RequestOptions {
 }
 
 async function call(route: MutatingRoute, options: RequestOptions = {}): Promise<Response> {
+  const taskPath = `/api/v1/projects/${projectId}/tasks/${taskId}`;
   const path = route === "create" ? "/api/v1/projects"
     : route === "members" ? `/api/v1/projects/${projectId}/members`
-      : `/api/v1/projects/${projectId}/product-manager-transfer`;
+      : route === "taskState" ? `${taskPath}/state`
+        : route === "progressUpdate" ? `${taskPath}/progress-updates`
+          : `/api/v1/projects/${projectId}/product-manager-transfer`;
+  const method = route === "taskState" ? "PATCH" : "POST";
   const headers = new Headers();
   const origin = options.origin === undefined ? appOrigin : options.origin;
   if (origin !== null) headers.set("origin", origin);
@@ -67,12 +79,15 @@ async function call(route: MutatingRoute, options: RequestOptions = {}): Promise
   if (contentType !== null) headers.set("content-type", contentType);
   // A byte body, so no content type is added implicitly when the header is omitted.
   const body = new TextEncoder().encode(JSON.stringify(validBodies[route]));
-  const request = new NextRequest(`${appOrigin}${path}`, { method: "POST", headers, body });
+  const request = new NextRequest(`${appOrigin}${path}`, { method, headers, body });
   const context = { params: Promise.resolve({ projectId }) };
+  const taskContext = { params: Promise.resolve({ projectId, taskId }) };
   switch (route) {
     case "create": return (await import("../../src/app/api/v1/projects/route")).POST(request);
     case "members": return (await import("../../src/app/api/v1/projects/[projectId]/members/route")).POST(request, context);
     case "transfer": return (await import("../../src/app/api/v1/projects/[projectId]/product-manager-transfer/route")).POST(request, context);
+    case "taskState": return (await import("../../src/app/api/v1/projects/[projectId]/tasks/[taskId]/state/route")).PATCH(request, taskContext);
+    case "progressUpdate": return (await import("../../src/app/api/v1/projects/[projectId]/tasks/[taskId]/progress-updates/route")).POST(request, taskContext);
   }
 }
 
@@ -109,7 +124,7 @@ const badOrigins: [string, string | null][] = [
   ["the opaque origin null", "null"],
 ];
 
-describe.each(routes)("POST %s request-origin check", (route) => {
+describe.each(routes)("mutating route %s request-origin check", (route) => {
   it.each(badOrigins)("refuses %s with 403 FORBIDDEN before the session or database", async (_label, origin) => {
     await expectError(await call(route, { origin }), 403, "FORBIDDEN", "Insufficient permissions");
     expectUntouched();
