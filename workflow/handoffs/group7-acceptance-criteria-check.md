@@ -4,10 +4,10 @@
 
 - Task ID: `group7-acceptance-criteria-check`
 - Summary: Coordinate Group 7 implementation packages after approved requirements, with ownership and sequential shared-worktree boundaries.
-- Human owner (Developer A / Developer B): Developer A (Lim-ZY); Developer B (thegrimbee) owns the required database migration/persistence tests and Task 4.2–4.4 integrations.
+- Human owner (Developer A / Developer B): Developer A (Lim-ZY) owns Group 7. Developer B (thegrimbee) owns the persistence migration, Task 4.3 submission integration, and Task 4.4 review queue/pages; by explicit human exception Group 7 owns the task-detail GET read model/history API tests only, not Task 4.2 CRUD.
 - Requirement IDs: OpenSpec tasks 7.1, 7.2, and 7.3; applicable requirements in `completion-assessment`, `data-persistence`, and `task-management`. No formal requirement IDs are assigned.
-- Status: 7.2 implementation, regression tests, typecheck/lint/diff checks, and independent re-review are complete with no remaining findings. Independent review passed 363 tests across 9 files. Group 7.3 is not started and is paused by the human while the authorized commit agent creates scoped commits for the current branch delta. PostgreSQL integration remains unverified because `TEST_DATABASE_URL` is unset; migration not applied.
-- Next human action: Review the commit agent's scoped commit inventory/result. When Group 7.3 resumes, keep task-detail/review history reads and PM result-access tests with Task 4.2/4.4; submission reference stays with Task 4.3. Before UI implementation, review the frontend agent's reconfirmed developer and PM mockups.
+- Status: Group 7.1, 7.2, and 7.3 POST, task-detail read API, and reusable UI components are implemented and independently reviewed clean. UI tests passed 54/54; task-detail GET plus project-authorization tests passed 143/143; route tests passed 43/43; 7.1 input tests passed 116/116; adapter tests passed 97/97; AI/7.2 suites passed 363 tests across 9 files. TypeScript/scoped lint checks passed. Human-approved full task-detail DTO and collection order are in OpenSpec. No commit was created in this phase. PostgreSQL integration remains unverified; the migration has not been applied. Vercel support for `maxDuration = 150` remains a release check. Live browser layout/keyboard/focus checks remain unverified because no app/browser was available. Task 4.3 submission matching and Task 4.4 review queue/page integration remain separate scopes.
+- Next human action: Review the completed Group 7 delta and decide whether/when to authorize commit work. No push or PR is authorized.
 
 ## Source and scope `[ORCH]`
 
@@ -15,7 +15,7 @@
 - Source revision: `1f5cddc`.
 - Permitted paths and actions: Coordination records in `workflow/plans/` and `workflow/handoffs/`; completed assignments are detailed in the plan. 7.2 service tests are in `tests/unit/completion-assessment/snapshot-service.test.ts` and `tests/unit/completion-assessment/service.test.ts`; the AI runtime-export assertion is in `tests/unit/ai/soclaas-adapter.test.ts`. The implementation paths for the sanitizer follow-up were `src/server/ai/prompt.ts`, `src/server/ai/index.ts`, and `src/server/completion-assessment/service.ts`; original service implementation paths remain as listed in the plan. No other path may be added without a scope update. Current Group 7 specs, migration, tests, adapter, input, and workflow changes are uncommitted.
 - Prohibited paths and actions: Orchestrator does not edit product code, tests, migrations, or specifications. The migration implementer must not edit shipped migrations, tests, fixtures, or other files. Do not implement task submission/lifecycle or UI before its review gate.
-- Dependencies and parallel work: Groups 5 and 6 are prerequisites. Tasks 7.1 → 7.2 → 7.3 are sequential. All writers are sequenced in the current worktree; no concurrent writers. For the authorized sanitizer follow-up, the test-writer owned only `tests/unit/completion-assessment/service.test.ts` and `tests/unit/ai/soclaas-adapter.test.ts`; the implementer owned only `src/server/ai/prompt.ts`, `src/server/ai/index.ts`, and `src/server/completion-assessment/service.ts`. Focused tests passed 132/132; independent review passed 363 tests across 9 files, typecheck, and scoped ESLint, with no remaining findings. Group 7.3 remains paused. Its assigned-developer POST route can later be implemented at `src/app/api/v1/projects/[projectId]/tasks/[taskId]/acceptance-criteria-check/route.ts` with tests in `tests/unit/completion-assessment/route.test.ts`. PM `checkHistory` read tests are deferred to Task 4.2/4.4 because task-detail/review GET paths and UI belong to those tasks; Group 7 must not add a parallel history route or narrow history seam. Task 4.3 retains submission and lifecycle ownership. The frontend mockup review gate remains in force.
+- Dependencies and parallel work: Groups 5 and 6 are prerequisites. Tasks 7.1 → 7.2 → 7.3 were sequenced in one worktree, with no concurrent writers. Sanitizer, POST route, and UI correction sequences and their results are recorded in the assignment log below and the plan. Human approved `frontend_mockup_2.png`, `frontend_mockup_3.png`, and `frontend_mockup_pm_review.png`. Group 7 now owns task-detail `checkHistory` reads and PM history API tests by explicit exception; Task 4.3 owns submission writes, Task 4.4 owns review-queue listing/page integration. No review route, task CRUD/PATCH, or lifecycle write is in Group 7 scope. All writer sessions were sequential.
 
 ## Context references `[ALL, when relevant]`
 
@@ -32,12 +32,214 @@
 
 ## Decisions and open questions `[ORCH]`
 
-- Current state: Approved Group 7 behavior, including destination-path handling for renames, is reflected in the active change. 7.1 implementation and final review are clean (116 input tests passed). 7.2's original three findings and follow-on `<data` sanitization finding were approved and fixed. The shared sanitizer is exported through the AI public entry point and reused by completion assessment; validation uses model-visible lines, verified evidence maps back to safe/redacted source lines, omitted paths persist original server-calculated values, and ambiguity is handled safely. Regression coverage includes escaped criteria/evidence/omitted paths and the AI runtime export. Focused suites passed 132/132; independent review suites passed 363 across 9 files, typecheck, and scoped ESLint; no remaining findings. Group 7.3 was not started. The analyst confirmed the POST route/tests can proceed independently, while PM history/result-access tests belong with Task 4.2 task-detail and Task 4.4 review reads; submission reference remains Task 4.3. The human paused 7.3 and authorized scoped commits for the current branch changes. PostgreSQL integration remains unverified because `TEST_DATABASE_URL` is unset; migration not applied.
-- Human-approved decisions: All previously recorded Group 7 decisions plus authorization to resolve all three original 7.2 reviewer findings and the follow-on `<data` sanitizer finding, with regression tests. The human paused Group 7.3 and authorized the commit agent to create scoped commits for the current branch changes; this authorization does not include push or PR creation. Exact result JSON `{anchorSha, criteria:[{criterionId,criterion,status,evidence}], possibleGaps, omittedFiles}` with exact-line evidence and criterion IDs; unknown/duplicate/missing criterion IDs invalidate model output after the gateway retry; commit-set hash over sorted full SHAs joined by LF with no trailing LF; criteria hash over compact UTF-8 JSON `{id,description}` ordered by position then ID; one-statement point-in-time snapshot and captured-input hash behavior; Developer A owns the narrow read-only Group 7 snapshot seam while Developer B retains Task 4.2 CRUD/routes/writes.
+- Current state: Approved Group 7 behavior is reflected in the active change. 7.1/7.2 and the 7.3 POST route are reviewed clean. UI malformed-response tests were expanded and fixtures corrected; 37 pass and three array-status tests are expected-red. Component-only implementer is assigned to add the strict string type guard, then independent review and frontend QA follow. Human authorized Group 7 task-detail GET history reads and approved a full DTO (task identity/key/title/description/status/assignee/due date/branch/criteria, attached commits, progress updates, review feedback, `checkHistory`); analyst is updating OpenSpec before read-model testing/implementation. No review route will be added. Task 4.4 page/queue integration and Task 4.3 submission remain out of scope. Vercel support and PostgreSQL integration remain unverified.
+- Human-approved decisions: All previously recorded Group 7 decisions plus authorization to resolve the 7.2 reviewer findings and UI malformed-response validation finding with regression tests. The human approved the three mockup references. Latest authorization supersedes prior Task 4.2 read ownership for Group 7 task-detail GET model/history API tests and approves full DTO fields: task identity/key/title/description/status/assignee/due date/branch/acceptance criteria, attached commits, progress updates, review feedback, and `checkHistory`. Group 7 still does not own broader Task 4.2 CRUD, Task 4.4 review-queue pages/listing, or Task 4.3 submission matching. Exact result JSON and snapshot/hash contracts remain as recorded above.
 - Assumptions (identify unapproved assumptions): None for product behavior. Candidate implementation paths are listed in the coordination plan and must be confirmed at each assignment.
-- Open questions / conflicts: The PM history/result-access API tests required by Group 7.3 are deferred until Task 4.2 task-detail history reads and Task 4.4 review reads exist. This is an ownership boundary, not a behavior decision; Group 7 must not add a competing history route/service. Group 7.3 is paused by the human, and no 7.3 code/tests have been assigned. UI remains gated on frontend reconfirmation of the developer-side and PM mockups plus human review.
+- Open questions / conflicts: Analyst is updating OpenSpec with the human-approved full task-detail DTO before history tests/code begin. No review-queue API currently exists and none will be added; Task 4.4 owns listing/pages and Task 4.3 owns submission matching. UI status-array regression tests are complete; strict type-guard correction is active, followed by reviewer and frontend QA.
 
 ## Worker session reports
+
+### Session `implementer / provider session ID not surfaced`
+
+- Provider: `codex`
+- Provider session ID: not available
+- Work ID: `group7-acceptance-criteria-check`
+- Agent: implementer
+- Phase: UI status-type validation follow-up
+- Platform and model (if surfaced): not available
+- Role: implementer
+- Human owner and assigned task scope: Developer A; only `src/components/completion-assessment/developer-check-panel.tsx`
+- Source revision: not available
+- Resource usage (provider-reported): not available
+- Unavailable resource metrics: tokens, cache, cost, tool calls, and provider session ID not surfaced
+- Work completed / findings: Requires `typeof criterion.status === "string"` before checking membership in the allowed status enum, rejecting array/object coercions.
+- Files changed: `src/components/completion-assessment/developer-check-panel.tsx`
+- Checks run and exact results: Focused UI suite passed 40/40; scoped ESLint, `npx tsc --noEmit --incremental false`, and scoped `git diff --check` passed.
+- Gaps / blockers: Independent re-review and frontend rendered QA remain; task-detail GET work waits for the analyst's approved-spec update.
+- Visual diff: `/tmp/group7-ui-response-validation.html` (includes shared worktree changes).
+
+### Session `test-writer / provider session ID not surfaced`
+
+- Provider: `codex`
+- Provider session ID: not available
+- Work ID: `group7-acceptance-criteria-check`
+- Agent: test-writer
+- Phase: UI DTO status-type regression follow-up
+- Platform and model (if surfaced): not available
+- Role: test-writer
+- Human owner and assigned task scope: Developer A; only `tests/unit/completion-assessment/check-panel.test.tsx`
+- Source revision: `9537871f1aee6b1e49a1ae8ddd33149437cb9319`
+- Resource usage (provider-reported): not available
+- Unavailable resource metrics: tokens, cache, cost, tool calls, and provider session ID not surfaced
+- Work completed / findings: Added five malformed status-value cases (enum-containing arrays, empty array, object) asserting safe error, unchanged history, and restored Run control. Corrected all 11 malformed-payload fixtures to preserve matching anchor SHAs so each case fails for its intended nested-field defect.
+- Files changed: `tests/unit/completion-assessment/check-panel.test.tsx`
+- Checks run and exact results: Focused UI suite reported 37 passed and 3 expected failures for `['addressed']`, `['unclear']`, and `['not_addressed']`; scoped ESLint, TypeScript, and scoped diff check passed.
+- Gaps / blockers: Component implementation is next on the status type guard only.
+
+### Session `analyst / provider session ID not surfaced`
+
+- Provider: `codex`
+- Provider session ID: not available
+- Work ID: `group7-acceptance-criteria-check`
+- Agent: analyst
+- Phase: Group 7 task-detail checkHistory read context
+- Platform and model (if surfaced): not available
+- Role: analyst
+- Human owner and assigned task scope: Developer A; read-only exploration of the narrow task-detail history-read integration and contract
+- Source revision: not available
+- Resource usage (provider-reported): not available
+- Unavailable resource metrics: tokens, cache, cost, and tool calls not surfaced
+- Work completed / findings: Confirmed approved history requirements define entry fields (`id`, `anchorSha`, `createdAt`, `redacted`, `payload`), newest-first order with result-ID tie-breaker, and access for assigned developer plus project PM. PM may read; developer must be assigned. `TaskAccessRepository` verifies project membership/task-in-project but does not enforce assignee. Current task-detail GET delegates to a 501 stub; `CompletionAssessmentRepository` lacks a history-list read; no review-queue API route exists. Existing specs do not define the full task-detail DTO or response envelope. Do not add a review route or broaden into CRUD/pages.
+- Files changed: none
+- Checks run and exact results: Read-only repository exploration; no tests/checks run.
+- Gaps / blockers: Human approval required for the scoped task-detail GET DTO/envelope before writing tests or implementation. Candidate areas after approval: completion-assessment repository/service/public entry; existing task detail route and an auth/read handler or narrow task read service seam; composition only if required. Candidate tests: focused history repository/service tests and task-detail GET authorization/API tests, updating existing 501 stub expectations if required. Review-queue listing/page remains Task 4.4.
+
+### Session `implementer / provider session ID not surfaced`
+
+- Provider: `codex`
+- Provider session ID: not available
+- Work ID: `group7-acceptance-criteria-check`
+- Agent: implementer
+- Phase: Group 7 UI malformed-success validation
+- Platform and model (if surfaced): not available
+- Role: implementer
+- Human owner and assigned task scope: Developer A; only `src/components/completion-assessment/developer-check-panel.tsx`
+- Source revision: not available
+- Resource usage (provider-reported): not available
+- Unavailable resource metrics: tokens, cache, cost, tool calls, and provider session ID not surfaced
+- Work completed / findings: Added full nested success DTO validation before state mutation: result metadata, timestamp/IDs, payload anchor match, criteria array with unique IDs/text/allowed status/evidence string arrays, and possible-gap/omitted-path string arrays. Malformed HTTP 200 results take the existing safe invalid-result path and leave prior history intact.
+- Files changed: `src/components/completion-assessment/developer-check-panel.tsx`
+- Checks run and exact results: `npx vitest run tests/unit/completion-assessment/check-panel.test.tsx` passed 35/35; scoped ESLint, `npx tsc --noEmit --incremental false`, and scoped `git diff --check` passed.
+- Gaps / blockers: Independent re-review and frontend rendered QA remain. Task-detail read DTO decision is separate and pending.
+- Visual diff: `/tmp/group7-ui-response-validation.html` (includes shared worktree changes).
+
+### Session `reviewer / provider session ID not surfaced`
+
+- Provider: `codex`
+- Provider session ID: not available
+- Work ID: `group7-acceptance-criteria-check`
+- Agent: reviewer
+- Phase: Group 7 reusable UI component review
+- Platform and model (if surfaced): not available
+- Role: reviewer
+- Human owner and assigned task scope: Developer A; read-only review of the two component files and the assigned component test
+- Source revision: `9537871f1aee6b1e49a1ae8ddd33149437cb9319` plus scoped uncommitted components/tests
+- Resource usage (provider-reported): not available
+- Unavailable resource metrics: tokens, cache, cost, elapsed time, and provider session ID not surfaced
+- Work completed / findings: Found P2: `isCheckResponse` validates metadata but not the nested result payload. A malformed successful response without `payload` is accepted, then `CheckHistory` throws while reading `criteria`. Read-only in-memory reproduction confirmed `Cannot read properties of undefined (reading 'criteria')`. Reviewer recommends full nested DTO validation before state updates and regression tests. Other component criteria are met within scope.
+- Files changed: none
+- Checks run and exact results: 24/24 component tests passed; scoped ESLint, `npx tsc --noEmit --incremental false`, and scoped whitespace check passed. In-memory malformed-response reproduction confirmed finding.
+- Gaps / blockers: Human resolution required for corrective test and validation change; rendered frontend QA waits for resolution/review. No browser/layout/focus inspection, live API, or page integration was performed.
+
+### Session `implementer / provider session ID not surfaced`
+
+- Provider: `codex`
+- Provider session ID: not available
+- Work ID: `group7-acceptance-criteria-check`
+- Agent: implementer
+- Phase: Group 7 reusable UI components
+- Platform and model (if surfaced): not available
+- Role: implementer
+- Human owner and assigned task scope: Developer A; only `src/components/completion-assessment/check-history.tsx` and `src/components/completion-assessment/developer-check-panel.tsx`
+- Source revision: not available
+- Resource usage (provider-reported): not available
+- Unavailable resource metrics: tokens, cache, cost, tool calls, and provider session ID not surfaced
+- Work completed / findings: Implemented the shared read-only history/result panel and developer-only Run check panel, including response reuse notice, deduplication when updating visible history, and safe error messages.
+- Files changed: `src/components/completion-assessment/check-history.tsx`; `src/components/completion-assessment/developer-check-panel.tsx`
+- Checks run and exact results: 24 component tests passed; scoped ESLint, `npx tsc --noEmit --incremental false`, and scoped `git diff --check` passed.
+- Gaps / blockers: Page integration and Task 4.2 history reads remain outside scope; independent review is next.
+- Visual diff: `/home/klzy/.codex/visualizations/2026/11/07/01a1b3a2-0a52-7993-9ebd-70db9dc351b0/group7-ui-components-diff.html` (includes shared worktree changes).
+
+### Session `test-writer / provider session ID not surfaced`
+
+- Provider: `codex`
+- Provider session ID: not available
+- Work ID: `group7-acceptance-criteria-check`
+- Agent: test-writer
+- Phase: Group 7 reusable UI component tests
+- Platform and model (if surfaced): not available
+- Role: test-writer
+- Human owner and assigned task scope: Developer A; only `tests/unit/completion-assessment/check-panel.test.tsx`
+- Source revision: `9537871f1aee6b1e49a1ae8ddd33149437cb9319`
+- Resource usage (provider-reported): not available
+- Unavailable resource metrics: tokens, cache, cost, tool calls, and provider session ID not surfaced
+- Work completed / findings: Added 24 tests for developer POST `{}` behavior, new/reused results and duplicate prevention, history anchors/timestamps/order, criteria/status/evidence, gaps/omissions, conditional redaction, PM read-only presentation, empty state, text escaping, loading/disabled controls, and safe API/network errors.
+- Files changed: `tests/unit/completion-assessment/check-panel.test.tsx`
+- Checks run and exact results: All 24 tests are expected-red because the two component modules are not present yet; scoped ESLint passed; TypeScript reported only two expected TS2307 missing-component errors; whitespace check had no findings.
+- Gaps / blockers: Implementation is next. Browser layout QA and Task 4.2 history integration remain outside this assignment.
+
+### Session `implementer / provider session ID not surfaced`
+
+- Provider: `codex`
+- Provider session ID: not available
+- Work ID: `group7-acceptance-criteria-check`
+- Agent: implementer
+- Phase: 7.3 G11 duration correction
+- Platform and model (if surfaced): not available
+- Role: implementer
+- Human owner and assigned task scope: Developer A; only `src/app/api/v1/projects/[projectId]/tasks/[taskId]/acceptance-criteria-check/route.ts`
+- Source revision: not available
+- Resource usage (provider-reported): not available
+- Unavailable resource metrics: tokens, cache, cost, tool calls, and provider session ID not surfaced
+- Work completed / findings: Added statically analyzable `export const maxDuration = 150;` to meet approved G11.
+- Files changed: `src/app/api/v1/projects/[projectId]/tasks/[taskId]/acceptance-criteria-check/route.ts`
+- Checks run and exact results: Focused route suite passed 43/43; scoped ESLint, `npx tsc --noEmit`, and scoped diff check passed.
+- Gaps / blockers: Independent reviewer recheck cleared the fix. Vercel plan support remains a release check.
+- Visual diff: `_temp/visual-diff.html` (includes shared worktree changes beyond this implementer's route-only path).
+
+### Session `reviewer / provider session ID not surfaced`
+
+- Provider: `codex`
+- Provider session ID: not available
+- Work ID: `group7-acceptance-criteria-check`
+- Agent: reviewer
+- Phase: 7.3 G11 re-review
+- Platform and model (if surfaced): not available
+- Role: reviewer
+- Human owner and assigned task scope: Developer A; read-only re-review of G11 correction and route/test criteria
+- Source revision: `9537871f1aee6b1e49a1ae8ddd33149437cb9319` plus current working files
+- Resource usage (provider-reported): not available
+- Unavailable resource metrics: tokens, cache, cost, tool calls, and provider session ID not surfaced
+- Work completed / findings: No findings. Confirmed static `maxDuration = 150` meets approved `design.md:329`; previously reviewed route criteria remain met. PM history/result-access API tests remain a Task 4.2 dependency; Vercel duration eligibility remains unverified.
+- Files changed: none
+- Checks run and exact results: Focused route suite 43/43; scoped ESLint passed; `npx tsc --noEmit --incremental false` passed.
+- Gaps / blockers: Group 7.3 remains incomplete pending PM result-access/history API tests integrated with Task 4.2. Release must verify Vercel supports the configured duration.
+
+### Session `reviewer / provider session ID not surfaced`
+
+- Provider: `codex`
+- Provider session ID: not available
+- Work ID: `group7-acceptance-criteria-check`
+- Agent: reviewer
+- Phase: 7.3 POST route review
+- Platform and model (if surfaced): not available
+- Role: reviewer
+- Human owner and assigned task scope: Developer A; read-only review of the POST route and route tests
+- Source revision: `9537871f1aee6b1e49a1ae8ddd33149437cb9319` plus uncommitted route/tests
+- Resource usage (provider-reported): not available
+- Unavailable resource metrics: tokens, cache, cost, tool calls, and provider session ID not surfaced
+- Work completed / findings: Found P1 G11 noncompliance: the approved design requires the first AI Route Handler to set `maxDuration >= 150`; the route currently omits this export. Other assigned route criteria were met, including request validation, auth, safe service delegation/errors, result reuse, no-store, and no lifecycle mutation. PM history API tests remain a separate Task 4.2 dependency.
+- Files changed: none
+- Checks run and exact results: Route suite passed 42/42; `npx tsc --noEmit --incremental false` and scoped ESLint passed.
+- Gaps / blockers: Add the required static duration export and regression test, then re-review. Deployment-plan support remains a separate release check.
+
+### Session `test-writer / provider session ID not surfaced`
+
+- Provider: `codex`
+- Provider session ID: not available
+- Work ID: `group7-acceptance-criteria-check`
+- Agent: test-writer
+- Phase: 7.3 G11 duration regression
+- Platform and model (if surfaced): not available
+- Role: test-writer
+- Human owner and assigned task scope: Developer A; only `tests/unit/completion-assessment/route.test.ts`
+- Source revision: not available
+- Resource usage (provider-reported): not available
+- Unavailable resource metrics: tokens, cache, cost, tool calls, and provider session ID not surfaced
+- Work completed / findings: Added a regression assertion requiring the route's static `maxDuration` export to satisfy G11 (`>= 150`).
+- Files changed: `tests/unit/completion-assessment/route.test.ts`
+- Checks run and exact results: `npx vitest run tests/unit/completion-assessment/route.test.ts` reported 42 passed and 1 expected failure because `maxDuration` is currently undefined.
+- Gaps / blockers: Route-only implementation correction and reviewer recheck remain.
 
 ### Session `analyst / provider session ID not surfaced`
 
@@ -426,6 +628,24 @@
 - Gaps / blockers: none within review scope.
 - Review limits: No PostgreSQL execution/concurrency, live GitHub/LLM calls, routes, or UI. Resource metrics were not available.
 
+### Session `test-writer / provider session ID not surfaced`
+
+- Provider: `codex`
+- Provider session ID: not available
+- Work ID: `group7-acceptance-criteria-check`
+- Agent: test-writer
+- Phase: developer panel stale-props regression tests
+- Platform and model (if surfaced): not available
+- Role: test-writer
+- Human owner and assigned task scope: Developer A; only `tests/unit/completion-assessment/check-panel.test.tsx`
+- Source revision: `9537871f1aee6b1e49a1ae8ddd33149437cb9319`
+- Resource usage (provider-reported): not available
+- Unavailable resource metrics: provider session/model identifiers, tokens, cache, cost, and tool-call totals not surfaced
+- Work completed / findings: Added four regressions for changing task identity, changing project identity, switching to empty history, and refreshed history for the same task. Test harness updates props while preserving hook state. Existing PM read-only coverage remains.
+- Files changed: `tests/unit/completion-assessment/check-panel.test.tsx`
+- Checks run and exact results: Focused Vitest: 40 passed, 4 expected failures exposing stale history; scoped ESLint, `npx tsc --noEmit --incremental false`, and scoped diff check passed.
+- Gaps / blockers: Browser lifecycle/layout/focus QA is not covered by this Node test harness. Implementer may proceed.
+
 ### Session `orchestrator / provider session ID not surfaced`
 
 - Provider: `codex`
@@ -469,20 +689,39 @@
 - Developer A's adapter implementer completed only `src/server/github/github-adapter.ts` and `src/server/github/index.ts`; TypeScript and scoped whitespace checks passed. The test-writer completed only `tests/unit/github/github-app-adapter.test.ts` with 97/97 passing. Adapter review found no blocking issue, with the status-matrix/fake-method coverage gaps noted above.
 - The 7.1 input implementer completed corrections only in `src/server/completion-assessment/input.ts` and `src/server/completion-assessment/path-rules.ts`; TypeScript, scoped ESLint, and diff checks passed. The test-writer added the UTF-8, spaces, and mixed-quoting regression cases only in `tests/unit/completion-assessment/input.test.ts`; 116 tests passed, ESLint and diff check passed. Final independent review found no remaining findings and independently reran all 116 tests. 7.2 contracts are approved and recorded; the test-writer is now assigned first to the two test files named in the plan, with one implementation package to follow.
 - Developer A then owns GitHub adapter extensions, 7.1 input assembly, 7.2 check service/cache, and the new 7.3 POST route, in that dependency order. Test-writer sessions own separate, named test files after each implementation contract is settled.
-- Developer B/Task 4.2 owns task-detail history read integration; Developer B/Task 4.3 owns the matching submission reference and all lifecycle mutations; Developer B/Task 4.4 owns task-detail and review-queue page integration. These existing route/page paths are not Group 7 parallel write paths.
-- No UI worker is assigned. A read-only frontend agent must reconfirm `frontend_mockup_2.png`, `frontend_mockup_3.png`, and `frontend_mockup_pm_review.png`; UI implementation waits for human review.
+- Human approval superseded the earlier Task 4.2 ownership boundary for task-detail reads: Group 7 owns the task-detail GET read model and PM history access API tests. Task 4.3 still owns the matching submission reference and lifecycle mutations. Task 4.4 still owns review-queue listing and task/review page integration. No new review-queue route is allowed.
+- Human approval is recorded for `frontend_mockup_2.png`, `frontend_mockup_3.png`, and `frontend_mockup_pm_review.png`. UI test-writer owns only `tests/unit/completion-assessment/check-panel.test.tsx`; implementers owned only `src/components/completion-assessment/check-history.tsx` and `src/components/completion-assessment/developer-check-panel.tsx`. Shared component API: `CheckHistory({ checkHistory })` and `DeveloperCheckPanel({ projectId, taskId, checkHistory })`, using check DTO `{id, anchorSha, createdAt, redacted, payload}`. Components consume page-provided history; Group 7 now owns task-detail GET/history API by approved exception, Task 4.4 owns page integration, and Task 4.3 owns submission writes. Final frontend QA found no remaining component recommendations; no live browser was available.
+- Follow-up UI response-validation review: reviewer found no remaining findings after the authorized malformed-response and non-string status fixes. Reviewer verified array/object statuses are rejected before history mutation and all 40/40 focused UI tests pass, with scoped ESLint and TypeScript passing. The reviewer did not exercise a browser; read-only frontend QA is underway.
+- Frontend QA completed source-only inspection of the approved mockup fit. It found one P2: `developer-check-panel.tsx` initializes local history from props once and does not resynchronize if project/task/history props change; a reused mounted component may show or merge stale results across tasks. The impact is not runtime-verified because no Next process or browser tab was available; viewport/responsive/keyboard/focus behavior is also unverified. The user authorized resolving this under the completion instruction. Test-writer now owns only `tests/unit/completion-assessment/check-panel.test.tsx`; implementation will then own only `src/components/completion-assessment/developer-check-panel.tsx`, followed by re-review and frontend QA. No concurrent writers.
+- The analyst updated the approved full task-detail DTO in the active task-management spec. Human approved collection ordering: criteria position/ID ascending; commits, progress updates, and review feedback timestamp/ID ascending; check history creation timestamp/result ID descending. Analyst is recording the tie directions in OpenSpec. Read-model test-writer and implementer remain sequenced after the UI stale-props fix; no task-detail/history implementation has started.
+- UI stale-props correction implementer changed only `src/components/completion-assessment/developer-check-panel.tsx`: local history and request state are scoped to project/task identity, refreshed incoming history merges by result ID, and stale request completions cannot overwrite current-task history/loading state. Focused UI suite passed 44/44; scoped ESLint, `npx tsc --noEmit --incremental false`, and scoped diff check passed. Visual diff: `/tmp/group7-ui-stale-props.html` (shared-worktree snapshot). No dependencies added. Independent re-review is assigned next; frontend QA follows if clear.
+- Independent review found two additional P2 races in that component: stale requests can overwrite the current task's visible error/reuse notice, and A→B→A navigation can let an earlier A request clear a newer A request's loading state. Reviewer reran 44/44 tests, ESLint, and TypeScript; all passed, but these specific navigation/deferred-response cases were missing. Frontend QA is paused. Test-writer follow-up owns only `tests/unit/completion-assessment/check-panel.test.tsx`; implementation and re-review will follow sequentially.
+- Follow-up test-writer added seven deterministic deferred-request cases: late A HTTP/network/invalid-result failures must preserve B's error; late A reuse must preserve B's reuse notice/history; and after returning to A, old success/reuse/error completions must not displace request A2's loading/result/error/notice. Focused Vitest reported 44 passed and 7 expected failures; scoped ESLint, TypeScript, and diff check passed. Implementer is now assigned only `src/components/completion-assessment/developer-check-panel.tsx`.
+- Follow-up implementer changed only `developer-check-panel.tsx`: consolidated panel state tracks project/task identity generation plus a per-request token, guarding result merges, errors, reuse notices, and finally/loading updates. This handles A→B→A without allowing an old A1 response to mutate A2 state. Focused UI tests passed 51/51; scoped ESLint, `npx tsc --noEmit --incremental false`, and scoped diff check passed. Visual diff: `/tmp/group7-ui-stale-props.html` (shared-worktree snapshot). No dependencies added; independent re-review is underway.
+- Independent re-review cleared both async race findings with no remaining findings. It verified late A HTTP/network/invalid-result errors cannot replace B's error, stale reuse cannot replace B's notice/history, and A1 cannot affect A2 after A→B→A across success/error/reuse/finally paths. It also rechecked task/project reset, same-task history refresh, schema validation, PM read-only behavior, and advisory results. Focused suite 51/51, scoped ESLint, TypeScript, and diff check passed. Real React scheduling/browser/page integration remain outside review. Frontend QA is repeating read-only inspection next.
+- Repeat frontend QA confirmed the async-state fix but identified two additional component-fit findings: history results should be collapsed disclosures with SHA/time visible, as the UI spec/mockup show; and small metadata/empty-evidence text must use a color meeting the recorded WCAG AA 4.5:1 target on dark surfaces. No browser was available, so live disclosure/focus/contrast remain unverified. Human authorized resolution. Test-writer added three regressions only in `check-panel.test.tsx`; 51 pass and 3 expected-fail. Implementer now owns only `src/components/completion-assessment/check-history.tsx` to address disclosure and contrast.
+- Follow-up implementer updated only `src/components/completion-assessment/check-history.tsx`; each result is a collapsed native disclosure with SHA/timestamp visible, and metadata/empty-evidence text uses `neutral-400`. Focused suite 54/54, scoped ESLint, TypeScript, and diff check passed. Visual diff: `/home/klzy/.codex/visualizations/2026/11/07/01a1b3a2-0a52-7993-9ebd-70db9dc351b0/group7-check-history-followup-diff.html` (shared-worktree snapshot). Independent review is assigned next.
+- Independent re-review found no findings. It verified summary SHA/time, collapsed native `<details>`, all payload content inside the disclosure, and computed token contrast estimates above 4.5:1 on the specified dark backgrounds (approximately 5.87–6.71:1). Focused tests 54/54, ESLint, TypeScript, and diff check passed. Live browser layout/keyboard/focus remains unverified; frontend QA repeats next.
+- Final frontend QA found no further recommendations. It reran `npx vitest run tests/unit/completion-assessment/check-panel.test.tsx` (54/54; Vite native-config warning only), verified the collapsed native disclosure structure, SHA/time summary, payload, keyboard semantics by native HTML source, and contrast tokens. No app or browser existed, so live viewport, responsive layout, keyboard/focus behavior remain unverified. No files changed.
+- Task-read API test-writer completed only new `tests/unit/task-detail-read.test.ts` and the taskRead-stub expectation in `tests/unit/project-authorization-routes.test.ts`. The suite exercises the actual GET route with synthetic auth/pg fakes: approved exact DTO/privacy, PM and assigned-developer access, denial, arrays/order/history, no-store, and no writes. Focused tests: 133 passed, 8 expected failures because GET is still the 501 stub. Scoped ESLint, TypeScript, and diff check passed. PostgreSQL ORDER BY semantics are not proven by the fake database.
+- Task-read implementer is now assigned these exact paths: new `src/server/task-detail/{read-repository.ts,read-service.ts,handlers.ts,index.ts}`; extend `src/server/completion-assessment/{repository.ts,service.ts,index.ts}` with task-scoped list/public read; wire once in `src/server/composition.ts`; update only GET delegation in `src/app/api/v1/projects/[projectId]/tasks/[taskId]/route.ts`. The task-detail repository must consume the public completion-assessment service for history, not directly query `check_results`. Keep generic auth stubs/PATCH/CRUD, review queue, Task 4.4 pages, and Task 4.3 submission untouched.
+- Implementer completed the assigned GET read model using those exact paths. It returns the approved read-only DTO, enforces assigned-developer and PM access, and gets history through the public completion-assessment service. No spec/schema blockers or dependencies. Focused API tests passed 141/141; TypeScript, scoped ESLint, and scoped diff check passed. Visual diff: `/tmp/group7-task-detail-read.html` (shared-worktree snapshot). Independent review is active. PostgreSQL execution/order semantics remain subject to review/test environment limitations.
+- Independent review found two P2 authorization/date bugs despite 141/141 focused tests: (1) assignee is checked from an earlier query but not rechecked against the returned task snapshot, so reassignment between queries can disclose detail/history to the former assignee; (2) converting PostgreSQL `date` through `toISOString()` shifts calendar dates back one day in `Asia/Singapore` (reproduced for `2026-11-30`). Other reviewed criteria passed: exact DTO/privacy, stable SQL orders, membership/task scoping, no-store, no writes, and history via public service. Reviewer reran 141 tests, TypeScript, scoped ESLint/diff check. PostgreSQL execution remains unavailable because `TEST_DATABASE_URL` is unset.
+- Test-writer is adding two regressions in only `tests/unit/task-detail-read.test.ts`: assignment reassignment between authorization and detail snapshot must deny the old assignee before returning history; pg-parsed `Date` representing `2026-11-30` local midnight in Asia/Singapore must serialize as the same calendar date. Implementation follows only on `read-service.ts` and `read-repository.ts`, then independent re-review.
+- Follow-up tests now pass 16 and fail the 2 new cases as expected: reassignment currently returns 200 and queries history; dueDate currently maps `2026-11-30` to `2026-11-29`. Scoped ESLint, TypeScript, and diff check passed. Deterministic Date fixture was used without mutating process timezone. Implementer owns only `read-service.ts` and `read-repository.ts` for the correction.
+- Implementer corrected only those two paths: `TaskDetailService` now checks the returned snapshot's assignee before reading history; repository SQL selects `due_date::text` so the calendar date is timezone-stable. Follow-up suite `npx vitest run tests/unit/task-detail-read.test.ts`: 18/18 passed. Scoped ESLint and TypeScript passed. `git diff --check` produced no diagnostics; it exits 1 under the no-index wrapper because files are untracked. Visual diff refreshed at `/tmp/group7-task-detail-read.html` (shared worktree). Independent re-review is underway.
 - All worker sessions must be sequenced in the current worktree. Isolated agents cannot share `.git`; do not rely on parallel worktrees or concurrent writers.
 
 ## Consolidated outcome `[ORCH]`
 
-- Changed files and rationale: This handoff records the completed 7.2 re-review, the unstarted/paused 7.3 package and its task-ownership boundary, plus the authorized scoped-commit next step. No product source, tests, migrations, or specifications were changed by the orchestrator.
-- Tests/checks and results: The DB test-writer reports 14 scenarios collected and skipped due to missing `TEST_DATABASE_URL`; targeted ESLint passed, exact command not surfaced. Adapter tests passed 97/97; input tests passed 116/116. Independent 7.2 reviews passed 71 tests before fixes and 363 tests across 9 files after all fixes. The focused implementation run also passed 132/132. Typecheck, scoped ESLint, and scoped diff checks passed. The migration was not applied. PostgreSQL integration remains unverified because `TEST_DATABASE_URL` is unset.
-- Generated artifacts: Implementer visual diffs: `/home/klzy/.codex/visualizations/2026/11/07/01a1b3a2-0a52-7993-9ebd-70db9dc351b0/group7-migration-diff.html`, `/home/klzy/.codex/visualizations/2026/11/07/01a1b3a2-0a52-7993-9ebd-70db9dc351b0/group7-github-adapter-diff.html`, `/home/klzy/.codex/visualizations/2026/11/07/01a1b3a2-0a52-7993-9ebd-70db9dc351b0/group7-input-assembly-diff.html`, and `/tmp/group7-prompt-sanitizer.html`; these include shared-worktree changes beyond each worker's own path scope.
+- Changed files and rationale: Group 7.3 POST route, reusable check/history UI, and task-detail GET read model plus checkHistory were implemented under approved requirements. Orchestrator changed only this plan, the handoff, and the existing session log. No commit was made in this continuation.
+- Tests/checks and results: Root's aggregate focused run passed **240/240** across the check-panel, check-route, task-detail-read, and project-authorization route suites. Exact relevant commands/results: `npx vitest run tests/unit/completion-assessment/check-panel.test.tsx` — 54/54; `npx vitest run tests/unit/completion-assessment/route.test.ts` — 43/43; `npx vitest run tests/unit/task-detail-read.test.ts tests/unit/project-authorization-routes.test.ts` — 143/143. Additional prior focused suites: 7.1 input 116/116; GitHub adapter 97/97; AI/7.2 363 tests across 9 files. Root aggregate `npx tsc --noEmit`, scoped ESLint, and `git diff --check` passed; OpenSpec validation passed after spec changes. PostgreSQL tests were unavailable/skipped because `TEST_DATABASE_URL` is unset; the migration was not applied.
+- Generated artifacts: Implementer visual diffs include `/home/klzy/.codex/visualizations/2026/11/07/01a1b3a2-0a52-7993-9ebd-70db9dc351b0/group7-migration-diff.html`, `/home/klzy/.codex/visualizations/2026/11/07/01a1b3a2-0a52-7993-9ebd-70db9dc351b0/group7-github-adapter-diff.html`, `/home/klzy/.codex/visualizations/2026/11/07/01a1b3a2-0a52-7993-9ebd-70db9dc351b0/group7-input-assembly-diff.html`, `/tmp/group7-prompt-sanitizer.html`, `/tmp/group7-ui-stale-props.html`, `/home/klzy/.codex/visualizations/2026/11/07/01a1b3a2-0a52-7993-9ebd-70db9dc351b0/group7-check-history-followup-diff.html`, and `/tmp/group7-task-detail-read.html`. Visual diffs contain broader shared-worktree changes than the individual worker scopes.
 - Dependencies added: None.
-- Known gaps and unverified items: PostgreSQL integration behavior is unverified because `TEST_DATABASE_URL` is unset; migration is not applied. Group 7.3 is paused and unimplemented. Its PM history/result-access API tests await Task 4.2/4.4 read routes. UI remains gated on frontend reconfirmation and human review.
-- Reviewer findings: Migration/test review found no code defect; DB execution remains unverified. Adapter review found no blocker, with direct coverage gaps for 400/422 status mapping and fake methods. Final 7.1 review found no remaining findings and independently reran 116 tests. Independent 7.2 re-review cleared the original three fixes and the sanitizer follow-up; the combined AI/Group 7.2 suites passed 363 tests across 9 files, typecheck and scoped ESLint passed, with no remaining findings.
+- Known gaps and unverified items: PostgreSQL integration/order behavior is unverified because `TEST_DATABASE_URL` is unset; the persistence migration is unapplied. Vercel support for the 150-second route duration remains a release check. Task 4.3 submission matching and Task 4.4 review-queue/page integration are separate follow-up scopes. Frontend QA was source-only because no running app/browser was available; live layout, responsive, keyboard, and focus behavior remain unverified.
+- Reviewer findings: Final 7.1 review found no remaining findings and independently reran 116 tests. Independent 7.2 re-review cleared the original three fixes and sanitizer follow-up; AI/Group 7.2 suites passed 363 tests across 9 files, typecheck and scoped ESLint passed. Initial 7.3 route review found missing G11 duration export; follow-up review cleared it. UI reviewers cleared malformed response/status, stale-props/request-race, disclosure, and contrast findings; final frontend QA found no further recommendations. Task-detail review found and cleared assignment-race and calendar-date issues; final re-review passed 143 tests with no findings. PostgreSQL execution remains unverified.
 - Suggested skills / references for the next worker `[ORCH, when applicable]`: Follow `workflow/agents/` role contracts, `workflow/agent-handoff-template.md`, and the source paths above. Use the visual review gate before any UI implementation.
-- Next action and responsible human: The authorized commit/PR agent inventories and commits current branch changes as scoped commits; no push or PR is authorized. After the human resumes Group 7.3, assign the standalone POST route and tests. Defer PM history/result-access API tests to Task 4.2/4.4, and keep UI behind frontend mockup reconfirmation and human review.
+- Next action and responsible human: Developer A reviews the completed Group 7 delta and decides whether to authorize scoped commit work. No commit or push was made in this phase. Task 4.3 submission matching and Task 4.4 review-queue/page integration remain with their owners; no review-queue route was added.
 
 ## Change log `[ORCH]`
 
@@ -495,3 +734,32 @@
 | 2026-11-07 | reviewer / provider session ID not surfaced | Re-review cleared the original fixes and found a related P2 involving `<data` sanitization changing model-visible criterion/evidence text; human decision requested. |
 | 2026-11-07 | reviewer / provider session ID not surfaced | Cleared the authorized sanitizer follow-up; reported 363 passing tests across 9 files, typecheck and scoped ESLint pass, and no remaining findings. |
 | 2026-11-07 | orchestrator / provider session ID not surfaced | Recorded that Group 7.3 is paused and unstarted, clarified the Task 4.2/4.4 PM history-read ownership boundary, and documented the authorized commit-agent next step. |
+| 2026-11-07 | orchestrator / provider session ID not surfaced | Recorded human resumption of Group 7.3, active test-writer-first sequencing for the POST route, and the still-outstanding PM history API tests dependent on Task 4.2. |
+| 2026-11-07 | orchestrator / provider session ID not surfaced | Recorded the human's resumption of Group 7.3, assigned tests before the single POST route, and kept required PM history API tests tracked as a Task 4.2 dependency. |
+| 2026-11-07 | reviewer / provider session ID not surfaced | Found P1 G11 omission: the route must statically export `maxDuration >= 150`; other POST criteria met. |
+| 2026-11-07 | orchestrator / provider session ID not surfaced | Recorded test-first G11 regression, route-only `maxDuration = 150` fix with 43/43 passing tests, and independent re-review. |
+| 2026-11-07 | reviewer / provider session ID not surfaced | Cleared G11 correction; route suite, lint, and typecheck passed. Vercel duration support and Task 4.2 PM history API tests remain outstanding. |
+| 2026-11-07 | orchestrator / provider session ID not surfaced | Recorded human approval of the three mockup references and exact reusable component-only UI paths. Assigned test-writer first; Task 4.2 history reads/tests, Task 4.4 page integration, and Task 4.3 submission remain separately owned. |
+| 2026-11-07 | orchestrator / provider session ID not surfaced | Recorded 24 expected-red component tests and passed scoped ESLint; implementation is next on the two exact component paths. |
+| 2026-11-07 | reviewer / provider session ID not surfaced | Cleared the authorized malformed-response and non-string status validation fixes; 40/40 UI tests, scoped ESLint, and TypeScript passed. No remaining findings; browser QA was outside review scope. |
+| 2026-11-07 | orchestrator / provider session ID not surfaced | Recorded clean UI re-review and assigned read-only frontend QA; full task-detail DTO read package remains gated on analyst's approved OpenSpec update. |
+| 2026-11-07 | frontend / provider session ID not surfaced | Completed read-only source QA; reported no runtime/browser available and one P2 stale-props history risk in the developer panel. |
+| 2026-11-07 | orchestrator / provider session ID not surfaced | Recorded the frontend P2 and began test-first correction. Recorded human-approved collection ordering and Group 7 ownership of task-detail reads; read-model tests wait until UI sequence completes and the tie directions are synchronized in OpenSpec. |
+| 2026-11-07 | implementer / provider session ID not surfaced | Fixed stale props in `developer-check-panel.tsx`; 44/44 focused tests, scoped ESLint, TypeScript, and diff check passed. Independent review assigned. |
+| 2026-11-07 | reviewer / provider session ID not surfaced | Found two P2 async-state races: stale requests may overwrite current error/reuse notices, and A→B→A can clear a newer request's loading state. Frontend QA paused; test-first correction assigned. |
+| 2026-11-07 | test-writer / provider session ID not surfaced | Added seven deferred-request race regressions; 44 pass and 7 expected-red; scoped lint, tsc and diff check pass. Component-only follow-up implementation assigned. |
+| 2026-11-07 | implementer / provider session ID not surfaced | Added identity-generation/per-request-token guards for all async state; 51/51 focused tests and static checks passed. Independent re-review assigned. |
+| 2026-11-07 | reviewer / provider session ID not surfaced | Cleared the async-state race findings; verified request-token and identity guards for success, error, reuse and finally paths; 51/51 tests and static checks passed. Frontend QA repeats next. |
+| 2026-11-07 | frontend / provider session ID not surfaced | Re-checked the async correction; reported two P2 component-fit findings: collapsed per-result disclosure and compliant muted-text contrast. Browser runtime remained unavailable. |
+| 2026-11-07 | test-writer / provider session ID not surfaced | Added three disclosure/contrast regressions; 51 pass and 3 expected-red; lint, typecheck and diff check passed. Implementer assigned only check-history component. |
+| 2026-11-07 | implementer / provider session ID not surfaced | Added collapsed native history disclosures and increased muted metadata contrast; 54/54 focused tests and static checks passed. Independent review assigned. |
+| 2026-11-07 | reviewer / provider session ID not surfaced | Cleared disclosure/contrast fixes; estimated contrast 5.87–6.71:1 on reviewed surfaces; 54/54 tests and checks passed. Frontend QA repeats. |
+| 2026-11-07 | frontend / provider session ID not surfaced | Final component QA found no remaining recommendations; 54/54 focused tests passed. Browser runtime, viewport, responsive, keyboard/focus behavior unverified because no app/browser was available. |
+| 2026-11-07 | orchestrator / provider session ID not surfaced | Started task-detail GET test-first package on a new DTO/API test and legacy taskRead-stub expectation updates; no production implementation until expected-red tests land. |
+| 2026-11-07 | test-writer / provider session ID not surfaced | Added task-detail GET API tests; 133 passed and 8 expected failures on current stub; scoped lint/typecheck/diff passed. Read-model implementation assigned to exact disjoint source paths. |
+| 2026-11-07 | implementer / provider session ID not surfaced | Implemented full approved task-detail GET read model with public completion-assessment history; 141/141 focused tests and static checks passed. Independent review assigned. |
+| 2026-11-07 | reviewer / provider session ID not surfaced | Found two P2 task-detail read defects: stale assignee authorization on reassignment race and timezone-shifted dueDate parsing; other criteria met. Test-first corrections assigned. |
+| 2026-11-07 | test-writer / provider session ID not surfaced | Added assignment-race and due-date timezone regressions; 16 pass, 2 expected-red; lint/tsc/diff passed. Implementer owns only read service/repository follow-up. |
+| 2026-11-07 | implementer / provider session ID not surfaced | Fixed assignment check against returned snapshot and selected PostgreSQL DATE as text; 18/18 focused tests, ESLint/TypeScript passed; reviewer re-review assigned. |
+| 2026-11-07 | reviewer / provider session ID not surfaced | Cleared task-detail reassignment/date fixes; task-detail plus project-authorization suites passed 143, static checks passed; PostgreSQL execution remains unverified. |
+| 2026-11-07 | orchestrator / provider session ID not surfaced | Recorded final Group 7.3 completion within approved API/UI/read-model scope; logged Task 4.3/4.4, PostgreSQL, and browser evidence limits; no commit authorized or made. |
