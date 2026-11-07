@@ -19,7 +19,11 @@
     - "Protected API errors use stable safe responses".
   - data-persistence: "Identifiers, timestamps, and revisions": the "Concurrent edits to a task" and "Concurrent task creation" scenarios.
 - Status: Implemented (TDD: red, then green). Unit and PostgreSQL integration tests pass. U1–U13 are approved and recorded in `design.md`. The commit-pr agent is authorized to commit on `feat/tasks-crud-4-2` (order: openspec, tests, feat, workflow/handoff) and draft the PR against `dev`; no push, no PR.
-- Next human action: thegrimbee reviews the commits and the PR draft, then separately authorizes any push or PR creation. Still to run: `/security-review`, the X1 yardstick reviewer, and Lim-ZY's cross-review of `src/server/auth/project-authorization.ts`.
+- Next human action:
+  - thegrimbee reviews the commits and the PR draft, then separately authorizes any push or PR creation.
+  - thegrimbee decides on the X1 yardstick nits and unrecorded decisions (see "Reviewer findings").
+  - Still to do: Lim-ZY's cross-review of `src/server/auth/project-authorization.ts`.
+  - `/security-review` is done: no changes needed, as reported by thegrimbee on 2026-11-07.
 
 ## Source and scope `[ORCH]`
 
@@ -198,6 +202,48 @@ The single-agent equivalent of the 4.1 A1 (implementer) and A2 (test-writer) ass
 - Checks: `npm run lint`, `npx tsc --noEmit`, `npm run build` and `npm test`. Then `npm run test:integration` if a disposable database is available.
 - After A1: run `/security-review` in the main session (1 fix round, as in 4.1). Then the X1 yardstick reviewer, using the 4.1 prompt with only the task-specific inputs changed, blob `92ce8a9`, against diff base `dev`. Then the commit-pr agent, only when authorized.
 
+**Yardstick reviewer prompt (as used for 4.2)**
+
+The exact prompt given to the 4.2 yardstick reviewer `a9cb591bb5423d9fe`. It was copied from the main session's scratchpad file `yardstick-prompt-4-2.md`.
+
+The main session word-diffed it against the 4.1 prompt in `workflow/handoffs/projects-membership-4-1.md`. Only these things changed:
+- The task ID and branch.
+- The handoff path.
+- The assignment location: "Main session plan" instead of Session `orchestrator / 4-1-plan-2`.
+- The spec files: `data-persistence/spec.md` was added.
+- The merge-base, HEAD, and the diff and name-status paths.
+- The working-tree sentence, because 4.2's tree was not clean.
+- The check output.
+
+The "Decisions:" line and the Purpose sentence ("will be run on task 4.2's final diff") are kept verbatim, although they read oddly for 4.2.
+
+````text
+You are the X1 yardstick reviewer for task 4.2 (`tasks-crud-4-2`), branch `feat/tasks-crud-4-2`, in `D:/Education/CS3227/CS3227-2610-MP4`. Follow `workflow/agents/reviewer.md` and AGENTS.md "Review Procedure". You are read-only and cannot run commands, so check output is provided below.
+
+Purpose: give an independent defect count on the final task diff against `dev`. You are separate from the task's pipeline reviewer. Do not read or rely on any earlier review findings: ignore the "Reviewer findings" text, the review-round table, the reviewer, security-pass and fix-round session blocks in the handoff, and design.md "Review decisions R1 to R8" as a list of findings (R1–R8 are still approved decisions you must respect as requirements). Review the code as if for the first time. The same prompt, with only the task-specific inputs changed, will be run on task 4.2's final diff so the two counts can be compared.
+
+## Given
+- Task handoff: `workflow/handoffs/tasks-crud-4-2.md` — read the Task record (Requirement IDs, by name), "Source and scope" (prohibited paths), "Decisions and open questions", and assignments A1 (including its "Must follow" list) and A2 (including its test targets) under "Main session plan".
+- Specs: `openspec/changes/project-task-management/specs/task-management/spec.md`, `openspec/changes/project-task-management/specs/identity-and-access/spec.md` and `openspec/changes/project-task-management/specs/data-persistence/spec.md`.
+- Decisions: `openspec/changes/project-task-management/design.md` — "Project and Membership Decisions" (all decision blocks under it), "API Error Contract", and "Data Persistence Decisions".
+- Final diff against `dev` (`git diff dev...HEAD -- src tests`, merge-base `9537871f1aee6b1e49a1ae8ddd33149437cb9319`, HEAD `4eb9a74913e457161c4ef3d4ae5251a038ee3fb3`): `C:\Users\gabri\AppData\Local\Temp\claude\3019322dfb901958\35821f01-53b1-49ad-8d86-f92e6d429389\scratchpad\4.2-diff.patch`. Full name-status list of the branch delta: `C:\Users\gabri\AppData\Local\Temp\claude\3019322dfb901958\35821f01-53b1-49ad-8d86-f92e6d429389\scratchpad\4.2-name-status.txt`. All `src` and `tests` work is committed; the working tree differs from HEAD only in `workflow/handoffs/tasks-crud-4-2.md` and one new `logs/` file.
+- Check output (run by the main session at HEAD): `npm run lint` exit 0; `npx tsc --noEmit` exit 0; `npm test` 26/26 files, 1443/1443 tests. `npm run build` exit 0, run by the main session on the same `src` and `tests` content before it was committed. `npm run test:integration` run by the human against a disposable database: 16/16 files, 305/305 tests.
+
+You may read the whole repository.
+
+## Check
+1. Every scenario under the handoff's Requirement IDs: implemented and tested? Name the code and test location, or the omission.
+2. Every A1 "Must follow" rule and every recorded decision the code depends on.
+3. Boundaries: only assigned paths changed; prohibited paths untouched; AGENTS.md coupling rules (no module-level mutable state, no control flags, public-entry imports only, adapters at edges); server-only; security (authorization, project membership, 404 concealment, Origin/CSRF, input validation, parameterized SQL, no internal detail in errors, no-store).
+4. Code quality: cohesion, coupling, abstraction, reuse and duplication.
+5. Test quality: do the tests verify the scenarios, or would they pass on wrong behaviour?
+
+Do not invent requirements or redesign. Where something depends on an unrecorded decision, report it as such, not as a defect.
+
+## Report
+Findings grouped **must / should / nit**, each with `file:line` evidence, the requirement or decision it relates to, and why. Then: the total count per severity; a per-scenario coverage table; the list of unrecorded decisions needing a human; and resource usage as surfaced ("not available" otherwise).
+````
+
 ## Worker session reports
 
 ### Session `main session / analyst stage`
@@ -287,6 +333,176 @@ The single-agent equivalent of the 4.1 A1 (implementer) and A2 (test-writer) ass
 - Visual diff path, or reason skill was unavailable: the `present-changes-visually` skill is not available in this session.
 - Other generated artifacts / dependencies: none. No dependency added.
 
+### Session `commit-pr / ae7c94b943d92ec81`
+
+**Excluded from the X1 single-agent total.** The commit-pr step was identical in both X1 arms, by human decision on 2026-11-07, so its usage is recorded here separately.
+
+- Provider: `claude`
+- Agent: `commit-pr` subagent
+- Phase: commits and PR draft
+
+#### Shared fields `[ALL]`
+
+- Platform and model (if surfaced): Claude Code subagent, `claude-sonnet-5-5` (from the transcript).
+- Role: commit/PR agent.
+- Human owner and assigned task scope: thegrimbee authorized commits on `feat/tasks-crud-4-2` in the order openspec, tests, feat, workflow/handoff, and a PR draft against `dev`. No push and no PR.
+- Source revision: `03f750c` plus the working tree, ending at `4eb9a74`.
+- Started / ended / elapsed: 2026-11-07 14:53:33 to 14:54:12 SGT (39.2 s; the platform reported 39,181 ms).
+- Resource usage (provider-reported):
+  - Platform notification: 52,327 subagent tokens and 4 tool uses.
+  - Transcript, computed with `workflow/scripts/handoff-backfill/inventory_lib.py` `usage_of` (`python -I`, de-duplicated by message ID): 4 responses; input 8, output 3,628 (thinking 217), cache read 135,614, cache write 49,931; total 189,181; 4 tool calls.
+  - The two totals measure different things and are not comparable (see the 4.1 X1 note).
+- Unavailable resource metrics: cost. The agent itself reported its usage as "not available".
+- Work completed / findings:
+  - It made four commits on `feat/tasks-crud-4-2`:
+    - `2fc07c9` docs(openspec): the 3 OpenSpec files.
+    - `c27ae5d` test(tasks): the 7 test files.
+    - `0e0a293` feat(tasks): the 12 source files.
+    - `4eb9a74` docs(workflow): this handoff.
+  - The main session checked each commit's file list with `git show --stat`.
+  - It used the trailer `Co-Authored-By: Claude Sonnet 5.5`, its own model, not the requested Opus trailer. It reported this rather than amending.
+  - It left `logs/2026-11-07-task-4.2-implementation.md` uncommitted, as instructed.
+  - It drafted the PR title `feat(tasks): task create, read, edit, reassign and soft delete (task 4.2)` against `dev`.
+  - Its draft listed `GET` as "list and read tasks". The main session corrected this to "read a task", because T1 has no listing route.
+- Files changed: none (git commits only).
+- Checks run and exact results: `git status --short` after each commit (as reported). Push and PR creation: not done.
+- Gaps / blockers: none.
+
+#### Commit/PR fields `[COMMIT-PR]`
+
+- Base branch and comparison used: `dev`; `git log dev..HEAD` and `git diff --stat dev...HEAD` (26 files, +4044/-1019, including the 4.1 bookkeeping files already on the branch).
+- Complete branch-change inventory:
+  - `bf91218` (the 4.1 bookkeeping, already on the branch).
+  - `03f750c` (a merge of `dev`).
+  - The four commits above.
+- Commit hashes, or why commits were not authorized/safe: `2fc07c9`, `c27ae5d`, `0e0a293`, `4eb9a74`.
+- Draft PR title: `feat(tasks): task create, read, edit, reassign and soft delete (task 4.2)`
+- Draft PR description: given to thegrimbee in chat on 2026-11-07, with the `GET` correction above.
+- Push / PR creation status: not done. Pushing and opening the PR each need separate authorization.
+
+### Session `yardstick reviewer / a9cb591bb5423d9fe`
+
+**X1 instrument, not part of the single-agent total** (as for the 4.1 yardstick).
+
+- Provider: `claude`
+- Provider session ID: not available (agent ID surfaced: `a9cb591bb5423d9fe`)
+- Work ID: `tasks-crud-4-2`
+- Agent: reviewer (X1 yardstick; a fresh `reviewer` session. 4.2 had no pipeline reviewer.)
+- Phase: X1 yardstick review of the final 4.2 diff, after commit
+
+#### Shared fields `[ALL]`
+
+- Platform and model (if surfaced):
+  - Claude Code (Agent SDK subagent).
+  - Config: `.claude/agents/reviewer.md` blob `92ce8a9963b5bb086e60a0921fdf85fff7795fa7`, verified by the main session with `git rev-parse HEAD:.claude/agents/reviewer.md` before launch. This is the same blob as the 4.1 yardstick, so the reviewer configuration is like-for-like: model `sonnet`, effort `medium`, maxTurns 25, tools Read, Grep and Glob.
+  - Resolved model ID: `claude-sonnet-5-5`. All 16 de-duplicated responses in the subagent transcript `subagents/agent-a9cb591bb5423d9fe.jsonl` carry this model. One other `"model"` string, `claude-opus-5-5`, appears once in the transcript and is not a reviewer response, as in 4.1.
+- Role: Reviewer (X1 yardstick)
+- Human owner and assigned task scope: Developer B (thegrimbee). An independent defect count on the final 4.2 diff against `dev`, using the 4.1 prompt with only the listed inputs substituted. See "Yardstick reviewer prompt (as used for 4.2)" under "Main session plan".
+- Source revision: HEAD `4eb9a74913e457161c4ef3d4ae5251a038ee3fb3`, merge-base with `dev` `9537871f1aee6b1e49a1ae8ddd33149437cb9319`. `src` and `tests` are clean against HEAD. Only this handoff and the `logs/` summary were uncommitted.
+- Started / ended / elapsed `[ALL, optional when surfaced]`: 2026-11-07 15:09:33 to 15:12:21 SGT, from the transcript timestamps. The platform reported 168,186 ms.
+- Resource usage (provider-reported): tokens in / out / total; cache read / write; cost; tool calls or other surfaced metrics:
+  - Platform notification: 124,988 subagent tokens, 34 tool uses, 168,186 ms.
+  - Transcript, computed with `workflow/scripts/handoff-backfill/inventory_lib.py` `usage_of` (`python -I`, de-duplicated by message ID):
+    - 16 responses.
+    - Input 32 and output 19,355, of which thinking is 10,258.
+    - Cache read 1,173,698 and cache write 118,762.
+    - 34 tool calls.
+  - The two totals measure different things and are not comparable (see the 4.1 X1 note).
+- Unavailable resource metrics: cost. The agent itself reported its usage as "not available".
+- Work completed / findings:
+  - Input: the final diff `git diff dev...HEAD -- src tests`, 19 files, 3,320 insertions and 1,003 deletions.
+  - Main-session check output given in the prompt: lint, `tsc` and `npm test` (26 files, 1,443 tests) re-run at HEAD before launch, all passing; build from before the commit; the human's integration run (16 files, 305 tests).
+  - Totals: must 0, should 3, nit 5. Details are under "X1 yardstick review" in Consolidated outcome → "Reviewer findings".
+- Files changed (use `none` if read-only): none
+- Checks run and exact results (use `none` if none were run): none. It has read-only tools and used the main session's check output given in the prompt.
+- Gaps / blockers (use `none` if none): none
+
+#### Reviewer fields `[REVIEWER]`
+
+- Acceptance-criteria status (met / unmet / unverified, with evidence):
+  - Every 4.2 scenario is Met.
+  - Concurrent creation, concurrent edits and the D6 race rest on the PostgreSQL run, which the reviewer did not see.
+  - The board listing in "Product manager creates a task" belongs to task 4.4 and is not verifiable here.
+  - Boundaries, security and the A1 must-follow rules are all met.
+- Code-quality findings (cohesion, coupling, abstractions, reuse): should 3 (duplication inside the new module), and nits 1, 2, 3 and 4. See "X1 yardstick review".
+- Other findings by severity and evidence: shoulds 1 and 2 (test gaps) and nit 5. Six unrecorded decisions were raised (not defects), plus one pending item. See "X1 yardstick review".
+- Review limits:
+  - The reviewer's own:
+    - Read all `src` files in the diff, `task-routes.test.ts` L305-1025, `task-service.test.ts` L140-331 and the full integration file.
+    - Did not read `tests/unit/support/sql-fake.ts`, or the import-only edits to `project-routes.test.ts` and `project-service.test.ts`, in depth.
+    - Ran no commands.
+  - Main-session caveat on evidence. The reviewer said its line numbers are source lines at HEAD, computed from the patch.
+    - The main session spot-checked them. Source and unit-test citations are correct: `handlers.ts:44-58`, `service.ts:102-106`, `repository.ts:216`, `task-routes.test.ts:650`. This is unlike 4.1, where many citations were patch offsets.
+    - The integration-test citations are wrong.
+      - The early ones are about 40 lines early: `:56-64` is the WEB-12 test, which is really at L95-L123, and `:80-88` is the concurrent-creation test at L125.
+      - Later ones are a few lines off: `:216` is the concurrent-edits test at L220, and `:243` is the soft-delete test at L245.
+      - Some are marked `~`.
+    - The findings themselves can be identified by function or test name.
+
+### Session `main session / X1 rework (yardstick shoulds)`
+
+**X1 rework: the "later defects" measure for the single-agent arm.** It is recorded separately and excluded from the 4.2 single-agent total and from the yardstick (instrument) cost.
+
+- Provider: `claude`
+- Provider session ID: not available. The transcript is `35821f01-53b1-49ad-8d86-f92e6d429389.jsonl`, the same chat as the yardstick run.
+- Agent: main session (no subagent)
+- Phase: rework after the X1 yardstick, before `/security-review`
+
+#### Shared fields `[ALL]`
+
+- Platform and model (if surfaced): Claude Code (VS Code extension), `claude-opus-5-5` (from the transcript).
+- Role: main session fixing yardstick findings.
+- Human owner and assigned task scope: thegrimbee, 2026-11-07: "Fix the 'should' findings as you see fit. This should go to 4.2 rework in X1 (the 'later defects' measure). Record the cost of fixing them separately." The nits were not in scope.
+- Source revision: HEAD `4eb9a74` plus the working tree. Nothing was committed.
+- Started / ended / elapsed: 2026-11-07 15:25:57 to 15:30:51 SGT (4 min 54 s), from the human's prompt to the last check and measurement. It excludes this recording step, which came afterwards.
+- Resource usage (provider-reported), computed from the main transcript for records at or after the prompt (`python -I`, de-duplicated by message ID, the same method as `inventory_lib.usage_of`):
+  - 22 responses.
+  - Input 46 and output 21,328, of which thinking is 7,773.
+  - Cache read 3,369,212 and cache write 53,928.
+  - Total 3,444,514.
+  - 24 tool calls.
+- Human interventions: 1 (the prompt above).
+- Unavailable resource metrics: cost.
+- Work completed / findings:
+  - **Should 1 (untested U3–U6): fixed by tests only.** I added 10 tests to `tests/unit/task-routes.test.ts`, in the describe block "implementation decisions U3 to U6":
+    - U5: an uppercase `assigneeId` on create and on reassign, an uppercase current assignee as a no-op, and an uppercase criterion `id`.
+    - U6: an unchanged kept criterion keeps version 1, the reworded one gets version 2, there is one criteria `UPDATE`, and the task version is 2.
+    - U4: the read's two `SELECT`s run between `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY` and `COMMIT`.
+    - U3: create and reassign lock the actor and the assignee in one `FOR SHARE` statement, in person-ID order; edit and delete lock only the actor.
+    - Each test was checked against a deliberate break of the code, which was then restored from HEAD:
+      - Removing the UUID lowercasing fails 4 tests.
+      - Always rewriting kept criteria fails the U6 test.
+      - A plain `BEGIN` for the read fails the U4 test.
+      - Removing `ORDER BY person_id` fails both U3 lock-order tests.
+    - A defect in my own first attempt: the U5 assignee tests first used the seeded IDs, which are all digits. `toUpperCase()` left them unchanged, so the tests passed on the break. They now use a synthetic developer `0aaaaaaa-2222-4222-8222-2222222222ab`, which has hex letters and sorts before the PM.
+    - No product-code defect was found. U3–U6 were already implemented correctly.
+  - **Should 2 (criteria-only edit untested against PostgreSQL): fixed by a test only.** I added "increases the version exactly once for a criteria-only edit and leaves unchanged criteria unwritten (T6, U6)" to `tests/integration/db/tasks-crud.test.ts`. It checks that the task version is 2, the title and description are unchanged, and the criterion versions are `[1, 2]`. It relies on the `tasks_bump_version` and `acceptance_criteria_bump_version` triggers. **Unverified:** `TEST_DATABASE_URL` is not set in this session.
+  - **Should 3 (duplication in the module): refactored, no behaviour change.**
+    - `src/server/tasks/handlers.ts`:
+      - New `admitWrite` holds the checks before the session (guard, path IDs, then body). `handleTaskCreate` and `authorizeTaskWrite` both use it.
+      - New `respond` replaces the five copies of the `try { … } catch { taskErrorResponse }` wrapper.
+      - The task lookup keeps its own `try/catch`.
+      - A `taskId === undefined` line remains only to narrow the type. `TaskRouteContext.taskId` stays optional, because retyping it would touch `project-authorization.ts`, which is awaiting Lim-ZY's review (nit 2 is unchanged).
+    - `src/server/tasks/service.ts`: new `lockRolesAsManager` holds the U3 lock and the R4/R5 PM check. `lockForWrite` and `createTask` both use it.
+    - The route files' outer `try/catch` returning 500 is unchanged; it is the existing pattern.
+- Files changed:
+  - `src/server/tasks/handlers.ts`
+  - `src/server/tasks/service.ts`
+  - `tests/unit/task-routes.test.ts`
+  - `tests/integration/db/tasks-crud.test.ts`
+  - In total: 4 files, +179/−41.
+- Checks run and exact results (PowerShell, working tree):
+  - `npm run lint`: exit 0.
+  - `npx tsc --noEmit`: exit 0.
+  - `npm test`: `Test Files 26 passed (26)`, `Tests 1453 passed (1453)`. Before the rework it was 1,443.
+  - `npm run build`: exit 0. `next-env.d.ts` was rewritten and reverted with `git checkout -- next-env.d.ts`.
+  - `npm run test:integration`: not run by the main session (no disposable database).
+  - **Integration, run by thegrimbee** on 2026-11-07 at 15:34 SGT against a disposable database (full suite): `Test Files 16 passed (16)`, `Tests 306 passed (306)`, duration 23.64s.
+    - That is 305 plus the new criteria-only edit test.
+    - The result was reported by the human; the main session did not see the run.
+- Gaps / blockers:
+  - The yardstick nits and its unrecorded decisions are untouched.
+
 ## Consolidated outcome `[ORCH]`
 
 - Changed files and rationale:
@@ -343,12 +559,84 @@ The single-agent equivalent of the 4.1 A1 (implementer) and A2 (test-writer) ass
     The 4.1 tests pass unchanged.
   - **U13 Edit write order.** In an edit, the task `UPDATE`, which carries the version guard, runs before any criteria write. A conflicting edit therefore writes no criteria.
 - Known gaps and unverified items:
-  - `/security-review` has not been run.
-  - The X1 yardstick reviewer has not been run.
+  - `/security-review`: thegrimbee reported on 2026-11-07 that it found nothing needing a change. Security fix rounds used: 0 of 1. The session, model, usage and exact diff scope were not given to the main session: not available.
+  - The X1 yardstick reviewer ran on 2026-11-07 (0 must / 3 should / 5 nit). The three shoulds were fixed in the X1 rework. The nits and unrecorded decisions are not yet resolved by the human.
   - Lim-ZY has not yet cross-reviewed the `src/server/auth/project-authorization.ts` change.
-  - The `logs/` session summary is drafted in `logs/2026-11-07-task-4.2-implementation.md` and awaits human verification. It is left uncommitted.
+  - The `logs/` summaries `logs/2026-11-07-task-4.2-implementation.md` and `logs/2026-11-07-task-4.2-x1-yardstick.md` were verified by Gabriel.
   - The C1 follow-up for 7.3 (`checkHistory`) is still open.
-- Reviewer findings: none yet (no reviewer has run).
+- Reviewer findings: no pipeline reviewer ran (X1 single-agent arm). The X1 yardstick ran after the commits.
+
+  **X1 yardstick review: reviewer `a9cb591bb5423d9fe`** (a fresh `reviewer` session; Sonnet / medium / 25, `claude-sonnet-5-5`; Read, Grep and Glob only; blob `92ce8a9963b5bb086e60a0921fdf85fff7795fa7`, the same as 4.1)
+  - Scope:
+    - Final diff `git diff dev...HEAD -- src tests`, merge-base `9537871f1aee6b1e49a1ae8ddd33149437cb9319`, HEAD `4eb9a74913e457161c4ef3d4ae5251a038ee3fb3`; 19 files, 3,320 insertions and 1,003 deletions.
+    - The prompt was the 4.1 yardstick prompt with only the listed inputs substituted.
+  - Usage (platform): 124,988 tokens, 34 tool uses, 168,186 ms. Transcript: 16 responses; output 19,355, of which thinking is 10,258; cache read 1,173,698. Cost: not available.
+  - Evidence caveat (main session):
+    - Source and unit-test citations are source line numbers and were spot-checked as correct.
+    - Integration-test citations are off by up to about 40 lines. The findings can be identified by test name.
+    - See the session block's review limits.
+  - Totals: must 0, should 3, nit 5.
+
+  Must: none.
+
+  Should:
+  1. **Approved implementation decisions with no test.** The tests would pass if the behaviour were wrong.
+     - U5 (UUID lowercasing in `validation.ts`): no test sends an uppercase `assigneeId` or criterion `id`. Without the lowercasing, an uppercase criterion `id` would be refused as "not current", and an uppercase assignee would fail the `roles.get()` lookup (`service.ts:104`, `:116`).
+     - U6 (unchanged criteria are not rewritten, `service.ts:36-47`): no test asserts that a kept, unchanged criterion's `version` stays the same. `task-routes.test.ts:650` counts only task updates.
+     - U4 (`REPEATABLE READ READ ONLY` in `getTask`): no test inspects the `BEGIN`.
+     - U3 (lock order by person ID): covered only indirectly. The D6 integration race accepts several outcomes and cannot tell a reordered lock from the correct one.
+  2. **The criteria-only edit's version bump is verified only against the fake.** `updateTaskFields` sends `SET title = title` (`repository.ts:216`) and relies on the `tasks_bump_version` trigger (migration L427). The reviewer believes the code is correct. The only integration edit test (L201) also sends `title` and `branchName`, so a criteria-only edit (T6, "version increases by one") is unverified against PostgreSQL. It is tested only in `task-routes.test.ts:650` with the `sql-fake` trigger model (U12).
+  3. **Duplication inside the new module.**
+     - `handleTaskCreate` (`handlers.ts:67-75`) repeats the guard, parse, path-ID, session and role preamble of `authorizeTaskWrite` (`:44-58`).
+     - The `try { json(await …) } catch { taskErrorResponse }` wrapper is repeated in 5 handlers.
+     - `createTask` (`service.ts:102-106`) repeats `lockForWrite`'s `lockRoles` and `requireProductManager` sequence (`:53-58`).
+     - A shared "lock and require PM" helper would keep the lock order and the R4 rule in one place. This is not a spec violation.
+
+  Nit:
+  1. `handleTaskCreationStub`, `handleTaskReadStub` and `handleTaskEditStub` in `project-authorization.ts` keep "Stub" names although they now work. GET and PATCH go through them, while DELETE and the assignee PUT call `@/server/tasks` directly. This is approved by T16 but inconsistent. Lim-ZY's cross-review is still pending.
+  2. `TaskRouteContext.taskId` is typed as optional (`handlers.ts:14`). The `isUuid` guard makes this safe. Also, `handleTaskRead`'s `request` parameter is unused (`:85`).
+  3. The state-name mapping is duplicated in `service.ts:20` and in the state stub's vocabulary in `project-authorization.ts`. This is forced by the ban on editing 4.3's files; consider fixing it in 4.3.
+  4. The UUID regex is copied again in `validation.ts`, making at least 4 copies. R8 accepted the duplicates for 4.1.
+  5. The `"title = title"` trigger-bump trick (`repository.ts:216`) is commented, but it is fragile if the trigger changes. See should 2.
+
+  - Boundaries, security and A1 must-follow: all met.
+    - The T8/Q4 order, including the task lookup before the role check.
+    - 404 concealment of deleted and cross-project tasks.
+    - Parameterized SQL; the only interpolation is the constant column list and the `SET` fragment.
+    - `no-store` on every response.
+    - The in-transaction PM recheck under `FOR SHARE`, with `NOT_FOUND` for no membership (R4).
+    - Soft delete only, with no `app.reports` write and no `task_events` write except reassignment.
+    - The task number is allocated after every check, in one transaction.
+    - `WHERE version = $n` guards.
+    - One `assignment_change` event, and the U10 no-op.
+    - Origin is checked on all four mutation routes.
+    - No prohibited paths are touched.
+  - Per-scenario coverage:
+    - Every 4.2 scenario is Met, including Origin and check order (`task-routes.test.ts:948-1025`) and safe errors.
+    - Concurrent creation, concurrent edits and the D6 race are covered by PostgreSQL only (R7).
+    - The board listing belongs to task 4.4 and is not verifiable here.
+    - The D6 race test checks the invariant, not that the race actually interleaved.
+  - Unrecorded decisions it raised (not defects):
+    1. There is no request-body size limit; `readJsonBody` parses before authentication.
+    2. `title` rejects only CR and LF, not U+2028 or U+0085. `trim()` uses the JavaScript whitespace set.
+    3. `branchName` patterns beyond the recorded list (for example `a/.b`, or a `.lock` component in the middle) are accepted.
+    4. A criterion that is blank after trim on create (`[" "]`) gives `INVALID_REQUEST`, not `ACCEPTANCE_CRITERIA_REQUIRED`. This follows T7 literally, but the spec wording is ambiguous.
+    5. `acceptanceCriteria: null` on create gives `INVALID_REQUEST` (a wrong type). T7 says only "absent or empty".
+    6. The C1 follow-up for 7.3 (`checkHistory`) is still open. Until then, "Submission history remains readable" is unmet for task-detail reads, as `design.md` records.
+    - Also listed, as pending rather than a decision: Lim-ZY's cross-review of `project-authorization.ts`.
+  - Comparison note:
+    - 4.1's yardstick gave 0 must / 1 should / 8 nit. 4.2's gives 0 / 3 / 5.
+    - The reviewer blob is the same. The prompt differs only in the listed inputs, plus the name-status sentence: 4.2's working tree was not clean, because the handoff and log were uncommitted.
+    - Two sentences kept verbatim read oddly for 4.2:
+      - The "Decisions:" line does not name "Task Management Decisions (4.2)". The reviewer reached T1–T17 and U1–U13 through the handoff anyway.
+      - "will be run on task 4.2's final diff".
+    - 4.1's yardstick should (the duplicated SQL fake) does not recur; T17 extracted it to `tests/unit/support/sql-fake.ts`. 4.1's nits on the "Stub" names and the UUID regex copies recur as 4.2 nits 1 and 4.
+  - Outcome (X1 rework, 2026-11-07; see session `main session / X1 rework (yardstick shoulds)`):
+    - Should 1: fixed with 10 unit tests, each checked against a deliberate break.
+    - Should 2: fixed with 1 PostgreSQL test. It passed in thegrimbee's integration run (16 files, 306 tests).
+    - Should 3: fixed by a refactor with no behaviour change.
+    - No product-code defect was found: shoulds 1 and 2 were test gaps, and should 3 was code quality.
+    - The nits and unrecorded decisions are still open.
 - Next action and responsible human: thegrimbee (see the Task record).
 
 ## Change log `[ORCH]`
@@ -357,3 +645,7 @@ The single-agent equivalent of the 4.1 A1 (implementer) and A2 (test-writer) ass
 |---|---|---|
 | 2026-11-07 13:53 | main session | Analyst stage done in the main session (X1 single-agent arm; no orchestrator, a deliberate deviation). thegrimbee approved the spec delta and T1–T17 as recommended (17 accepted / 0 modified / 0 rejected) and delegated C1; the agent chose (c). Decisions, error codes and spec delta recorded (uncommitted). OpenSpec strict validation gives the same 6 warnings as the baseline. Main session plan written. Stopped for human review. |
 | 2026-11-07 14:25 | main session | TDD for 4.2. A2 tests written and confirmed red: 190 failed / 1,164 passed, and `task-service.test.ts` could not load. A1 implemented until green: 26 files and 1,443 tests passed. Lint, type-check and build pass (`next-env.d.ts` reverted). The 13 integration tests were skipped with no `TEST_DATABASE_URL` (unverified). Unrecorded decisions U1–U13 listed for human review. The 13:53 entry above was first written as 05:53 (UTC) and has been corrected. Nothing committed. Stopped for human review. |
+| 2026-11-07 14:56 | main session | thegrimbee reported the integration run (16 files and 305 tests passed) and approved U1–U13, which were recorded in `design.md`. The commit-pr agent made `2fc07c9`, `c27ae5d`, `0e0a293` and `4eb9a74` on `feat/tasks-crud-4-2` and drafted the PR against `dev`; no push, no PR. Its usage is recorded separately and excluded from the X1 single-agent total. This entry and the commit-pr session block are uncommitted, because they postdate `4eb9a74`. |
+| 2026-11-07 15:15 | main session | Ran the X1 yardstick reviewer `a9cb591bb5423d9fe` (Sonnet / medium / 25, `claude-sonnet-5-5`, blob `92ce8a9963b5bb086e60a0921fdf85fff7795fa7`, the same as 4.1) on `git diff dev...HEAD -- src tests` at `4eb9a74`, with the 4.1 prompt and the listed inputs substituted. Before launch, lint, `tsc` and `npm test` (26 files, 1,443 tests) were re-run at HEAD and passed. Recorded: the session block (124,988 tokens, 34 tool uses, 168,186 ms; 16 responses), the prompt under "Main session plan", and the findings (0 must / 3 should / 5 nit, six unrecorded decisions, and the integration-test citation offset caveat) under "Reviewer findings". The "Reviewer findings" and "Known gaps" status lines were updated. Nothing fixed. Uncommitted. |
+| 2026-11-07 15:31 | main session | X1 rework (the "later defects" measure, recorded separately): fixed yardstick shoulds 1–3 at thegrimbee's request. Added 10 unit tests (U3–U6), each checked against a deliberate break, and 1 PostgreSQL test (criteria-only edit; not run, so unverified). Refactored `handlers.ts` (`admitWrite`, `respond`) and `service.ts` (`lockRolesAsManager`) with no behaviour change. Lint, `tsc` and build pass, and `npm test` passed 26 files and 1,453 tests. Cost: 22 responses, 24 tool calls, total 3,444,514 tokens (output 21,328), 4 min 54 s, 1 human intervention. Nothing committed. |
+| 2026-11-07 15:40 | main session | thegrimbee reported the integration run after the rework (16 files and 306 tests passed) and that `/security-review` found nothing needing a change. thegrimbee verified both 4.2 logs and authorized commits on `feat/tasks-crud-4-2`, split as the agent sees fit. This was handed to the commit-pr agent; no push, no PR. |
