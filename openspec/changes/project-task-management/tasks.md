@@ -62,9 +62,9 @@ Depends on: 2. Can run alongside groups 3–5.
 
 Depends on: 5 and 6.
 
-- [ ] 7.1 Implement diff filtering and the input budget; add tests for excluded files and skipped-file reporting.
-- [ ] 7.2 Implement the check service: per-criterion result, evidence verification against the diff, and caching by commit set and criteria; add fake-adapter tests for success, failure, unverifiable evidence, and cache hits.
-- [ ] 7.3 Show the check to the developer and attach the latest result to submissions; add assigned-developer and product-manager result-access API tests, and tests that a check never changes task state.
+- [ ] 7.1 Implement diff filtering, repository-owned `.acceptance-check.json` loading from the current default-branch tip, normalization and hashing of category prefixes, exact lockfile basenames, and generated path prefixes, GitHub-marked binary exclusion, destination-path handling for renames, and the 48,000-character budget; add tests for exclusions, priority ordering, whole-file selection, skipped-file reporting, and safe refusal when configuration is missing, invalid, or unavailable.
+- [ ] 7.2 Implement the check service: per-criterion result, evidence verification against the diff, and caching by task, commit-set hash, criteria hash, and normalized path-rules hash; add fake-adapter tests for success, failure, unverifiable evidence, and cache hits. Add a new versioned migration and PostgreSQL integration tests for `check_results.path_rules_hash` and the corresponding uniqueness keys. Developer B owns the database migration and persistence tests; Developer A owns the check service. Do not modify shipped migrations.
+- [ ] 7.3 Add the task-scoped assigned-developer check API and Acceptance Criteria Check UI/history component; add assigned-developer and product-manager result-access API tests, and tests that a check never changes task state. Coordinate task-detail history exposure with Task 4.2, the matching check-result reference on submission with Task 4.3, and page integration with Task 4.4. Task 4.3 retains ownership of lifecycle and submission state changes; Task 4.4 retains ownership of task-detail and review-queue pages. Group 7 does not implement submission or change task state.
 
 ## 8. Progress Report
 

@@ -59,11 +59,20 @@ When a task is written, the database SHALL reject it if its assignee has no Deve
 - **THEN** the task and those records remain stored, and the task is marked as deleted
 
 ### Requirement: Stored results are keyed for reuse
-The database SHALL store at most one check result per task for a given commit set and acceptance-criteria hash, and at most one report per project and date range, so that the reuse rules of the Acceptance Criteria Check and the Progress Report can be applied.
+The database SHALL store at most one check result per task for a given commit-set hash, acceptance-criteria hash, and normalized path-rules hash, and at most one report per project and date range, so that the reuse rules of the Acceptance Criteria Check and the Progress Report can be applied. Task ID SHALL be a separate key dimension. The commit-set hash SHALL be SHA-256 of full commit SHAs sorted lexicographically and joined by LF, with no trailing LF. The acceptance-criteria hash SHALL be SHA-256 of compact UTF-8 JSON containing `{ "id", "description" }` objects ordered by criterion position and then criterion ID, with object properties serialized as `id` then `description`. New check-result rows SHALL store a non-null SHA-256 path-rules hash. Existing rows without a path-rules hash SHALL be preserved as legacy history and SHALL NOT be reused by new checks.
 
 #### Scenario: Same check stored twice
-- **WHEN** a second check result is written for the same task, commit set, and criteria hash
+- **WHEN** a second check result is written for the same task, commit-set hash, criteria hash, and path-rules hash
 - **THEN** the database rejects the duplicate
+
+#### Scenario: Different path rules retain distinct checks
+- **WHEN** check results are written for the same task, commit set, and criteria but different normalized path-rules hashes
+- **THEN** the database stores one result for each distinct path-rules hash
+
+#### Scenario: Legacy check history is preserved
+- **WHEN** the path-rules hash migration encounters an existing check result
+- **THEN** the result remains available as history without a fabricated path-rules hash
+- **AND** a new check using a current path-rules hash may be stored for the same commit set and criteria
 
 ### Requirement: Stored records exclude secrets and AI content
 The database SHALL NOT store GitHub App private keys or GitHub user or installation access tokens. A project MAY store the GitHub App installation ID and the linked repository's stable ID, owner, and name. Usage records SHALL NOT contain prompt or response content.

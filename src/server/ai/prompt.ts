@@ -19,7 +19,8 @@ const PREAMBLE = [
 
 const DATA_TAG = /<(\/?data)/gi;
 
-function neutralizeTags(text: string): string {
+/** Apply the deterministic escaping used for untrusted prompt data sections. */
+export function sanitizePromptData(text: string): string {
   return text.replace(DATA_TAG, "&lt;$1");
 }
 
@@ -34,7 +35,7 @@ export function buildPrompt(instructions: string, segments: readonly PromptSegme
         kinds.push(kind);
       }
     }
-    return `<data name="${segment.name}">\n${neutralizeTags(redacted.text)}\n</data>`;
+    return `<data name="${segment.name}">\n${sanitizePromptData(redacted.text)}\n</data>`;
   });
 
   return {
