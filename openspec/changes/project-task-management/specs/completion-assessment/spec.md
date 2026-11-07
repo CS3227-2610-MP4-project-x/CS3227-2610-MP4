@@ -160,7 +160,7 @@ The system SHALL reuse a stored result, without calling the LLM, only when the c
 - **THEN** that commit's SHA is stored as the result's anchor SHA
 
 ### Requirement: Check history is visible to both roles
-The system SHALL let the assigned developer run checks and view their distinct stored history through task detail. The product manager SHALL have read-only access to that history through task detail and review responses. Task-detail and review responses SHALL expose `checkHistory`, with one entry per distinct stored result in stable newest-first order, using result ID as the tie-breaker for equal creation timestamps. Each entry SHALL contain the result ID, anchor SHA, creation timestamp, redaction flag, and result payload. Duplicate cache reuse SHALL NOT create a separate history entry.
+The system SHALL let the assigned developer run checks and view their distinct stored history through task detail. The product manager SHALL have read-only access to that history through task detail and review responses. Task-detail and review responses SHALL expose `checkHistory`, with one entry per distinct stored result ordered by `createdAt` descending then `id` descending. Each entry SHALL contain the result ID, anchor SHA, creation timestamp, redaction flag, and result payload. Duplicate cache reuse SHALL NOT create a separate history entry. The task-detail GET envelope and its role access are defined by the task-management requirement "Authorized members read task detail".
 
 #### Scenario: Product manager reviews a submission
 - **WHEN** the product manager opens a task in In Review
