@@ -286,3 +286,79 @@ describe("SubmissionTipLookup time budget (F8)", () => {
     await expect(pending).resolves.toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Fix round 2, F3: a lookup failure is logged as a redacted category only
+// ---------------------------------------------------------------------------
+
+// The lookup turns every failure into "no tip" and logs why with exactly one console.warn whose
+// payload is only `{ category }`: the thrown error's class name, or "timeout". The error's
+// message (a pg message can carry SQL or values) must never reach the log. The messages below
+// look like secrets so that any leak is caught.
+describe("SubmissionTipLookup failure logging (fix round 2, F3)", () => {
+  const SECRET = "SELECT secret_column FROM x WHERE token='abc'";
+  class SyntheticDatabaseError extends Error {}
+  class SyntheticProviderError extends Error {}
+  let warn: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    warn.mockRestore();
+    vi.useRealTimers();
+  });
+
+  /** Exactly one warning whose payload is only `{ category }`, with no secret text anywhere. */
+  function expectOneRedactedWarning(category: string): void {
+    expect(warn).toHaveBeenCalledTimes(1);
+    const args = warn.mock.calls[0] as unknown[];
+    expect(args.filter((arg) => typeof arg === "object" && arg !== null)).toEqual([{ category }]);
+    expect(args.every((arg) => typeof arg === "string" || (typeof arg === "object" && arg !== null && !(arg instanceof Error)))).toBe(true);
+    const text = args.map((arg) => typeof arg === "string" ? arg : JSON.stringify(arg)).join(" ");
+    expect(text).not.toContain(SECRET);
+    expect(text).not.toContain("secret_column");
+    expect(text).not.toContain("token=");
+  }
+
+  it.each([
+    ["the snapshot read throws", (h: ReturnType<typeof harness>) => h.snapshots.getSubmissionSnapshot.mockRejectedValue(new SyntheticDatabaseError(SECRET)), "SyntheticDatabaseError"],
+    ["the path rules cannot be loaded", (h: ReturnType<typeof harness>) => h.evidence.loadPathRules.mockRejectedValue(new SyntheticProviderError(SECRET)), "SyntheticProviderError"],
+    ["an ancestry query fails", (h: ReturnType<typeof harness>) => h.evidence.isAncestor.mockRejectedValue(new SyntheticProviderError(SECRET)), "SyntheticProviderError"],
+    ["an ancestry query fails with a plain Error", (h: ReturnType<typeof harness>) => h.evidence.isAncestor.mockRejectedValue(new Error(SECRET)), "Error"],
+  ])("logs one warning with only the error's class name when %s", async (_case, breakIt, category) => {
+    const h = harness();
+    breakIt(h);
+    await expect(h.lookup.findSubmissionTip(projectId, taskId)).resolves.toBeNull();
+    expectOneRedactedWarning(category);
+  });
+
+  it("logs one warning with category \"timeout\" when the budget expires", async () => {
+    vi.useFakeTimers();
+    const h = harness({ timeoutMs: 1_000 });
+    h.evidence.isAncestor.mockImplementation(() => new Promise<never>(() => undefined));
+    const pending = h.lookup.findSubmissionTip(projectId, taskId);
+    await vi.advanceTimersByTimeAsync(1_000);
+    await expect(pending).resolves.toBeNull();
+    expectOneRedactedWarning("timeout");
+  });
+
+  it("logs only the timeout, not a second warning, when a call fails after the budget expired", async () => {
+    vi.useFakeTimers();
+    const h = harness({ timeoutMs: 1_000 });
+    h.evidence.isAncestor.mockImplementation(() =>
+      new Promise<boolean>((_resolve, reject) => setTimeout(() => reject(new SyntheticProviderError(SECRET)), 5_000)));
+    const pending = h.lookup.findSubmissionTip(projectId, taskId);
+    await vi.advanceTimersByTimeAsync(6_000);
+    await expect(pending).resolves.toBeNull();
+    expectOneRedactedWarning("timeout");
+  });
+
+  it("logs nothing when the lookup simply finds no tip or succeeds", async () => {
+    await harness({ shas: [] }).lookup.findSubmissionTip(projectId, taskId);
+    await harness({ shas: [shaA, shaB, shaC], history: [`${shaA}>${shaB}`, `${shaA}>${shaC}`] }).lookup.findSubmissionTip(projectId, taskId);
+    await harness().lookup.findSubmissionTip(projectId, taskId);
+    expect(warn).not.toHaveBeenCalled();
+  });
+});
