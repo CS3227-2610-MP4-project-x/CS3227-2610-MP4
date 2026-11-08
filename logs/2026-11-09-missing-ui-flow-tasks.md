@@ -7,3 +7,4 @@
 - **Changes:** Added tasks 4.5 (create-project page and members screen, including PM transfer), 4.6 (PM task controls) and 4.7 (project dashboard) with a tracking note to `openspec/changes/project-task-management/tasks.md`, and clarified group 8's dependency. Each new task requires a human-approved spec delta before implementation. No requirements or spec text were invented. `design.md` was not edited because it holds uncommitted task 4.4 work.
 - **Checks:** Documentation-only change; no tests run.
 - **Human verification:** Pending review by thegrimbee.
+- **Prompt 3:** Asked the agent to fix the outdated "token status" wording. Changed the Project settings row in `specs/ui-spec.md` to "GitHub App connection status (unlinked, linked, or unavailable; never any access token)", matching the 5.1/5.3 GitHub App flow and the settings panel states.
