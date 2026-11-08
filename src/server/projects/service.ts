@@ -26,6 +26,12 @@ export class ProjectService {
     return { id: project.id, key: project.key, name: project.name, role: project.role };
   }
 
+  /** The person's projects for the "my projects" entry on `/` (design.md B3); order is the repository's. */
+  async listProjectsForPerson(personId: string): Promise<readonly ProjectView[]> {
+    const projects = await this.projects.listProjectsForMember(personId);
+    return projects.map((project) => ({ id: project.id, key: project.key, name: project.name, role: project.role }));
+  }
+
   /** Adds a registered person as a developer; only the product manager may (D5, S2). */
   async addMember(projectId: string, actorPersonId: string, githubUsername: string): Promise<MemberView> {
     const person = await this.findOnePerson(githubUsername);

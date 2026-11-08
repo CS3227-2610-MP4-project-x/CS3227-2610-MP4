@@ -145,6 +145,19 @@ export class ProjectRepository {
     return row ? { ...projectRecord(row), role: row.role as ProjectRole } : null;
   }
 
+  /** Every project the person is a member of, with their role, by name then id (design.md B3). */
+  async listProjectsForMember(personId: string): Promise<readonly (ProjectRecord & { role: ProjectRole })[]> {
+    const result = await this.database.query(
+      `SELECT p.id::text AS id, p.key, p.name, m.role
+         FROM app.projects p
+         JOIN app.memberships m ON m.project_id = p.id
+        WHERE m.person_id = $1::uuid
+        ORDER BY p.name ASC, p.id ASC`,
+      [personId],
+    );
+    return result.rows.map((row) => ({ ...projectRecord(row), role: row.role as ProjectRole }));
+  }
+
   /** Runs `work` in one transaction on one connection; rolls back on any error (design.md S6). */
   async transaction<T>(work: (transaction: ProjectTransaction) => Promise<T>): Promise<T> {
     const connection = await this.database.connect();
