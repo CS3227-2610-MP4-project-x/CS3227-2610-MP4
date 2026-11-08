@@ -15,7 +15,7 @@ const f = vi.hoisted(() => ({
   getUser: vi.fn(), query: vi.fn(), writes: [] as string[],
   member: true, exists: true, projectExists: true, deleted: false,
   role: "developer", assigned: true, foreign: false, empty: false, branch: "feature/check" as string | null,
-  fail: false, reassignDuringRead: false, dueDate: "2026-11-30" as string | Date,
+  fail: false, reassignDuringRead: false, dueDate: "2026-11-30" as string | Date, version: 17,
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/server/config", () => ({ getServerConfig: () => ({
@@ -51,7 +51,8 @@ const history = () => [3, 2, 1].map((n) => ({
 }));
 function expected() {
   return {
-    task: { id: f.taskId, projectKey: "WEB", taskKey: "WEB-12", title: "Validate requests", description: "Synthetic plain text <script>input</script>", status: "in_progress", assignee: actor(), dueDate: "2026-11-30", branchName: f.branch, acceptanceCriteria: f.empty ? [] : criteria() },
+    // Task 4.3, design.md L1: `version` is the task's current integer version (databaseTask's 17).
+    task: { id: f.taskId, projectKey: "WEB", taskKey: "WEB-12", title: "Validate requests", description: "Synthetic plain text <script>input</script>", status: "in_progress", version: f.version, assignee: actor(), dueDate: "2026-11-30", branchName: f.branch, acceptanceCriteria: f.empty ? [] : criteria() },
     attachedCommits: f.empty ? [] : commits(), progressUpdates: f.empty ? [] : updates(),
     reviewFeedback: f.empty ? [] : feedback(), checkHistory: f.empty ? [] : history(),
   };
@@ -69,13 +70,13 @@ function databaseTask() {
     attached_commits: dto.attachedCommits, progress_updates: dto.progressUpdates,
     review_feedback: dto.reviewFeedback, check_history: dto.checkHistory,
     auth_user_id: f.authId, github_user_id: "987654", token: "synthetic-private-token",
-    version: 17, deleted_at: null, role: f.role, person_id: f.personId,
+    version: f.version, deleted_at: null, role: f.role, person_id: f.personId,
   };
 }
 const rows = (data: Record<string, unknown>[]) => ({ rows: data, rowCount: data.length });
 
 beforeEach(() => {
-  Object.assign(f, { member: true, exists: true, projectExists: true, deleted: false, role: "developer", assigned: true, foreign: false, empty: false, branch: "feature/check", fail: false, reassignDuringRead: false, dueDate: "2026-11-30" });
+  Object.assign(f, { member: true, exists: true, projectExists: true, deleted: false, role: "developer", assigned: true, foreign: false, empty: false, branch: "feature/check", fail: false, reassignDuringRead: false, dueDate: "2026-11-30", version: 17 });
   f.writes.length = 0;
   f.getUser.mockReset().mockResolvedValue({ data: { user: { id: f.authId } }, error: null });
   f.query.mockReset().mockImplementation(async (statement: string | { text: string; values?: readonly unknown[] }, values?: readonly unknown[]) => {
@@ -182,6 +183,18 @@ describe("authorized task-detail GET and check history", () => {
     });
     expect.soft(historyReads).toEqual([]);
     await expectError(response, 403);
+  });
+  // Task 4.3: task-management "Task detail exposes the current version" (design.md L1, M1).
+  it.each(["developer", "product_manager"])("exposes the task's current integer version to the %s", async (role) => {
+    f.role = role;
+    if (role === "product_manager") f.assigned = false;
+    f.version = 2_147_483_647;
+    const response = await get();
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.task.version).toBe(2_147_483_647);
+    expect(Number.isInteger(body.task.version)).toBe(true);
+    expect(f.writes).toEqual([]);
   });
   it("keeps the calendar due date when pg returns Singapore local midnight as a Date", async () => {
     // 2026-11-30 00:00:00 in Asia/Singapore; no process timezone is mutated.

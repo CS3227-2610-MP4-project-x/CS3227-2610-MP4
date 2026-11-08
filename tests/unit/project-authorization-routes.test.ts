@@ -18,7 +18,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // and T16. Their default bodies below are now valid (T2, T4), because the body is validated
 // before the session (T8). The authorized-success cases for those routes, which write, live in
 // tests/unit/task-routes.test.ts; this file keeps the denial, concealment and safe-error
-// cases. The task-state stub assertions are unchanged (task 4.3).
+// cases.
+//
+// Task 4.3 replaced the task-state stub: identity-and-access "Task state transition is functional
+// and enforces lifecycle permissions" and "Invalid state transition uses the permission
+// response"; task-management "Task lifecycle" and "Task state route"; design.md L1, L2 and the
+// 4.3 check order. The state body is now {state, version} (L1) and is validated before the
+// session, so the default state body below is valid. The 501 stub assertions are superseded
+// ("Superseded tests" conflict resolution). This file's database fake refuses every write, so
+// it keeps the 403 matrix denials and body validation; the authorized transitions, which write,
+// are covered in tests/unit/task-lifecycle-routes.test.ts.
 const fixtures = vi.hoisted(() => ({
   authId: "11111111-1111-4111-8111-111111111111",
   personId: "22222222-2222-4222-8222-222222222222",
@@ -100,7 +109,7 @@ async function requestEndpoint(endpoint: Endpoint, options: {
         : endpoint === "taskState" ? `${taskPath}/state` : taskPath;
   // Task 4.1 (D3, Q4): project creation validates its body before the session, so the
   // default creation body is a valid {key, name}.
-  const defaultBody = endpoint === "taskState" ? { state: "In Progress" }
+  const defaultBody = endpoint === "taskState" ? { state: "In Progress", version: 1 }
     : endpoint === "projectCreate" ? { key: "WEB", name: "Synthetic project" }
       : endpoint === "taskCreate" ? {
         title: "Synthetic task", description: "Synthetic description", assigneeId: fixtures.otherPersonId,
@@ -342,52 +351,88 @@ describe("protected API authorization stubs", () => {
   });
 });
 
-describe("task state role and assignment authorization", () => {
-  it.each([
-    ["to_do", "In Progress"],
-    ["in_progress", "In Review"],
-  ])("allows the assigned developer to request %s → %s without changing state", async (current, target) => {
-    fixtures.status = current;
-    await expectError(await requestEndpoint("taskState", { body: JSON.stringify({ state: target }) }), 501);
-    expect(fixtures.status).toBe(current);
+describe("task state role and assignment authorization (task 4.3 403 matrix, L2)", () => {
+  type Actor = "assigned developer" | "unassigned developer" | "product manager";
+  const ACTORS: readonly Actor[] = ["assigned developer", "unassigned developer", "product manager"];
+  const STATUSES = ["to_do", "in_progress", "in_review", "done"] as const;
+  const TARGETS = ["To Do", "In Progress", "In Review", "Done"] as const;
+  // identity-and-access "Task state transition is functional and enforces lifecycle permissions".
+  const ALLOWED = new Set([
+    "assigned developer|to_do|In Progress",
+    "assigned developer|in_progress|In Review",
+    "product manager|in_review|Done",
+    "product manager|in_review|In Progress",
+  ]);
+  const denied = ACTORS.flatMap((actor) => STATUSES.flatMap((status) => TARGETS
+    .filter((target) => !ALLOWED.has(`${actor}|${status}|${target}`))
+    .map((target) => [actor, status, target] as const)));
+
+  function actAs(actor: Actor): void {
+    if (actor !== "assigned developer") fixtures.assigneeId = fixtures.otherPersonId;
+    if (actor === "product manager") fixtures.role = "product_manager";
+  }
+
+  it("covers every combination of role, assignment and current state that is not allowed", () => {
+    // 3 actors x 4 current states x 4 requested states, less the four allowed transitions.
+    expect(denied).toHaveLength(44);
   });
 
-  it.each([
-    ["to_do", "In Progress"],
-    ["in_progress", "In Review"],
-  ])("refuses an unassigned developer's %s → %s request", async (current, target) => {
-    fixtures.status = current;
-    fixtures.assigneeId = fixtures.otherPersonId;
-    await expectError(await requestEndpoint("taskState", { body: JSON.stringify({ state: target }) }), 403);
+  it.each(denied)("refuses the %s's request on a %s task for %s with 403 FORBIDDEN and writes nothing", async (actor, status, target) => {
+    actAs(actor);
+    fixtures.status = status;
+    await expectError(await requestEndpoint("taskState", { body: JSON.stringify({ state: target, version: 1 }) }), 403);
+    expect(fixtures.status).toBe(status);
   });
 
-  it.each(["Done", "In Progress"])("allows the PM's In Review → %s request without changing state", async (target) => {
+  it.each(["To Do", "In Progress", "In Review", "Done"])("refuses any request on a Done task, including %s, with 403", async (target) => {
     fixtures.role = "product_manager";
-    fixtures.status = "in_review";
     fixtures.assigneeId = fixtures.otherPersonId;
-    await expectError(await requestEndpoint("taskState", { body: JSON.stringify({ state: target }) }), 501);
-    expect(fixtures.status).toBe("in_review");
+    fixtures.status = "done";
+    await expectError(await requestEndpoint("taskState", { body: JSON.stringify({ state: target, version: 1 }) }), 403);
   });
 
-  it.each(["Done", "In Progress"])("refuses an assigned developer's PM-only In Review → %s request", async (target) => {
+  it("refuses the assigned developer's request for changes with feedback (Developer cannot request changes)", async () => {
     fixtures.status = "in_review";
-    await expectError(await requestEndpoint("taskState", { body: JSON.stringify({ state: target }) }), 403);
+    await expectError(await requestEndpoint("taskState", {
+      body: JSON.stringify({ state: "In Progress", version: 1, feedback: "Synthetic feedback" }),
+    }), 403);
   });
 
-  it.each([
-    ["to_do", "In Progress"],
-    ["in_progress", "In Review"],
-  ])("refuses the PM's developer-only %s → %s request", async (current, target) => {
+  it("refuses the PM's In Progress request with feedback on a To Do task with 403, before the feedback rule", async () => {
     fixtures.role = "product_manager";
-    fixtures.status = current;
-    await expectError(await requestEndpoint("taskState", { body: JSON.stringify({ state: target }) }), 403);
+    fixtures.assigneeId = fixtures.otherPersonId;
+    fixtures.status = "to_do";
+    await expectError(await requestEndpoint("taskState", {
+      body: JSON.stringify({ state: "In Progress", version: 1, feedback: "Synthetic feedback" }),
+    }), 403);
+  });
+
+  it("refuses an unassigned developer even with the largest valid version (403 before the version guard)", async () => {
+    fixtures.assigneeId = fixtures.otherPersonId;
+    await expectError(await requestEndpoint("taskState", { body: JSON.stringify({ state: "In Progress", version: 2_147_483_647 }) }), 403);
   });
 
   it.each([
-    "{}", "null", "[]", '{"state":null}', '{"state":42}',
-    '{"state":"in_progress"}', '{"state":"Unknown"}',
-    '{"state":"constructor"}', '{"state":"toString"}', '{"state":"__proto__"}',
-  ])("rejects missing or invalid state in %s", async (body) => {
+    "{}", "null", "[]", '"In Progress"',
+    '{"state":null,"version":1}', '{"state":42,"version":1}',
+    '{"state":"in_progress","version":1}', '{"state":"in progress","version":1}', '{"state":"Unknown","version":1}',
+    '{"state":"constructor","version":1}', '{"state":"toString","version":1}', '{"state":"__proto__","version":1}',
+    '{"state":"In Progress"}', '{"state":"In Progress","version":null}', '{"state":"In Progress","version":0}',
+    '{"state":"In Progress","version":-1}', '{"state":"In Progress","version":1.5}', '{"state":"In Progress","version":"1"}',
+    '{"state":"In Progress","version":2147483648}', '{"state":"In Progress","version":true}',
+    '{"version":1}',
+    '{"state":"In Progress","version":1,"assigneeId":"22222222-2222-4222-8222-222222222222"}',
+    '{"state":"In Progress","version":1,"note":"x"}',
+    '{"state":"Done","version":1,"feedback":"Synthetic feedback"}',
+    '{"state":"In Review","version":1,"feedback":"Synthetic feedback"}',
+    '{"state":"To Do","version":1,"feedback":"Synthetic feedback"}',
+  ])("rejects the invalid state body %s with 400 INVALID_REQUEST", async (body) => {
     await expectError(await requestEndpoint("taskState", { body }), 400);
+  });
+
+  it("rejects an invalid state body with 400 before the session check (check order)", async () => {
+    fixtures.getUser.mockResolvedValue({ data: { user: null }, error: null });
+    await expectError(await requestEndpoint("taskState", { body: JSON.stringify({ state: "Done", version: 1, feedback: "x" }) }), 400);
+    expect(fixtures.query).not.toHaveBeenCalled();
   });
 });

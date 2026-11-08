@@ -3,17 +3,31 @@ import "server-only";
 import { resolveProjectAccess } from "@/server/auth";
 import type { ServerComposition } from "@/server/composition";
 import { refuseUnsafeMutation } from "@/server/projects";
+import type { TaskAccessRecord } from "@/server/repositories/task-access-repository";
 import { TaskError, taskErrorResponse } from "./errors";
-import type { ParseResult } from "./types";
-import { isUuid, parseCreateTaskBody, parseDeleteTaskBody, parseEditTaskBody, parseReassignTaskBody } from "./validation";
+import { permittedTransition, storedStateOf } from "./states";
+import type { ParseResult, ProjectRole, StateChangeInput } from "./types";
+import {
+  isUuid,
+  parseCreateTaskBody,
+  parseDeleteTaskBody,
+  parseEditTaskBody,
+  parseProgressUpdateBody,
+  parseReassignTaskBody,
+  parseStateChangeBody,
+} from "./validation";
 
-// Route handlers for task 4.2. Check order (design.md T8, Q4): Origin (403); content type, body
-// and path IDs (400); session (401); membership (404); task exists in the project (404); role
-// (403); then domain errors (409). GET has no Origin check.
+// Route handlers for tasks 4.2 and 4.3. Check order (design.md T8, Q4 and the 4.3 check order):
+// Origin (403); content type, body and path IDs (400); session (401); membership (404); task
+// exists in the project (404); role, or the 403 matrix on the task's current state (403); the
+// state route's feedback rule (400); then domain errors (409). GET has no Origin check.
 
 type TaskRouteContext = Readonly<{ params: Promise<{ projectId: string; taskId?: string }> }>;
 
 type TaskWrite<T> = Readonly<{ projectId: string; taskId: string; personId: string; input: T }>;
+
+/** A request that passed every check up to the role check, with the task it names. */
+type TaskRequest<T> = TaskWrite<T> & Readonly<{ role: ProjectRole; task: TaskAccessRecord }>;
 
 function json(body: unknown, status: number): Response {
   return Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -59,15 +73,16 @@ async function admitWrite<T>(
 }
 
 /**
- * The shared checks before a product manager's write to one task: the admission checks,
- * session, membership, task lookup, then role. Returns the validated write or a refusal.
+ * The shared checks before a write to one task: the admission checks, session, membership and
+ * the task lookup (design.md T8, U9). Returns the validated request, the actor's role and the
+ * task's current assignee and state, or a refusal. The caller applies its own role rule.
  */
-async function authorizeTaskWrite<T>(
+async function admitTaskRequest<T>(
   request: Request,
   context: TaskRouteContext,
   composition: ServerComposition,
   parseBody: (body: unknown) => ParseResult<T>,
-): Promise<TaskWrite<T> | Response> {
+): Promise<TaskRequest<T> | Response> {
   const { projectId, taskId } = await context.params;
   const admitted = await admitWrite(request, composition, [projectId, taskId], parseBody);
   if (admitted instanceof Response) return admitted;
@@ -75,13 +90,27 @@ async function authorizeTaskWrite<T>(
   if (taskId === undefined) return refusal("INVALID_REQUEST");
   const access = await resolveProjectAccess(composition, projectId);
   if (access instanceof Response) return access;
+  let task: TaskAccessRecord | null;
   try {
-    if (!await composition.taskAccessRepository.findTaskInProject(projectId, taskId)) return refusal("NOT_FOUND");
+    task = await composition.taskAccessRepository.findTaskInProject(projectId, taskId);
   } catch (error) {
     return taskErrorResponse(error);
   }
-  if (access.role !== "product_manager") return refusal("FORBIDDEN");
-  return { projectId, taskId, personId: access.personId, input: admitted.input };
+  if (!task) return refusal("NOT_FOUND");
+  return { projectId, taskId, personId: access.personId, role: access.role, task, input: admitted.input };
+}
+
+/** The checks before a product manager's write to one task: admission, then the PM role (403). */
+async function authorizeTaskWrite<T>(
+  request: Request,
+  context: TaskRouteContext,
+  composition: ServerComposition,
+  parseBody: (body: unknown) => ParseResult<T>,
+): Promise<TaskWrite<T> | Response> {
+  const admitted = await admitTaskRequest(request, context, composition, parseBody);
+  if (admitted instanceof Response) return admitted;
+  if (admitted.role !== "product_manager") return refusal("FORBIDDEN");
+  return { projectId: admitted.projectId, taskId: admitted.taskId, personId: admitted.personId, input: admitted.input };
 }
 
 /** `POST /api/v1/projects/{projectId}/tasks`: the PM creates a task (design.md T1, T2). */
@@ -148,4 +177,60 @@ export async function handleTaskDelete(
     await composition.taskService.deleteTask(write.projectId, write.taskId, write.personId, write.input.version);
     return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
   });
+}
+
+/**
+ * Runs the transition the 403 matrix allowed, after the feedback rule: feedback is required for
+ * a request for changes and refused with any other transition (design.md L2, L3).
+ */
+async function applyStateChange(composition: ServerComposition, change: TaskRequest<StateChangeInput>): Promise<Response> {
+  const { projectId, taskId, personId, role, task, input } = change;
+  const transition = permittedTransition({ personId, role }, { assigneeId: task.assigneeId, status: task.state }, storedStateOf(input.state));
+  if (!transition) return refusal("FORBIDDEN");
+  const lifecycle = composition.taskLifecycleService;
+  if (transition === "requestChanges") {
+    if (!input.feedback?.ok) return refusal("INVALID_REQUEST");
+    const feedback = input.feedback.value;
+    return respond(async () => json(await lifecycle.requestChanges(projectId, taskId, personId, { version: input.version, feedback }), 200));
+  }
+  if (input.feedback) return refusal("INVALID_REQUEST");
+  switch (transition) {
+    case "start":
+      return respond(async () => json(await lifecycle.startTask(projectId, taskId, personId, input.version), 200));
+    case "submit":
+      return respond(async () => json(await lifecycle.submitTask(projectId, taskId, personId, input.version), 200));
+    case "approve":
+      return respond(async () => json(await lifecycle.approveTask(projectId, taskId, personId, input.version), 200));
+  }
+}
+
+/**
+ * `PATCH /api/v1/projects/{projectId}/tasks/{taskId}/state`: a lifecycle transition (design.md
+ * L1 to L7). The 403 matrix is applied here to the task as read, and again by the service under
+ * the row lock, where a changed version is 409.
+ */
+export async function handleTaskStateChange(
+  request: Request,
+  context: TaskRouteContext,
+  composition: ServerComposition,
+): Promise<Response> {
+  const change = await admitTaskRequest(request, context, composition, parseStateChangeBody);
+  if (change instanceof Response) return change;
+  return applyStateChange(composition, change);
+}
+
+/**
+ * `POST /api/v1/projects/{projectId}/tasks/{taskId}/progress-updates`: the assigned developer
+ * posts a progress update; 201 with the stored update (design.md L4).
+ */
+export async function handleProgressUpdateCreate(
+  request: Request,
+  context: TaskRouteContext,
+  composition: ServerComposition,
+): Promise<Response> {
+  const post = await admitTaskRequest(request, context, composition, parseProgressUpdateBody);
+  if (post instanceof Response) return post;
+  if (post.role !== "developer" || post.task.assigneeId !== post.personId) return refusal("FORBIDDEN");
+  return respond(async () =>
+    json(await composition.taskLifecycleService.postProgressUpdate(post.projectId, post.taskId, post.personId, post.input), 201));
 }

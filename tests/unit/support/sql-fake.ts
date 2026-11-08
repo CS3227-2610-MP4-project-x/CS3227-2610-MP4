@@ -28,9 +28,14 @@ import { randomUUID } from "node:crypto";
 // version and updated_at trigger, and the app_runtime grants (no DELETE on tasks, no UPDATE or
 // DELETE on task_events). Timestamps are ISO 8601 UTC strings and dates are `YYYY-MM-DD`
 // strings. Locks are not modelled; the PostgreSQL integration tests cover them.
+//
+// Task 4.3 adds `progress_updates (id, task_id, author_id, body, created_at)` with its foreign
+// keys (design.md L4; columns as recorded in workflow/handoffs/tasks-lifecycle-4-3.md). The
+// table is not versioned. attached_commits and check_results are not modelled; submissions
+// that reference a check are covered by tests/integration/db/task-lifecycle.test.ts.
 
 export type Role = "product_manager" | "developer";
-export type Table = "people" | "projects" | "memberships" | "tasks" | "acceptance_criteria" | "task_events";
+export type Table = "people" | "projects" | "memberships" | "tasks" | "acceptance_criteria" | "task_events" | "progress_updates";
 export type Kind = "begin" | "commit" | "rollback" | "select" | "insert" | "update" | "delete" | "other";
 export type Row = Record<string, unknown>;
 
@@ -50,9 +55,10 @@ export interface TaskEventRow {
   previous_assignee_id: string | null; new_assignee_id: string | null; check_result_id: string | null;
   feedback: string | null; created_at: string;
 }
+export interface ProgressUpdateRow { id: string; task_id: string; author_id: string; body: string; created_at: string }
 export interface State {
   people: PersonRow[]; projects: ProjectRow[]; memberships: MembershipRow[]; tasks: TaskRow[];
-  acceptance_criteria: CriterionRow[]; task_events: TaskEventRow[];
+  acceptance_criteria: CriterionRow[]; task_events: TaskEventRow[]; progress_updates: ProgressUpdateRow[];
 }
 /** `memberships` holds the membership rows a SELECT matched (before projection). */
 export interface LogEntry { sql: string; values: unknown[]; kind: Kind; tables: Table[]; rows: Row[]; memberships: Row[] }
@@ -60,7 +66,7 @@ interface Binding { alias: string; table: Table; row: Row }
 type Scope = Binding[];
 
 const ROLES: readonly Role[] = ["product_manager", "developer"];
-const TABLES: readonly Table[] = ["people", "projects", "memberships", "tasks", "acceptance_criteria", "task_events"];
+const TABLES: readonly Table[] = ["people", "projects", "memberships", "tasks", "acceptance_criteria", "task_events", "progress_updates"];
 const COLUMNS: Record<Table, readonly string[]> = {
   people: ["id", "auth_user_id", "github_user_id", "github_username"],
   projects: ["id", "key", "name", "last_task_number", "version"],
@@ -74,6 +80,7 @@ const COLUMNS: Record<Table, readonly string[]> = {
     "id", "task_id", "actor_id", "event_type", "from_status", "to_status",
     "previous_assignee_id", "new_assignee_id", "check_result_id", "feedback", "created_at",
   ],
+  progress_updates: ["id", "task_id", "author_id", "body", "created_at"],
 };
 /** Tables whose rows carry `version` and `updated_at`, bumped by the migration's trigger. */
 const VERSIONED: readonly Table[] = ["people", "projects", "memberships", "tasks", "acceptance_criteria"];
@@ -87,7 +94,7 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 class UnsupportedSql extends Error {}
 
 function emptyState(): State {
-  return { people: [], projects: [], memberships: [], tasks: [], acceptance_criteria: [], task_events: [] };
+  return { people: [], projects: [], memberships: [], tasks: [], acceptance_criteria: [], task_events: [], progress_updates: [] };
 }
 
 export function clone(state: State): State {
@@ -112,7 +119,7 @@ function kindOf(sql: string): Kind {
 
 function tablesOf(sql: string): Table[] {
   const found = new Set<Table>();
-  for (const match of sql.matchAll(/"?app"?\."?(people|projects|memberships|tasks|acceptance_criteria|task_events)\b"?/gi)) {
+  for (const match of sql.matchAll(/"?app"?\."?(people|projects|memberships|tasks|acceptance_criteria|task_events|progress_updates)\b"?/gi)) {
     found.add(match[1].toLowerCase() as Table);
   }
   return [...found];
@@ -560,6 +567,11 @@ export class FakeDatabase {
       }
       if (!EVENT_TYPES.includes(String(row.event_type))) throw pgError("23514", "task_events_event_type_valid");
       if ((row.event_type === "review_feedback") !== (row.feedback !== null)) throw pgError("23514", "task_events_feedback_only_on_review_feedback");
+    } else if (table === "progress_updates") {
+      row = { id: randomUUID(), created_at: now, ...assigned };
+      if (!this.state.tasks.some((task) => task.id === row.task_id)) throw pgError("23503", "progress_updates_task_id_fkey");
+      if (!this.state.people.some((person) => person.id === row.author_id)) throw pgError("23503", "progress_updates_author_id_fkey");
+      if (typeof row.body !== "string") throw pgError("23502");
     } else {
       throw new UnsupportedSql(`Unexpected write in test: ${sql}`);
     }

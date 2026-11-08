@@ -8,7 +8,9 @@ import type {
   EditTaskInput,
   ParseResult,
   ReassignTaskInput,
+  StateChangeInput,
 } from "./types";
+import { isTaskState } from "./states";
 
 // design.md T2, T4, T5, T6 and T7. Text is trimmed and counted in Unicode code points (R1).
 const TITLE_MAX = 200;
@@ -30,6 +32,11 @@ const EDIT_FIELDS: ReadonlySet<string> = new Set([
   "version", "title", "description", "dueDate", "branchName", "acceptanceCriteria",
 ]);
 const CRITERION_FIELDS: ReadonlySet<string> = new Set(["id", "description"]);
+const STATE_CHANGE_FIELDS: ReadonlySet<string> = new Set(["state", "version", "feedback"]);
+const PROGRESS_UPDATE_FIELDS: ReadonlySet<string> = new Set(["body"]);
+// design.md L3 and L4: human-chosen limits, in code points.
+const FEEDBACK_MAX = 5_000;
+const PROGRESS_UPDATE_MAX = 2_000;
 
 /** Thrown inside this module only, and turned into a ParseResult at each entry point. */
 class BodyError extends Error {
@@ -193,6 +200,28 @@ export function parseDeleteTaskBody(body: unknown): ParseResult<DeleteTaskInput>
     const fields = objectFields(body, new Set(["version"]));
     return { version: version(required(fields, "version")) };
   });
+}
+
+/**
+ * `PATCH .../tasks/{taskId}/state`: `{state, version}` plus `feedback`, which only a request for
+ * In Progress may carry (design.md L1, L3). The feedback text is validated here, but a bad
+ * value is reported by the handler after the 403 matrix (the 4.3 check order).
+ */
+export function parseStateChangeBody(body: unknown): ParseResult<StateChangeInput> {
+  return parse(() => {
+    const fields = objectFields(body, STATE_CHANGE_FIELDS);
+    const state = required(fields, "state");
+    if (!isTaskState(state)) invalid();
+    const input = { state, version: version(required(fields, "version")) };
+    if (!fields.has("feedback")) return input;
+    if (state !== "In Progress") invalid();
+    return { ...input, feedback: parse(() => trimmedText(fields.get("feedback"), FEEDBACK_MAX)) };
+  });
+}
+
+/** `POST .../tasks/{taskId}/progress-updates`: exactly `{body}` (design.md L4). */
+export function parseProgressUpdateBody(body: unknown): ParseResult<string> {
+  return parse(() => trimmedText(required(objectFields(body, PROGRESS_UPDATE_FIELDS), "body"), PROGRESS_UPDATE_MAX));
 }
 
 /** Checks a project or task path ID with the same UUID rule as the existing routes. */

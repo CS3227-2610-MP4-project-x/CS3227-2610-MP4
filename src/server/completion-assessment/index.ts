@@ -7,3 +7,5 @@ export type { CheckCacheKey, CheckHistoryEntry, SaveCheckInput, StoredCheckResul
 export { TaskSnapshotRepository } from "./snapshot-repository";
 export type { TaskSnapshot, TaskSnapshotCriterion, TaskSnapshotRepositoryBinding } from "./snapshot-repository";
 export { TaskSnapshotError, TaskSnapshotService } from "./snapshot-service";
+export { SubmissionSnapshotRepository, SubmissionTipLookup } from "./submission-tip";
+export type { SubmissionSnapshot, SubmissionTip } from "./submission-tip";

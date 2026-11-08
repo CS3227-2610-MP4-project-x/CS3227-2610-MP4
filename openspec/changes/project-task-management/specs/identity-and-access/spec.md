@@ -101,12 +101,12 @@ The system SHALL provide temporary project and task route stubs to verify server
 - **THEN** the endpoint is no longer a stub: a project product manager may edit the task, a project developer receives HTTP 403, and a non-member receives HTTP 404
 - **AND** the task-management requirement "Product manager manages tasks" defines its payload and responses
 
-#### Scenario: Task state transition stub enforces lifecycle permissions
+#### Scenario: Task state transition is functional and enforces lifecycle permissions
 - **WHEN** a person sends PATCH to `/api/v1/projects/{projectId}/tasks/{taskId}/state` with a JSON body whose `state` is `To Do`, `In Progress`, `In Review`, or `Done`
 - **THEN** only the assigned developer is authorized to request `In Progress` from `To Do` or `In Review` from `In Progress`
 - **AND** only the project's product manager is authorized to request `Done` or `In Progress` from `In Review`
-- **AND** an authenticated project member without the required assignment or role receives HTTP 403, while a non-member receives HTTP 404
-- **AND** an authorized request reaches a stub that returns HTTP 501 without changing the task state
+- **AND** an authenticated project member without the required assignment or role, or who requests any other combination of role, assignment, and current state, receives HTTP 403, while a non-member receives HTTP 404
+- **AND** an authorized request is no longer a stub: it changes the task as the task-management requirements "Task lifecycle" and "Task state route" define
 
 #### Scenario: Authorized request reaches a protected route stub
 - **WHEN** an authenticated person with the required project access requests one of the initial protected route stubs before its feature is implemented
@@ -137,10 +137,16 @@ The system SHALL provide temporary project and task route stubs to verify server
 - **THEN** the system returns HTTP 500 with code `INTERNAL_ERROR` and message `Internal server error`
 - **AND** the response does not expose the underlying failure details
 
-#### Scenario: State transition validation remains with task lifecycle implementation
-- **WHEN** a requested state transition is invalid for the task's current state
-- **THEN** task 3.2's authorization stubs do not implement transition validation or mutation
-- **AND** task 4.3 defines the functional invalid-transition response and behavior
+#### Scenario: Invalid state transition uses the permission response
+- **WHEN** a requested state transition is not allowed for the requester from the task's current state
+- **THEN** the system returns HTTP 403 with code `FORBIDDEN` and message `Insufficient permissions`, and the task state is unchanged
+- **AND** task 4.3 adds no separate invalid-transition error code
+- **AND** HTTP 409 on this route comes only from the task-management `version` guard, with code `VERSION_CONFLICT`
+
+#### Scenario: Progress update route is a protected mutating route
+- **WHEN** a person requests `POST /api/v1/projects/{projectId}/tasks/{taskId}/progress-updates`
+- **THEN** only the assigned developer is authorized, any other project member receives HTTP 403, and a non-member or task outside the project receives HTTP 404
+- **AND** the task-management requirement "Developer submits task progress" defines its payload and responses
 
 ### Requirement: Protected API errors use stable safe responses
 Protected API errors SHALL use the JSON envelope `{ "error": { "code": "...", "message": "..." } }`. Codes and generic messages SHALL be stable and SHALL NOT expose provider, database, or other internal details.
@@ -172,7 +178,7 @@ Protected API errors SHALL use the JSON envelope `{ "error": { "code": "...", "m
 Every state-changing project route SHALL require an `Origin` header equal to the environment's `APP_ORIGIN` and a `Content-Type` of `application/json`, and SHALL reject other requests before changing any state.
 
 #### Scenario: Bad origin is refused
-- **WHEN** a mutating request to `POST /api/v1/projects`, `POST /api/v1/projects/{projectId}/members`, `POST /api/v1/projects/{projectId}/product-manager-transfer`, `POST /api/v1/projects/{projectId}/tasks`, `PATCH /api/v1/projects/{projectId}/tasks/{taskId}`, `PUT /api/v1/projects/{projectId}/tasks/{taskId}/assignee`, or `DELETE /api/v1/projects/{projectId}/tasks/{taskId}` has a missing `Origin` header or one that differs from `APP_ORIGIN`
+- **WHEN** a mutating request to `POST /api/v1/projects`, `POST /api/v1/projects/{projectId}/members`, `POST /api/v1/projects/{projectId}/product-manager-transfer`, `POST /api/v1/projects/{projectId}/tasks`, `PATCH /api/v1/projects/{projectId}/tasks/{taskId}`, `PUT /api/v1/projects/{projectId}/tasks/{taskId}/assignee`, `DELETE /api/v1/projects/{projectId}/tasks/{taskId}`, `PATCH /api/v1/projects/{projectId}/tasks/{taskId}/state`, or `POST /api/v1/projects/{projectId}/tasks/{taskId}/progress-updates` has a missing `Origin` header or one that differs from `APP_ORIGIN`
 - **THEN** the system returns HTTP 403 with code `FORBIDDEN` and a safe message, and nothing changes
 
 #### Scenario: Wrong content type is refused

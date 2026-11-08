@@ -8,7 +8,7 @@ export type TaskDetailAccess = Readonly<{ personId: string; role: ProjectRole }>
 export type TaskDetailView = Readonly<{
   task: Readonly<{
     id: string; projectKey: string; taskKey: string; title: string; description: string;
-    status: string; assignee: Readonly<{ id: string; githubUsername: string }>;
+    status: string; version: number; assignee: Readonly<{ id: string; githubUsername: string }>;
     dueDate: string; branchName: string | null;
     acceptanceCriteria: readonly Readonly<{ id: string; position: number; description: string }>[];
   }>;

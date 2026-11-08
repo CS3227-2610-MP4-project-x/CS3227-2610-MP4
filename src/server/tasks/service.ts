@@ -1,7 +1,7 @@
 import "server-only";
 
 import { TaskError } from "./errors";
-import type { LockedTask, TaskRecord, TaskRepository, TaskTransaction } from "./repository";
+import type { LockedTask, TaskRepository, TaskTransaction } from "./repository";
 import type {
   CreateTaskInput,
   CriterionInput,
@@ -9,34 +9,9 @@ import type {
   EditTaskInput,
   ProjectRole,
   ReassignTaskInput,
-  StoredTaskState,
-  TaskState,
   TaskView,
 } from "./types";
-
-const STATE_NAMES: Readonly<Record<StoredTaskState, TaskState>> = {
-  to_do: "To Do",
-  in_progress: "In Progress",
-  in_review: "In Review",
-  done: "Done",
-};
-
-function toView(record: TaskRecord): TaskView {
-  return {
-    id: record.id,
-    taskKey: `${record.projectKey}-${record.number}`,
-    title: record.title,
-    description: record.description,
-    assignee: { personId: record.assigneeId, githubUsername: record.assigneeGitHubUsername },
-    dueDate: record.dueDate,
-    branchName: record.branchName,
-    state: STATE_NAMES[record.status],
-    acceptanceCriteria: record.criteria,
-    version: record.version,
-    createdAt: record.createdAt,
-    updatedAt: record.updatedAt,
-  };
-}
+import { readWrittenTask, toView } from "./view";
 
 /** Missing membership conceals the project (R4); a developer is refused (design.md T8). */
 function requireProductManager(role: ProjectRole | undefined): void {
@@ -125,7 +100,7 @@ export class TaskService {
       for (const [index, description] of input.acceptanceCriteria.entries()) {
         await transaction.insertCriterion(taskId, index + 1, description);
       }
-      return toView(await requireRecord(transaction, projectId, taskId));
+      return readWrittenTask(transaction, projectId, taskId);
     });
   }
 
@@ -150,7 +125,7 @@ export class TaskService {
       }
       if (!await transaction.updateTaskFields(taskId, input.version, input)) throw new TaskError("VERSION_CONFLICT");
       if (input.acceptanceCriteria) await replaceCriteria(transaction, taskId, current, input.acceptanceCriteria);
-      return toView(await requireRecord(transaction, projectId, taskId));
+      return readWrittenTask(transaction, projectId, taskId);
     });
   }
 
@@ -166,7 +141,7 @@ export class TaskService {
         if (!await transaction.updateAssignee(taskId, input.version, input.assigneeId)) throw new TaskError("VERSION_CONFLICT");
         await transaction.insertAssignmentChange(taskId, actorPersonId, task.assigneeId, input.assigneeId);
       }
-      return toView(await requireRecord(transaction, projectId, taskId));
+      return readWrittenTask(transaction, projectId, taskId);
     });
   }
 
@@ -177,10 +152,4 @@ export class TaskService {
       if (!await transaction.markDeleted(taskId, expectedVersion)) throw new TaskError("VERSION_CONFLICT");
     });
   }
-}
-
-async function requireRecord(transaction: TaskTransaction, projectId: string, taskId: string): Promise<TaskRecord> {
-  const record = await transaction.findTask(projectId, taskId);
-  if (!record) throw new Error("Task disappeared during its own transaction.");
-  return record;
 }
