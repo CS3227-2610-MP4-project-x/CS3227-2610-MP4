@@ -32,6 +32,13 @@ Depends on: 3.
 - [x] 4.2 **[P]** Implement task create, read, edit, reassign, and soft delete with acceptance criteria and task IDs; replace the task stubs and add API authorization tests plus tests for missing criteria, assignees outside the project, and task IDs that are never reused.
 - [x] 4.3 Implement the To Do → In Progress → In Review → Done lifecycle, request-changes with feedback, and progress updates; replace the state stub and add transition, assignment/permission, competing-write, and route authorization tests. Also add `version` to the task-detail read, add the read-only completion-assessment tip lookup used by submission (Developer A agreed), and replace the stub assertions in `tests/unit/project-authorization-routes.test.ts`. See "Task Lifecycle Decisions (4.3)" in `design.md`.
 - [ ] 4.4 Build the board, task detail, and review queue pages following `specs/ui-spec.md`.
+- [ ] 4.5 Build the create-project page and the product-manager members screen: list the project's members, add a member by GitHub username, and transfer the product-manager role, using the 4.1 routes. Add a member-listing read (left to 4.4 by D4 and deferred by B1/C4). Draft and get human approval for the spec delta and any read or route decision before implementing; add page, read-service, and authorization tests.
+- [ ] 4.6 Build the product-manager New Task, edit, reassign, and delete controls on the board and task-detail pages, using the 4.2 routes and the task's current `version` (deferred by B1). Draft and get human approval for the spec delta before implementing; add rendering, role-visibility, validation, and stale-version tests.
+- [ ] 4.7 Build the project dashboard (Header, Project Progress, Action Buttons for the product manager, Task Summary Card, Task Allocation) following `specs/ui-spec.md`, and enable its navigation tab (deferred by B1/B4). Draft and get human approval for the spec delta and its read service before implementing; add read-service and rendering tests.
+
+### Tracking note for tasks 4.5 to 4.7
+
+Added on 9 November 2026 at the request of thegrimbee (Developer B). Task 4.4's decision B1 in `design.md` deferred the members screen, the product-manager task controls, and the dashboard to "a later approved change or task", but no task tracked them, and no task covered a UI for project creation. Without 4.5 and 4.6 the complete Developer and Product Manager journeys required by 9.2 cannot be performed through the UI. Member removal and role change remain out of scope (D7). Tasks 4.5 to 4.7 depend on 4.4 for the shared project navigation and page-access helper.
 
 ### Completion evidence for tasks 4.2 and 4.3
 
@@ -72,7 +79,7 @@ Depends on: 5 and 6.
 
 ## 8. Progress Report
 
-Depends on: 4 and 6. Can run alongside group 7.
+Depends on: 4.1–4.4 and 6. Can run alongside group 7 and tasks 4.5–4.7.
 
 - [ ] 8.1 Implement report input assembly from structured activity for a date range in SGT; add tests for range boundaries (including late-evening activity), excluded diffs, empty ranges, ranges longer than 7 days, and activity over the input budget.
 - [ ] 8.2 Implement report generation with citation checks and caching invalidated by new activity; add fake-adapter tests and product-manager-only API authorization tests.
