@@ -1,13 +1,55 @@
 # Task lifecycle: task 4.3 handoff
 
+## Completion verification (8 November 2026)
+
+This section supersedes the planning-only status of the historical record below. Source revision: `9b61ed713e7c490af095495c65a6819871494174`, branch `feat/tasks-board-detail-review-queue`. Human owner: Developer B; Developer A retains the recorded cross-review responsibilities. Scope: verify existing tasks 4.2/4.3 and correct completion records only; no product code, tests, requirements, migrations, or dependencies changed.
+
+### Independent reviewer findings
+
+All inspected functional criteria were met. No new must-fix code-quality findings were identified; CRUD, lifecycle, validation, persistence and the read-only tip lookup retain cohesive module boundaries.
+
+| Task 4.3 criterion | Status and source/test evidence |
+|---|---|
+| Four transitions and assigned-developer/PM permissions | Met: `src/server/tasks/states.ts`, `lifecycle-service.ts`; `tests/unit/project-authorization-routes.test.ts` and `task-lifecycle-routes.test.ts`. |
+| Request changes requires feedback and permits resubmission | Met: task validation and dedicated lifecycle service method; feedback and resubmission route cases in `tests/unit/task-lifecycle-routes.test.ts`. |
+| Progress updates restricted to the assignee without changing task state/version | Met: lifecycle service and route tests; reassignment race in `tests/integration/db/task-lifecycle.test.ts`. |
+| Atomic state/event writes and optimistic version guard | Met: row lock, version comparison, guarded update and event share one transaction; competing-write cases in `tests/integration/db/task-lifecycle.test.ts`. |
+| Task-detail read exposes version | Met: `src/server/task-detail/read-repository.ts` and `read-service.ts`; `tests/unit/task-detail-read.test.ts`. |
+| Read-only submission tip lookup and safe failure behavior | Met: `src/server/completion-assessment/submission-tip.ts`, its public entry point and composition wiring; unit tip-lookup tests and `tests/integration/db/submission-tip-lookup.test.ts`. Lookup precedes the transaction; commit set and criteria are rechecked under lock. |
+| Functional state route replaces stub and stub assertions | Met: task state Route Handler calls `handleTaskStateChange`; functional permission matrix replaces authorized 501 assertions. |
+
+Task 4.2 criteria and evidence are recorded in the matching completion section in `workflow/handoffs/tasks-crud-4-2.md`.
+
+### Checks and limits
+
+- Fresh local Windows verification at the source revision above: `npm.cmd test` passed 32 files / 1,895 tests; `npm.cmd run lint`, `npm.cmd run typecheck`, and `npm.cmd run build` exited 0.
+- Prior PostgreSQL execution: `logs/2026-11-07-task-4.3-implementation.md`, verified by Gabriel on 8 November 2026, records the human's post-fix run: 18 files / 331 tests passed. The 4.2 handoff separately records 16 files / 306 tests passed after rework.
+- No `TEST_DATABASE_URL` was configured and Docker's daemon was unavailable. PostgreSQL tests were not rerun; prior human evidence is not represented as a fresh run. No UI or end-to-end testing was performed for this documentation correction.
+- OpenSpec CLI was unavailable on PATH and no local executable was found; validation was not rerun. Only task checkboxes/evidence changed in OpenSpec.
+- Initial `npm` invocations were blocked by PowerShell script execution policy; `npm.cmd` ran successfully without changing that policy. The build regenerated `next-env.d.ts`; its generated-only diff was restored to the pre-session content.
+- Existing task 4.4 design/spec edits, local Claude settings and the 4.4 analysis log are outside scope. Task 4.4 remains unchecked.
+
+### Remaining human follow-ups
+
+- Confirm the recorded Lim-ZY cross-reviews of authorization, completion-assessment and task-detail changes. This session does not approve or infer completion of human review.
+- Record the matching-check tie-break decision noted in the 4.3 implementation log. The implementation selects the newest matching check, which satisfies the existing matching-check requirement; this documentation gap remains open.
+- The implementation log's F1 open item is resolved by the already approved design decision L9 and commit `dafe4c8`: either 403 or 409 can refuse the losing transition, with no write. No new decision was made here.
+- The human verified this session's disclosure log and explicitly authorized the scoped documentation commit on `feat/tasks-board-detail-review-queue` on 8 November 2026.
+
+### Verification session reports
+
+- Root: provider `codex`; agent orchestrator/coordinator; work ID `tasks-4-2-4-3-verification`; phase verification and completion records; source revision as above. Provider session ID and model: not available. Changed files: `openspec/changes/project-task-management/tasks.md`, both task handoffs, and `logs/2026-11-08-tasks-4-2-4-3-verification.md`. Work completed: consolidated independent review and fresh checks, corrected task status and historical handoff status. Resource metrics (tokens in/out/total, cache read/write, cost): not available.
+- Reviewer `/root/verify_tasks`: read-only source/spec/test inspection; all task 4.2/4.3 functional criteria met; no new must-fix findings; no files changed or tests executed. Review limits: no live database or UI; pending human cross-review. Platform: Codex; configured model GPT-6.1 Sol; exact provider session ID and resource metrics: not available.
+- Commit/PR: the human verified the interaction summary and authorized one scoped documentation commit on `feat/tasks-board-detail-review-queue`. The commit agent audited the branch against `dev` (identical at `9b61ed7`), confirmed a clean index, and selected only the four verification records. Subject: `docs(tasks): verify CRUD and lifecycle completion`. Existing unrelated changes are excluded. No push or PR creation authorized. Resource metrics: not available. No generated deliverables or dependencies added.
+
 ## Task record `[ORCH]`
 
 - Task ID: 4.3 (`openspec/changes/project-task-management/tasks.md` L33)
 - Summary: Implement the To Do → In Progress → In Review → Done lifecycle, request changes with feedback, and progress updates. Replace the state-route stub. Add `version` to the task-detail read and the read-only completion-assessment tip lookup used by submission. Replace the stub assertions in `tests/unit/project-authorization-routes.test.ts`. Add tests for transitions, assignment and permissions, competing writes, and route authorization. The approved decisions are in "Task Lifecycle Decisions (4.3)" (L1–L8, the check order, and the conflict resolutions) in `openspec/changes/project-task-management/design.md` L333–356.
 - Human owner (Developer A / Developer B): Developer B (thegrimbee). Developer A (Lim-ZY) agreed to two changes in Developer A's modules: L5's public tip-lookup function in `src/server/completion-assessment/`, and L1's `version` field in the Group 7.3 task-detail DTO (design.md L335, L355). The 4.3 agents write both changes, and Lim-ZY cross-reviews them before merge (Q3).
 - Requirement IDs: none assigned. design.md L175 says "No formal API requirement IDs are assigned" for these routes, and none were given for 4.3. Requirements are referenced by their OpenSpec requirement titles (see Context references). Do not construct IDs.
-- Status: Planned. The spec delta was approved and committed (`365a817`), and the analysis log was committed (`d5fc31a`). Q1–Q11 are resolved (see "Decisions and open questions"). No test, implementation or review work has started.
-- Next human action: Tell the main session to dispatch the test-writer.
+- Status: Implemented and merged at `9b61ed7`; independently verified on 8 November 2026. The planning sections below are historical. See "Completion verification (8 November 2026)" for current evidence and remaining human follow-ups.
+- Next human action: Verify the new interaction summary, confirm the recorded cross-review status, and record the matching-check tie-break decision. No new implementation is required for the task 4.3 checkbox.
 
 ## Source and scope `[ORCH]`
 

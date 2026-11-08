@@ -29,9 +29,13 @@ Depends on: 2.
 Depends on: 3.
 
 - [x] 4.1 **[P]** Implement project creation, keys, memberships, the one-product-manager invariant, and product-manager transfer; decide who may create a project and how its initial product manager is selected; add PostgreSQL integrity and project-route authorization tests.
-- [ ] 4.2 **[P]** Implement task create, read, edit, reassign, and soft delete with acceptance criteria and task IDs; replace the task stubs and add API authorization tests plus tests for missing criteria, assignees outside the project, and task IDs that are never reused.
-- [ ] 4.3 Implement the To Do → In Progress → In Review → Done lifecycle, request-changes with feedback, and progress updates; replace the state stub and add transition, assignment/permission, competing-write, and route authorization tests. Also add `version` to the task-detail read, add the read-only completion-assessment tip lookup used by submission (Developer A agreed), and replace the stub assertions in `tests/unit/project-authorization-routes.test.ts`. See "Task Lifecycle Decisions (4.3)" in `design.md`.
+- [x] 4.2 **[P]** Implement task create, read, edit, reassign, and soft delete with acceptance criteria and task IDs; replace the task stubs and add API authorization tests plus tests for missing criteria, assignees outside the project, and task IDs that are never reused.
+- [x] 4.3 Implement the To Do → In Progress → In Review → Done lifecycle, request-changes with feedback, and progress updates; replace the state stub and add transition, assignment/permission, competing-write, and route authorization tests. Also add `version` to the task-detail read, add the read-only completion-assessment tip lookup used by submission (Developer A agreed), and replace the stub assertions in `tests/unit/project-authorization-routes.test.ts`. See "Task Lifecycle Decisions (4.3)" in `design.md`.
 - [ ] 4.4 Build the board, task detail, and review queue pages following `specs/ui-spec.md`.
+
+### Completion evidence for tasks 4.2 and 4.3
+
+Verified against source and test coverage at `9b61ed713e7c490af095495c65a6819871494174` on 8 November 2026. Both implementations are present; fresh unit tests passed (32 files, 1,895 tests), as did lint, type-checking, and the production build. The 4.2 handoff records the human's post-rework PostgreSQL run (16 files, 306 tests passed); the human-verified 4.3 implementation log records the later post-fix run (18 files, 331 tests passed). PostgreSQL tests were not rerun during this verification because no disposable test database was configured. See `workflow/handoffs/tasks-crud-4-2.md`, `workflow/handoffs/tasks-lifecycle-4-3.md`, and `logs/2026-11-07-task-4.3-implementation.md`. Pending human cross-review and the matching-check tie-break documentation follow-up remain disclosed in the lifecycle handoff; these checkboxes record implementation completion, not human approval.
 
 ## 5. GitHub Evidence
 

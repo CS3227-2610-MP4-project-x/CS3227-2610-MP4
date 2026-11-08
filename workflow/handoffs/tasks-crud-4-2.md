@@ -1,5 +1,13 @@
 # Task CRUD: task 4.2 handoff
 
+## Completion verification (8 November 2026)
+
+Independent reviewer source inspection at `9b61ed713e7c490af095495c65a6819871494174` found all task 4.2 criteria met: task creation, the M1 task-detail read, strict edits with retained criterion IDs, reassignment with history, soft deletion, required criteria, project-developer assignees, and atomic readable IDs that are never reused. Evidence: `src/server/tasks/`, `src/server/task-detail/`, `tests/unit/task-routes.test.ts`, `tests/unit/tasks/task-service.test.ts`, and `tests/integration/db/tasks-crud.test.ts`. Authorization, Origin checks, private response caching, rollback and competing writes are covered by those tests.
+
+Fresh verification: `npm.cmd test` passed 32 files / 1,895 tests; `npm.cmd run lint`, `npm.cmd run typecheck`, and `npm.cmd run build` all exited 0. The historical human PostgreSQL run after rework passed 16 files / 306 tests (recorded below); the later human-verified 4.3 log records 18 files / 331 tests passing after its final fixes. No disposable test database was configured for this session, so PostgreSQL execution was not repeated. Task 4.2 is now checked in `openspec/changes/project-task-management/tasks.md`.
+
+The original findings and human cross-review follow-ups below are retained; marking implementation complete does not independently approve or close them. The current verification session and resource limitations are consolidated in `workflow/handoffs/tasks-lifecycle-4-3.md`; disclosure is in `logs/2026-11-08-tasks-4-2-4-3-verification.md`.
+
 ## Task record `[ORCH]`
 
 - Task ID: `tasks-crud-4-2` (OpenSpec task 4.2)
@@ -18,7 +26,7 @@
     - "Mutating project routes check the request origin", for the four task mutation routes.
     - "Protected API errors use stable safe responses".
   - data-persistence: "Identifiers, timestamps, and revisions": the "Concurrent edits to a task" and "Concurrent task creation" scenarios.
-- Status: Implemented (TDD: red, then green). Unit and PostgreSQL integration tests pass. U1–U13 are approved and recorded in `design.md`. The commit-pr agent is authorized to commit on `feat/tasks-crud-4-2` (order: openspec, tests, feat, workflow/handoff) and draft the PR against `dev`; no push, no PR.
+- Status: Implemented and integrated into `9b61ed7`; independently verified on 8 November 2026. U1–U13 and the later M1 task-read resolution are recorded in `design.md`. Historical commit instructions below apply only to the original implementation session. See "Completion verification (8 November 2026)" for current evidence.
 - Next human action:
   - thegrimbee reviews the commits and the PR draft, then separately authorizes any push or PR creation.
   - thegrimbee decides on the X1 yardstick nits and unrecorded decisions (see "Reviewer findings").
