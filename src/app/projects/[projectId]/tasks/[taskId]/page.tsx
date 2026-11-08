@@ -1,35 +1,131 @@
-import Link from "next/link";
-import { createRequestSupabaseClient } from "@/server/auth/supabase-auth";
+import type { ReactNode } from "react";
+import { notFound } from "next/navigation";
+import { CheckHistory } from "@/components/completion-assessment/check-history";
+import { DeveloperCheckPanel } from "@/components/completion-assessment/developer-check-panel";
+import { ProgressUpdateForm } from "@/components/tasks/progress-update-form";
+import { SubmitForReviewButton } from "@/components/tasks/submit-for-review-button";
+import { TaskCommitPicker } from "@/components/tasks/task-commit-picker";
+import { TaskStatusProvider } from "@/components/tasks/task-status";
+import {
+  AttachedCommitList, ReadFailureNotice, StateBadge, TaskPageShell, UnavailableNotice, formatDueDate, formatTimestamp,
+} from "@/components/tasks/task-page-parts";
+import { requirePagePathId, requireProjectPageAccess } from "@/server/auth";
 import { getServerComposition } from "@/server/composition";
-import { verifiedGitHubIdentity } from "@/server/github-repository-link";
-import { CommitPicker } from "@/components/github-evidence/commit-picker";
+import { TaskDetailServiceError, type TaskDetailView } from "@/server/task-detail";
+import { taskStateName } from "@/server/task-board";
 
 export const dynamic = "force-dynamic";
 
-export default async function TaskEvidencePage({ params }: { params: Promise<{ projectId: string; taskId: string }> }) {
-  const { projectId, taskId } = await params;
-  let task: { taskKey: string; title: string } | null = null;
-  try {
-    const composition = getServerComposition();
-    const client = await createRequestSupabaseClient(composition.config);
-    const { data, error } = await client.auth.getUser();
-    if (!error && data.user) task = await composition.githubEvidenceService.getTaskIdentity(
-      projectId, taskId, verifiedGitHubIdentity(data.user),
-    );
-  } catch { /* Keep authorization and provider details out of this minimal host page. */ }
+type DetailOutcome =
+  | Readonly<{ kind: "detail"; detail: TaskDetailView }>
+  | Readonly<{ kind: "unavailable" }>
+  | Readonly<{ kind: "not-found" }>
+  | Readonly<{ kind: "failed" }>;
 
-  return <main className="min-h-screen bg-[#1a1a1a] px-5 py-10 text-neutral-100 sm:px-8">
-    <div className="mx-auto max-w-5xl">
-      <nav aria-label="Breadcrumb" className="mb-8 text-sm text-neutral-400"><Link href="/" className="hover:text-white">Workspace</Link><span aria-hidden="true"> / </span><span>Task evidence</span></nav>
-      <h1 className="text-3xl font-semibold tracking-tight">{task ? task.title : "Task evidence"}</h1>
-      {task ? <>
-        <p className="mt-2 text-sm text-neutral-400">{task.taskKey} · Attach commits authored by your verified GitHub account.</p>
-        <section aria-labelledby="commit-evidence-heading" className="mt-8 rounded-2xl border border-white/10 bg-[#222] p-6">
-          <h2 id="commit-evidence-heading" className="text-lg font-semibold">Commit evidence</h2>
-          <p className="mt-1 text-sm text-neutral-400">Choose your commits from the project repository and attach them to this task.</p>
-          <div className="mt-5"><CommitPicker projectId={projectId} taskId={taskId} /></div>
+// task-management "Task detail page" and "Task detail actions follow the role"; design.md B2, B9,
+// B10. The 5.3 host page, expanded: it reads through the unchanged task-detail read.
+export default async function TaskDetailPage({ params }: { params: Promise<{ projectId: string; taskId: string }> }) {
+  const { projectId, taskId } = await params;
+  const composition = getServerComposition();
+  const access = await requireProjectPageAccess(composition, projectId);
+  requirePagePathId(taskId);
+  let outcome: DetailOutcome;
+  try {
+    outcome = { kind: "detail", detail: await composition.taskDetailService.getTaskDetail(projectId, taskId, access) };
+  } catch (error) {
+    const code = error instanceof TaskDetailServiceError ? error.code : "INTERNAL_ERROR";
+    outcome = code === "FORBIDDEN" ? { kind: "unavailable" } : code === "NOT_FOUND" ? { kind: "not-found" } : { kind: "failed" };
+  }
+  if (outcome.kind === "not-found") notFound();
+
+  if (outcome.kind === "unavailable") {
+    return <TaskPageShell crumb="Task"><UnavailableNotice>This task is unavailable: you are not its assigned developer.</UnavailableNotice></TaskPageShell>;
+  }
+  if (outcome.kind === "failed") {
+    return <TaskPageShell crumb="Task"><ReadFailureNotice>The task could not be loaded. Reload the page to try again.</ReadFailureNotice></TaskPageShell>;
+  }
+
+  const { task, attachedCommits, progressUpdates, reviewFeedback, checkHistory } = outcome.detail;
+  const isAssignedDeveloper = access.role === "developer";
+  const state = taskStateName(task.status);
+
+  return (
+    <TaskPageShell crumb={task.taskKey}>
+      <TaskStatusProvider>
+      <header>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="font-mono text-sm text-neutral-400">{task.taskKey}</span>
+          <StateBadge state={state} />
+        </div>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">{task.title}</h1>
+        <dl className="mt-4 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+          <div><dt className="text-neutral-400">Assignee</dt><dd className="text-neutral-100">{task.assignee.githubUsername}</dd></div>
+          <div><dt className="text-neutral-400">Due date</dt><dd className="text-neutral-100"><time dateTime={task.dueDate}>{formatDueDate(task.dueDate)}</time></dd></div>
+          <div><dt className="text-neutral-400">Branch</dt><dd className="break-all font-mono text-neutral-100">{task.branchName ?? "No branch recorded"}</dd></div>
+        </dl>
+        {isAssignedDeveloper && task.status === "in_progress" && (
+          <div className="mt-6"><SubmitForReviewButton projectId={projectId} taskId={task.id} taskKey={task.taskKey} version={task.version} /></div>
+        )}
+      </header>
+
+      <div className="mt-8 grid gap-6">
+        <Panel title="Description">
+          <p className="whitespace-pre-wrap text-sm leading-6 text-neutral-200">{task.description}</p>
+        </Panel>
+
+        <Panel title="Acceptance criteria">
+          <ol className="list-decimal space-y-1 pl-5 text-sm leading-6 text-neutral-200">
+            {task.acceptanceCriteria.map((criterion) => <li key={criterion.id}>{criterion.description}</li>)}
+          </ol>
+        </Panel>
+
+        <Panel title="Attached commits">
+          <AttachedCommitList commits={attachedCommits} />
+          {isAssignedDeveloper && <div className="mt-5"><TaskCommitPicker projectId={projectId} taskId={task.id} /></div>}
+        </Panel>
+
+        <Panel title="Progress updates">
+          {progressUpdates.length === 0
+            ? <p className="text-sm text-neutral-400">No progress updates yet.</p>
+            : <ol className="space-y-3">{progressUpdates.map((update) => (
+                <li key={update.id} className="rounded-xl border border-white/[.07] bg-black/20 p-3">
+                  <p className="text-xs text-neutral-400">{update.author.githubUsername} · <time dateTime={update.createdAt}>{formatTimestamp(update.createdAt)}</time></p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-neutral-200">{update.body}</p>
+                </li>
+              ))}</ol>}
+          {isAssignedDeveloper && <div className="mt-5"><ProgressUpdateForm projectId={projectId} taskId={task.id} /></div>}
+        </Panel>
+
+        <Panel title="Review feedback">
+          {reviewFeedback.length === 0
+            ? <p className="text-sm text-neutral-400">No review feedback yet.</p>
+            : <ol className="space-y-3">{reviewFeedback.map((item) => (
+                <li key={item.id} className="rounded-xl border border-white/[.07] bg-black/20 p-3">
+                  <p className="text-xs text-neutral-400">{item.author.githubUsername} · <time dateTime={item.createdAt}>{formatTimestamp(item.createdAt)}</time></p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-neutral-200">{item.feedback}</p>
+                </li>
+              ))}</ol>}
+        </Panel>
+
+        <section className="rounded-2xl border border-white/10 bg-[#222] p-6">
+          {isAssignedDeveloper
+            ? <DeveloperCheckPanel projectId={projectId} taskId={task.id} checkHistory={checkHistory} />
+            : <>
+                <h2 className="mb-4 text-xl font-semibold tracking-tight text-neutral-100">Acceptance Criteria Check</h2>
+                <CheckHistory checkHistory={checkHistory} />
+              </>}
         </section>
-      </> : <p role="status" className="mt-4 max-w-xl rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-neutral-300">This task is unavailable or you are not its assigned developer.</p>}
-    </div>
-  </main>;
+      </div>
+      </TaskStatusProvider>
+    </TaskPageShell>
+  );
+}
+
+function Panel({ title, children }: Readonly<{ title: string; children: ReactNode }>) {
+  return (
+    <section className="rounded-2xl border border-white/10 bg-[#222] p-6">
+      <h2 className="mb-3 text-lg font-semibold text-neutral-100">{title}</h2>
+      {children}
+    </section>
+  );
 }

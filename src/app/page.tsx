@@ -1,23 +1,21 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AccountControl } from "@/components/auth/account-control";
-import { createRequestSupabaseClient } from "@/server/auth/supabase-auth";
-import { getVerifiedGitHubProfile } from "@/server/auth/session-identity";
+import { requireWorkspaceSession } from "@/server/auth";
 import { getServerComposition } from "@/server/composition";
+import { readMyProjects, type ProjectView } from "@/server/projects";
 
 export const dynamic = "force-dynamic";
 
-export default async function Home() {
-  let profile = null;
-  try {
-    const { config } = getServerComposition();
-    const client = await createRequestSupabaseClient(config);
-    profile = await getVerifiedGitHubProfile(client);
-  } catch {
-    redirect("/sign-in");
-  }
+const ROLE_NAMES: Readonly<Record<ProjectView["role"], string>> = {
+  product_manager: "Product manager",
+  developer: "Developer",
+};
 
-  if (!profile) redirect("/sign-in");
+export default async function Home() {
+  const composition = getServerComposition();
+  const { authUserId, profile } = await requireWorkspaceSession(composition.config);
+  // design.md B3: null means the read failed; the page shows a safe message in place of the list.
+  const projects = await readMyProjects(composition.peopleRepository, composition.projectService, authUserId);
 
   return (
     <main className="workspace-page">
@@ -48,6 +46,28 @@ export default async function Home() {
             <span className="status-dot" />
             Session active
           </div>
+        </section>
+
+        <section className="workspace-projects" aria-labelledby="my-projects-title">
+          <p className="workspace-kicker">YOUR PROJECTS</p>
+          <h2 id="my-projects-title">My projects</h2>
+          {projects === null ? (
+            <p className="workspace-projects-message" role="alert">Your projects could not be loaded. Reload the page to try again.</p>
+          ) : projects.length === 0 ? (
+            <p className="workspace-projects-message">You are not a member of any projects yet.</p>
+          ) : (
+            <ul className="workspace-project-list">
+              {projects.map((project) => (
+                <li key={project.id} className="workspace-project">
+                  <div className="workspace-project-copy">
+                    <span className="workspace-project-name">{project.name}</span>
+                    <span className="workspace-project-meta">{project.key} · {ROLE_NAMES[project.role]}</span>
+                  </div>
+                  <Link className="workspace-project-link" href={`/projects/${encodeURIComponent(project.id)}/board`}>Open board</Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
         <section className="workspace-placeholder" aria-label="Project overview">
