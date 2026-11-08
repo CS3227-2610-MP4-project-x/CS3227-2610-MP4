@@ -3,11 +3,11 @@ import "server-only";
 import { createRequestSupabaseClient } from "@/server/auth/supabase-auth";
 import type { ServerComposition } from "@/server/composition";
 import type { ProjectRole } from "@/server/repositories/project-access-repository";
+import { isUuid } from "./uuid";
 
 // Session and membership helpers moved from project-authorization.ts (design.md Q5, Q7, Q8),
 // plus the Q6 session-to-person step. Behaviour of the moved helpers is unchanged.
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const INVALID_SESSION_AUTH_CODES: ReadonlySet<string> = new Set([
   "refresh_token_not_found",
   "refresh_token_already_used",
@@ -50,7 +50,7 @@ export async function getAuthenticatedUserId(
     const { data, error } = await client.auth.getUser();
     if (error) return response(isUnauthenticatedAuthError(error) ? 401 : 500);
     if (!data.user) return response(401);
-    if (!UUID_PATTERN.test(data.user.id)) return response(401);
+    if (!isUuid(data.user.id)) return response(401);
     return data.user.id;
   } catch (error) {
     return response(isUnauthenticatedAuthError(error) ? 401 : 500);
