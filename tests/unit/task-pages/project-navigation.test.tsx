@@ -109,6 +109,29 @@ function expectLinkedTab(html: string, label: string, href: string) {
 }
 
 describe("project navigation tabs (B4, O1-a)", () => {
+  // Task 4.5 approved addendum: "Return to Project Space". This ordinary link
+  // precedes every project tab for both roles, without using browser history.
+  it.each([
+    ["developer", "board"], ["developer", "tasks"],
+    ["product_manager", "board"], ["product_manager", "tasks"],
+  ] as const)("shows %s a return link before project tabs on %s", async (role, segment) => {
+    f.segment = segment;
+    const html = await navigation(role);
+    const back = links(html, "Back to Project Space");
+    expect(back).toHaveLength(1);
+    expect(hrefOf(back[0])).toBe("/");
+    expect(back[0]).not.toMatch(/aria-current="page"|aria-disabled="true"/);
+    const tabLabels = role === "product_manager"
+      ? ["Dashboard", "Board", "Review Queue", "Reports", "Settings"]
+      : ["Dashboard", "Board"];
+    const visible = visibleText(html);
+    const backPosition = visible.indexOf("Back to Project Space");
+    for (const label of tabLabels) {
+      const tabPosition = visible.indexOf(label);
+      expect(tabPosition).toBeGreaterThan(backPosition);
+    }
+  });
+
   it("shows the product manager Dashboard (disabled), Board, Review Queue, Reports (disabled) and Settings", async () => {
     const html = await navigation("product_manager");
 

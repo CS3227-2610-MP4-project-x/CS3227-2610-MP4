@@ -177,7 +177,8 @@ describe("my projects entry point (B3)", () => {
   it("shows an empty-state message and no project link when the person has no projects", async () => {
     const markup = await home();
 
-    expect(markup).not.toContain('href="/projects/');
+    expect(markup).not.toMatch(/href="\/projects\/[^/"?]+\/board(?:[?"#])/);
+    expect(markup).toMatch(/<a\b[^>]*href="\/projects\/new"[^>]*>[\s\S]*?Create project/i);
     expect(markup.replaceAll(username, "")).toMatch(/no projects|any projects|not a member/i);
   });
 
@@ -190,7 +191,8 @@ describe("my projects entry point (B3)", () => {
     expect(boundary.redirect).not.toHaveBeenCalled();
     expect(markup).toMatch(/no projects|any projects|not a member/i);
     expect(markup).not.toMatch(/could not|couldn.t|unable|unavailable|try again/i);
-    expect(markup).not.toContain('href="/projects/');
+    expect(markup).not.toMatch(/href="\/projects\/[^/"?]+\/board(?:[?"#])/);
+    expect(markup).toMatch(/<a\b[^>]*href="\/projects\/new"[^>]*>[\s\S]*?Create project/i);
   });
 
   it("keeps the order the read returns (project name, then id)", async () => {
@@ -218,7 +220,8 @@ describe("my projects entry point (B3)", () => {
     expect(markup).toMatch(/<button\b[^>]*>[\s\S]*?Sign out[\s\S]*?<\/button>/i);
     expect(markup).toMatch(/could not|couldn.t|unable|unavailable|try again/i);
     expect(markup).not.toContain("synthetic-private-db-detail");
-    expect(markup).not.toContain('href="/projects/');
+    expect(markup).not.toMatch(/href="\/projects\/[^/"?]+\/board(?:[?"#])/);
+    expect(markup).toMatch(/<a\b[^>]*href="\/projects\/new"[^>]*>[\s\S]*?Create project/i);
   });
 
   it("renders project names as plain text", async () => {

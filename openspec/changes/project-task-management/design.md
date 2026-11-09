@@ -522,6 +522,10 @@ Approved by the human in this chat on 9 November 2026: the task 4.5 spec delta a
 - **D7 Settings access scope.** Apply the shared helper and PM guard to members, preserving the repository panel's safe unavailable behavior. Avoid broad refactoring of Developer A's repository feature; host-page changes require cross-review.
 - **D8 Verification and dependency baseline.** Add Node-rendering tests, member-read authorization/projection tests, existing-route reuse/error tests, and PostgreSQL listing/isolation/order tests. No dependency or migration is planned. Acceptance of this recommendation confirms task 4.4's existing helpers as the task 4.5 baseline despite its unchecked checkbox and pending cross-review; it does not mark 4.4 complete or waive cross-review. Full journeys and accessibility verification retain tasks 9.2 and 9.3 ownership.
 
+### Task 4.5 approved return-navigation addendum
+
+On 9 November 2026 the human requested a back button from the developer project workspace to the main Project Space page, then explicitly chose "Both developer and product-manager project pages" when asked about visibility. Add a "Back to Project Space" link above the shared project tabs, pointing directly to `/` rather than browser history. Implement it in the existing project-navigation component; preserve project-name placement, tab ordering, role visibility, active states and server authorization. This is an approved task 4.5 scope extension. It remains uncommitted because the single authorized spec-only commit has already been made.
+
 ## Open Questions
 
 - Tester accounts for the deployed environments.

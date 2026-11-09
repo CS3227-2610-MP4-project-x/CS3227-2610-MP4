@@ -2,7 +2,7 @@ import "server-only";
 
 import { ProjectError } from "./errors";
 import type { ProjectRepository, ProjectTransaction } from "./repository";
-import type { CreateProjectInput, MemberView, PersonLookup, PersonMatch, ProjectView } from "./types";
+import type { CreateProjectInput, MemberView, PersonLookup, PersonMatch, ProjectMemberView, ProjectView } from "./types";
 
 /** Project creation, reading, membership and product manager transfer (design.md D1 to D10, S2). */
 export class ProjectService {
@@ -30,6 +30,14 @@ export class ProjectService {
   async listProjectsForPerson(personId: string): Promise<readonly ProjectView[]> {
     const projects = await this.projects.listProjectsForMember(personId);
     return projects.map((project) => ({ id: project.id, key: project.key, name: project.name, role: project.role }));
+  }
+
+  /** Current PM-only member read. Authorization is rechecked here for direct service callers. */
+  async listMembers(projectId: string, actorPersonId: string): Promise<readonly ProjectMemberView[]> {
+    const access = await this.projects.findProjectForMember(projectId, actorPersonId);
+    if (!access) throw new ProjectError("NOT_FOUND");
+    if (access.role !== "product_manager") throw new ProjectError("FORBIDDEN");
+    return this.projects.listMembersForProject(projectId);
   }
 
   /** Adds a registered person as a developer; only the product manager may (D5, S2). */

@@ -28,18 +28,23 @@ export function ProjectNavigation({ projectId, role }: ProjectNavigationProps) {
   const active = tabSegmentOf(useSelectedLayoutSegment());
   const tabs = TABS.filter((tab) => role === "product_manager" || !tab.managerOnly);
   return (
-    <nav className="workspace-nav project-nav" aria-label="Project navigation">
-      {tabs.map((tab) => tab.segment === null
-        // F6: a disabled tab looks distinct from an inactive one and says why it cannot be used.
-        ? <span key={tab.label} className="workspace-nav-link project-nav-link-disabled" aria-disabled="true" title="Coming soon">
-            {tab.label}<span className="sr-only"> (coming soon)</span>
-          </span>
-        : <Link key={tab.label}
-            className={tab.segment === active ? "workspace-nav-link workspace-nav-link-active" : "workspace-nav-link"}
-            href={`/projects/${encodeURIComponent(projectId)}/${tab.segment}`}
-            aria-current={tab.segment === active ? "page" : undefined}>
-            {tab.label}
-          </Link>)}
-    </nav>
+    <>
+      <div className="mb-3">
+        <Link className="workspace-project-link" href="/">Back to Project Space</Link>
+      </div>
+      <nav className="workspace-nav project-nav" aria-label="Project navigation">
+        {tabs.map((tab) => tab.segment === null
+          // F6: a disabled tab looks distinct from an inactive one and says why it cannot be used.
+          ? <span key={tab.label} className="workspace-nav-link project-nav-link-disabled" aria-disabled="true" title="Coming soon">
+              {tab.label}<span className="sr-only"> (coming soon)</span>
+            </span>
+          : <Link key={tab.label}
+              className={tab.segment === active ? "workspace-nav-link workspace-nav-link-active" : "workspace-nav-link"}
+              href={`/projects/${encodeURIComponent(projectId)}/${tab.segment}`}
+              aria-current={tab.segment === active ? "page" : undefined}>
+              {tab.label}
+            </Link>)}
+      </nav>
+    </>
   );
 }

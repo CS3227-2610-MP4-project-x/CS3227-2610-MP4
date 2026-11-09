@@ -50,7 +50,10 @@ export default async function Home() {
 
         <section className="workspace-projects" aria-labelledby="my-projects-title">
           <p className="workspace-kicker">YOUR PROJECTS</p>
-          <h2 id="my-projects-title">My projects</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 id="my-projects-title">My projects</h2>
+            <Link className="workspace-project-link" href="/projects/new">Create project</Link>
+          </div>
           {projects === null ? (
             <p className="workspace-projects-message" role="alert">Your projects could not be loaded. Reload the page to try again.</p>
           ) : projects.length === 0 ? (

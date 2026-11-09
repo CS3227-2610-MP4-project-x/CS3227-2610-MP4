@@ -6,6 +6,18 @@ Defines how project members are organized and how product managers and developer
 
 ## ADDED Requirements
 
+### Requirement: Return to Project Space
+The shared project-page navigation SHALL expose a "Back to Project Space" link with href `/`, above the project tabs for both developers and product managers. Existing tab order, active states and server access checks SHALL remain unchanged.
+
+#### Scenario: Developer returns to Project Space
+- **WHEN** an authorized developer opens a project board or task-detail page
+- **THEN** the shared navigation shows "Back to Project Space" above the tabs linking directly to `/`
+
+#### Scenario: Product manager returns to Project Space
+- **WHEN** an authorized product manager opens a project page
+- **THEN** the shared navigation shows the same return link above the tabs
+- **AND** role-specific tab visibility and active states remain unchanged
+
 ### Requirement: Signed-in people use the create-project page
 The system SHALL provide dynamically rendered `/projects/new`, reachable from My projects for every signed-in person, including those with no projects. Labeled key and name inputs SHALL submit exactly `{key,name}` to `POST /api/v1/projects`, following "Signed-in people create projects" validation without normalizing lowercase keys.
 

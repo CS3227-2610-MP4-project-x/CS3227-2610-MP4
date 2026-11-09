@@ -1,7 +1,7 @@
 import "server-only";
 
 import { ProjectError, type ProjectErrorCode } from "./errors";
-import type { ProjectRole } from "./types";
+import type { ProjectMemberView, ProjectRole } from "./types";
 
 type Query = Readonly<{
   query<T extends Record<string, unknown> = Record<string, unknown>>(
@@ -156,6 +156,23 @@ export class ProjectRepository {
       [personId],
     );
     return result.rows.map((row) => ({ ...projectRecord(row), role: row.role as ProjectRole }));
+  }
+
+  /** Lists a project's full public member projection in stable, case-insensitive username order. */
+  async listMembersForProject(projectId: string): Promise<readonly ProjectMemberView[]> {
+    const result = await this.database.query(
+      `SELECT m.person_id::text AS "personId", pe.github_username AS "githubUsername", m.role
+         FROM app.memberships m
+         JOIN app.people pe ON pe.id = m.person_id
+        WHERE m.project_id = $1::uuid
+        ORDER BY lower(pe.github_username) ASC, m.person_id ASC`,
+      [projectId],
+    );
+    return result.rows.map((row) => ({
+      personId: String(row.personId),
+      githubUsername: String(row.githubUsername),
+      role: row.role as ProjectRole,
+    }));
   }
 
   /** Runs `work` in one transaction on one connection; rolls back on any error (design.md S6). */
