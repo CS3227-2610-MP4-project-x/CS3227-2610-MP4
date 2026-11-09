@@ -22,9 +22,9 @@ export default async function Home() {
       <div className="workspace-shell">
         <header className="workspace-header">
           <div className="workspace-brand">
-            <span className="brand-mark" aria-hidden="true">C</span>
+            <span className="brand-mark" aria-hidden="true">NP</span>
             <div>
-              <p className="workspace-kicker">CS3227 · PROJECT SPACE</p>
+              <p className="workspace-kicker">NoPressure</p>
               <h1>Workspace</h1>
             </div>
           </div>
@@ -38,9 +38,9 @@ export default async function Home() {
 
         <section className="workspace-welcome" aria-labelledby="welcome-title">
           <div className="welcome-copy">
-            <p className="workspace-kicker">YOUR PROJECT, IN ONE PLACE</p>
+            <p className="workspace-kicker">YOUR PROJECTS, IN ONE PLACE</p>
             <h2 id="welcome-title">Good to have you here, {profile.githubUsername}.</h2>
-            <p>Your signed-in workspace is ready. Project tasks and progress will appear here.</p>
+            <p>Your workspace is ready. Project tasks and progress will appear here.</p>
           </div>
           <div className="workspace-status" aria-label="Session active">
             <span className="status-dot" />
@@ -49,9 +49,9 @@ export default async function Home() {
         </section>
 
         <section className="workspace-projects" aria-labelledby="my-projects-title">
-          <p className="workspace-kicker">YOUR PROJECTS</p>
+          <p className="workspace-kicker">PROJECTS</p>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 id="my-projects-title">My projects</h2>
+            <h2 id="my-projects-title">My Projects</h2>
             <Link className="workspace-project-link" href="/projects/new">Create project</Link>
           </div>
           {projects === null ? (

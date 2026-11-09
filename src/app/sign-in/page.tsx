@@ -28,8 +28,8 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
     <main className="sign-in-page">
       <div className="sign-in-shell">
         <header className="sign-in-brand">
-          <span className="brand-mark" aria-hidden="true">C</span>
-          <span>CS3227 <span className="brand-separator">/</span> PROJECT SPACE</span>
+          <span className="brand-mark" aria-hidden="true">NP</span>
+          <span>NoPressure</span>
         </header>
 
         <section className="sign-in-card" aria-labelledby="sign-in-title">
@@ -53,9 +53,9 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
         </section>
 
         <footer className="sign-in-footer">
-          <span>Built for focused collaboration</span>
+          <span>NoPressure</span>
           <span className="footer-dot" />
-          <span>CS3227 PROJECT SPACE</span>
+          <span>Built for focused collaboration</span>
         </footer>
       </div>
     </main>

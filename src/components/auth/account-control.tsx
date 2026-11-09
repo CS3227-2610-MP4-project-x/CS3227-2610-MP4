@@ -49,8 +49,6 @@ export function AccountControl({ githubUsername, avatarUrl }: AccountControlProp
         <span className="account-chevron" aria-hidden="true">⌄</span>
       </summary>
       <div className="account-menu">
-        <p className="account-menu-label">GitHub account</p>
-        <p className="account-menu-username">@{githubUsername}</p>
         {hasSignOutError && <p className="account-error" role="alert">Try again later</p>}
         <button className="sign-out-button" type="button" onClick={signOut} disabled={isSigningOut}>
           {isSigningOut ? "Signing out…" : "Sign out"}
