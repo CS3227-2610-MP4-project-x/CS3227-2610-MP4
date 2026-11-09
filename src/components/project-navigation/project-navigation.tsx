@@ -7,12 +7,11 @@ export type ProjectNavigationProps = Readonly<{ projectId: string; role: "produc
 
 type Tab = Readonly<{ label: string; segment: string | null; managerOnly: boolean }>;
 
-// design.md B4 (O1-a), ui-spec "Top Navigation": Dashboard is shown but disabled while the
-// dashboard is deferred; Board is shown to every member; Review Queue, Reports (disabled until
-// task 8.3) and Settings are shown to the product manager only. A null segment is a disabled tab.
+// Task 4.7 D1, ui-spec "Top Navigation": Dashboard and Board are available to every member;
+// Review Queue, Reports (disabled until task 8.3) and Settings are PM-only.
 // Hiding a tab is never the protection: each page checks access on the server (B2).
 const TABS: readonly Tab[] = [
-  { label: "Dashboard", segment: null, managerOnly: false },
+  { label: "Dashboard", segment: "dashboard", managerOnly: false },
   { label: "Board", segment: "board", managerOnly: false },
   { label: "Review Queue", segment: "review-queue", managerOnly: true },
   { label: "Reports", segment: null, managerOnly: true },

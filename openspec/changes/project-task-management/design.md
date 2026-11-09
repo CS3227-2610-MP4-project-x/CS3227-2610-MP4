@@ -13,6 +13,12 @@ Human-approved on 9 November 2026: "I approve the spec delta and accept all your
 - **D7 (accepted) - Header and actions.** Header uses verified GitHub avatar/username and project-role label; circular settings-style account trigger opens the existing account/sign-out menu for both roles. Project Settings remains PM-only in navigation. PM New Task reuses the existing inline creation control on the dashboard; Review Queue links to its existing page; Progress Report is visibly disabled with a coming-soon explanation until 8.3. Developers receive no PM actions or creation member-choice data. The disabled report action satisfies the dashboard requirement without enabling the deferred report page.
 - **D8 (accepted) - Failures and evidence.** Reuse existing session/not-found handling. Dashboard data failure shows a safe reload message rather than zero metrics. Add service authorization/projection/arithmetic tests, rendering/navigation/filter tests and PostgreSQL isolation/deletion/SGT/transfer tests. Full journey and manual accessibility work remain tracked by 9.2/9.3.
 
+### Dashboard review scope addendum
+
+The human authorized extending the task 4.7 implementation/test scope for a named settings-trigger export in `src/components/auth/account-control.tsx`, sharing the existing account menu/sign-out behavior, with focused regression tests. This implements accepted D7 through a public presentation seam rather than dashboard CSS reaching into the shared component. Existing authentication/session requirements and the original account control remain in force. The separate avatar-fallback fixture conflict was resolved by human instruction to use a valid synthetic UUID, preserving the existing UUID authentication guard.
+
+After the full-suite workspace sign-out harness exposed the nested-menu render-shape incompatibility, the human chose: "Preserve the existing render shape in code". Shared hook/render helpers may preserve the original directly rendered account-control structure and shared sign-out behavior; the existing workspace assertions must remain unchanged.
+
 ## Context
 
 The change introduces nine capabilities described in the delta specs. The repository has OpenSpec configuration, agent guidance (`AGENTS.md`), and UI guidance (`specs/ui-spec.md`), but no application code yet. `AGENTS.md` sets the stack: Next.js App Router with TypeScript, Route Handlers under `/api/v1`, PostgreSQL on Supabase behind a server-only repository layer, the SoC LLM behind a replaceable adapter, and Vercel hosting.

@@ -6,7 +6,7 @@ import { ids, visibleText } from "./support";
 // Task 4.4 (OpenSpec change project-task-management), design.md "Board, Detail and Review Queue
 // Decisions (4.4)" B4 as resolved by thegrimbee (O1-a, 8 November 2026), handoff assumption A4,
 // and ui-spec "Top Navigation". No requirement IDs exist.
-//   O1-a: Dashboard is shown but disabled while the dashboard is deferred (B1); Board is shown to
+//   Task 4.7 D1 supersedes O1-a: Dashboard is enabled for both roles; Board is shown to
 //   every member; Review Queue, Reports (disabled until 8.3) and Settings are shown to the
 //   product manager only. Navigation only hides links; the pages' server checks are the
 //   protection (B2), which the page tests cover.
@@ -132,20 +132,20 @@ describe("project navigation tabs (B4, O1-a)", () => {
     }
   });
 
-  it("shows the product manager Dashboard (disabled), Board, Review Queue, Reports (disabled) and Settings", async () => {
+  it("shows the product manager Dashboard, Board, Review Queue, Reports (disabled) and Settings", async () => {
     const html = await navigation("product_manager");
 
-    expectDisabledTab(html, "Dashboard");
+    expectLinkedTab(html, "Dashboard", `/projects/${projectId}/dashboard`);
     expectLinkedTab(html, "Board", `/projects/${projectId}/board`);
     expectLinkedTab(html, "Review Queue", `/projects/${projectId}/review-queue`);
     expectDisabledTab(html, "Reports");
     expectLinkedTab(html, "Settings", `/projects/${projectId}/settings`);
   });
 
-  it("shows a developer Dashboard (disabled) and Board only", async () => {
+  it("shows a developer Dashboard and Board only", async () => {
     const html = await navigation("developer");
 
-    expectDisabledTab(html, "Dashboard");
+    expectLinkedTab(html, "Dashboard", `/projects/${projectId}/dashboard`);
     expectLinkedTab(html, "Board", `/projects/${projectId}/board`);
     expect(visibleText(html)).not.toContain("Review Queue");
     expect(visibleText(html)).not.toContain("Reports");
@@ -166,7 +166,7 @@ describe("project navigation tabs (B4, O1-a)", () => {
   });
 
   it.each([
-    ["board", "Board"], ["tasks", "Board"], ["review-queue", "Review Queue"], ["settings", "Settings"],
+    ["dashboard", "Dashboard"], ["board", "Board"], ["tasks", "Board"], ["review-queue", "Review Queue"], ["settings", "Settings"],
   ] as const)("marks the right tab current on segment %s (F5)", async (segment, label) => {
     f.segment = segment;
 
@@ -176,7 +176,7 @@ describe("project navigation tabs (B4, O1-a)", () => {
     expect(current).toEqual([label]);
   });
 
-  it.each(["Dashboard", "Reports"])("gives the disabled %s tab a distinct class and a Coming soon hint (F6)", async (label) => {
+  it.each(["Reports"])("gives the disabled %s tab a distinct class and a Coming soon hint (F6)", async (label) => {
     const html = await navigation("product_manager");
 
     const element = [...html.matchAll(/<(\w+)\b([^>]*aria-disabled="true"[^>]*)>([\s\S]*?)<\/\1>/g)]
