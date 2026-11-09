@@ -8,7 +8,7 @@ import { PeopleRepository } from "@/server/repositories/people-repository";
 import { ProjectAccessRepository } from "@/server/repositories/project-access-repository";
 import { TaskAccessRepository } from "@/server/repositories/task-access-repository";
 import { GitHubAppAdapter } from "@/server/github";
-import { GitHubEvidenceRepository, GitHubEvidenceService } from "@/server/github-evidence";
+import { createReportGithubMetadata, GitHubEvidenceRepository, GitHubEvidenceService } from "@/server/github-evidence";
 import { ProjectRepository, ProjectService } from "@/server/projects";
 import { TaskLifecycleService, TaskRepository, TaskService } from "@/server/tasks";
 import {
@@ -29,6 +29,7 @@ import { TaskDetailReadRepository, TaskDetailService } from "@/server/task-detai
 import { TaskBoardRepository, TaskBoardService } from "@/server/task-board";
 import { ReviewQueueRepository, ReviewQueueService } from "@/server/review-queue";
 import { ProjectDashboardRepository, ProjectDashboardService } from "@/server/project-dashboard";
+import { createProgressReportRepository, createProgressReportService } from "@/server/progress-report";
 
 export type ServerComposition = Readonly<{
   authService: AuthService;
@@ -45,6 +46,7 @@ export type ServerComposition = Readonly<{
   taskBoardService: TaskBoardService;
   reviewQueueService: ReviewQueueService;
   projectDashboardService: ProjectDashboardService;
+  progressReportService: ReturnType<typeof createProgressReportService>;
   config: ReturnType<typeof getServerConfig>;
   llmGateway: LlmGateway;
 }>;
@@ -113,6 +115,7 @@ export function getServerComposition(): ServerComposition {
   const taskBoardService = new TaskBoardService(new TaskBoardRepository(pool));
   const reviewQueueService = new ReviewQueueService(new ReviewQueueRepository(pool), completionAssessmentService);
   const projectDashboardService = new ProjectDashboardService(new ProjectDashboardRepository(pool), projectAccessRepository);
+  const progressReportService = createProgressReportService({ repository: createProgressReportRepository(pool), githubMetadata: createReportGithubMetadata({ adapter: githubEvidenceAdapter }) });
   composition = Object.freeze({
     authService: new AuthService(config.appOrigin, peopleRepository),
     peopleRepository,
@@ -128,6 +131,7 @@ export function getServerComposition(): ServerComposition {
     taskBoardService,
     reviewQueueService,
     projectDashboardService,
+    progressReportService,
     config,
     llmGateway,
   });

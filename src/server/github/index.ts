@@ -10,6 +10,7 @@ export type {
   GitHubAppAdapterOptions,
   GitHubBranch,
   GitHubCommit,
+  GitHubCommitMetadata,
   GitHubCommitAncestry,
   GitHubEvidenceAdapter,
   GitHubFailure,

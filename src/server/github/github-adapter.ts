@@ -22,6 +22,7 @@ export type GitHubCommit = Readonly<{
   authorLogin: string;
   date: string;
 }>;
+export type GitHubCommitMetadata = Readonly<{ sha: string; authoredAt: string; message: string; author: Readonly<{ githubUsername: string | null }> }>;
 
 export type GitHubCommitAncestry = Readonly<{
   ancestorSha: string;
@@ -308,6 +309,23 @@ export class GitHubAppAdapter implements GitHubEvidenceAdapter {
       });
   }
 
+  async getCommitMetadata(repository: GitHubRepository, sha: string): Promise<GitHubResult<GitHubCommitMetadata>> {
+    if (!isFullCommitSha(sha)) return failed("invalid_request");
+    return this.#singleRead(repository, `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.name)}/commits/${encodeURIComponent(sha)}`,
+      "application/vnd.github+json", async (response) => {
+        const body: unknown = await response.json();
+        if (!isObject(body) || typeof body.sha !== "string" || body.sha.toLowerCase() !== sha.toLowerCase() || !isObject(body.commit) ||
+            !isObject(body.commit.author) || typeof body.commit.author.date !== "string" || !isIsoDate(body.commit.author.date) ||
+            typeof body.commit.message !== "string") throw new Error("invalid response");
+        let username: string | null = null;
+        if (body.author !== null && body.author !== undefined) {
+          if (!isObject(body.author) || typeof body.author.login !== "string") throw new Error("invalid response");
+          username = body.author.login;
+        }
+        return { sha: body.sha, authoredAt: new Date(body.commit.author.date).toISOString(), message: body.commit.message, author: { githubUsername: username } };
+      });
+  }
+
   async listCommits(repository: GitHubRepository, query: CommitQuery): Promise<GitHubResult<readonly GitHubCommit[]>> {
     if (!query.author.login || !Number.isSafeInteger(query.author.id) || !isIsoDate(query.since) || !isIsoDate(query.until) || query.since > query.until || !query.branch) {
       return failed("invalid_request");
@@ -367,6 +385,7 @@ export type FakeGitHubAncestryOutcome = GitHubCommitAncestry;
 export type FakeGitHubScript = Readonly<{
   branches?: FakeGitHubBranchesOutcome;
   commits?: FakeGitHubCommitsOutcome;
+  commitMetadata?: Readonly<Record<string, GitHubResult<GitHubCommitMetadata>>>;
   diff?: FakeGitHubDiffOutcome;
   files?: readonly FakeGitHubFileOutcome[];
   ancestry?: readonly FakeGitHubAncestryOutcome[];
@@ -384,6 +403,10 @@ export class FakeGitHubAdapter implements GitHubEvidenceAdapter {
   async getCommitAuthor(_repository: GitHubRepository, sha: string): Promise<GitHubResult<GitHubUser>> {
     const commit = this.#script.commits?.ok ? this.#script.commits.value.find((item) => item.sha === sha) : undefined;
     return commit ? { ok: true, value: { id: commit.authorId, login: commit.authorLogin } } : failed("not_found");
+  }
+
+  async getCommitMetadata(_repository: GitHubRepository, sha: string): Promise<GitHubResult<GitHubCommitMetadata>> {
+    return this.#script.commitMetadata?.[sha] ?? failed("not_found");
   }
 
   async listBranches(): Promise<GitHubResult<readonly GitHubBranch[]>> {

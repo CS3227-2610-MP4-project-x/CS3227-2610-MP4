@@ -591,3 +591,12 @@ Human-approved on 9 November 2026: "I approve the spec delta and your recommenda
 - **D6 (accepted) - Budget measurement.** Use deterministic compact JSON with fixed field order; redact full text fields, apply existing prompt-data escaping, then measure the exact resulting activity/context data text with JavaScript `.length` (UTF-16 code units). Include metadata, task context and availability markers in the budget; exclude fixed instructions and outer prompt wrappers. Exactly 72,000 passes; 72,001 refuses. No truncation or dropping records.
 - **D7 (accepted) - Missing GitHub evidence and empty ranges.** Carry an explicit GitHub-unavailable flag; preserve all available structured activity. Return empty only when no range activity exists and required metadata reads succeeded (or no attached SHAs require reading). If metadata is unavailable and no other activity exists, return a ready input containing the unavailable-evidence marker, never no activity. Database read failure is an error, never empty.
 - **D8 (accepted) - Internal seam and authorization.** Implement an authorized, server-only service now: missing project/nonmember -> safe 404; developer member -> safe 403; PM -> assembly. Use one consistent read-only database snapshot, close it before GitHub calls, and return discriminated ready, empty, invalid_range, range_too_long, or input_budget_exceeded outcomes; infrastructure failures expose safe errors. Make no LLM, usage, report-cache or domain writes. HTTP payload/status decisions remain with 8.2.
+
+### Task 8.1 review conflict resolutions
+
+Human decisions on 9 November 2026:
+
+- D6 retained: "Keep D6; change the test to exercise existing <data> delimiters." The new report tests must target the existing `<data`/`</data` neutralization; arbitrary `<tag>` or `</untrusted_data>` strings are not data-section delimiters under this contract.
+- D7 retained and clarified: "Keep successful commit metadata and mark GitHub unavailable; update the conflicting test." A mixed metadata read retains successful SHA metadata and carries the unavailable marker. The metadata result port may carry commits alongside unavailable status; successful task associations remain in the assembled activity. Never treat an available subset as complete evidence.
+
+These resolve test/spec conflicts without changing approved D6/D7 intent. They are recorded after the single authorized specification commit and remain uncommitted; no additional commit is authorized.

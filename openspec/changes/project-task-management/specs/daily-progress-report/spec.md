@@ -152,3 +152,12 @@ A server-only service SHALL authorize current PM membership before evidence retr
 #### Scenario: Assembly has no mutation effects
 - **WHEN** assembly is ready, empty, invalid-range or over budget
 - **THEN** no LLM call or domain, report, usage or cache write occurs
+
+#### Scenario: Mixed GitHub metadata outcomes retain available activity
+- **WHEN** one attached SHA metadata read succeeds and another fails
+- **THEN** assembly keeps the successful commit metadata and every corresponding task association, marks GitHub evidence unavailable, and does not claim the available subset is complete evidence
+
+#### Scenario: Existing data-section escaping is reused
+- **WHEN** untrusted text contains `<data` or `</data` delimiters
+- **THEN** the existing prompt-data sanitizer neutralizes those delimiters before measuring the complete input
+- **AND** arbitrary `<tag>` and `</untrusted_data>` text does not require additional escaping under D6
