@@ -6,6 +6,93 @@ Defines how project members are organized and how product managers and developer
 
 ## ADDED Requirements
 
+### Requirement: Project members open the project dashboard
+The system SHALL provide a dynamically rendered dashboard at `/projects/{projectId}/dashboard` to both project roles. The shared Dashboard tab SHALL be enabled and current on that page. Existing role-specific tabs, the return link and workspace board links SHALL retain their behavior.
+
+#### Scenario: Member opens dashboard
+- **WHEN** a project member opens the dashboard
+- **THEN** the Header, Project Progress, Task Summary and Task Allocation render
+- **AND** Dashboard is an enabled link and the current project tab
+
+#### Scenario: Session or membership is unavailable
+- **WHEN** a visitor has no valid session or is not a project member
+- **THEN** the page respectively redirects to `/sign-in` or shows safe not-found
+- **AND** no dashboard data is disclosed
+
+### Requirement: Dashboard reads expose authorized aggregates
+The dashboard SHALL call a server-only read service that independently checks current project membership. Both roles SHALL receive project-wide aggregate counts and allocation labels, without task detail or member-management data. The read SHALL use a consistent snapshot, exclude deleted tasks, add no HTTP route and retain no persistent cache.
+
+#### Scenario: Developer receives aggregate data
+- **WHEN** a developer reads a project containing other developers' tasks
+- **THEN** project totals and allocation usernames/counts may be included
+- **AND** no other developer's task identifiers, titles, descriptions or evidence are included
+- **AND** existing board, detail and member-list permissions remain unchanged
+
+#### Scenario: Direct read by a nonmember
+- **WHEN** the dashboard service is called for a missing project or nonmember
+- **THEN** it returns the safe not-found outcome without dashboard contents
+
+### Requirement: Dashboard progress and task summary agree
+Project Progress and Task Summary SHALL use live project tasks, showing Done divided by total as the nearest whole percentage, or 0% when total is zero. The summary SHALL show Done/total, a corresponding progress bar, current member count including the PM, and View all linking to the existing role-scoped board.
+
+#### Scenario: Progress excludes deleted tasks
+- **WHEN** a project has three live tasks, one Done, and one deleted Done task
+- **THEN** both progress sections show 33% and one of three complete
+- **AND** the deleted task contributes to no metric
+
+#### Scenario: Empty project
+- **WHEN** the project has no live tasks
+- **THEN** progress is 0%, completed and total counts are zero
+- **AND** an explicit empty state is shown
+
+### Requirement: Dashboard allocation filters project task states
+Allocation SHALL support selection of the four task states, initially all selected. Each row SHALL show username, count and nearest whole percentage of all live tasks in selected states. It SHALL include current developers with zero counts and a labeled PM row when retained tasks contribute. Rows SHALL sort by lowercase username then person ID.
+
+#### Scenario: Filter changes allocation
+- **WHEN** the member changes selected task states
+- **THEN** row counts and percentages use exactly the selected states
+- **AND** project progress and completed-today metrics remain unchanged
+
+#### Scenario: No counted tasks
+- **WHEN** no states are selected or selected states contain no live tasks
+- **THEN** allocation counts and percentages are zero without division errors
+- **AND** the UI explains that no tasks match
+
+#### Scenario: Developer becomes product manager
+- **WHEN** a developer retaining Done tasks becomes PM
+- **THEN** those tasks remain in progress totals and applicable allocation
+- **AND** their allocation appears in a labeled PM row without duplication
+
+### Requirement: Dashboard shows SGT completions today
+The allocation heading SHALL show the distinct number of live project tasks approved today, using approval state-change events and database time in Asia/Singapore. Today SHALL include its start midnight and exclude the next midnight. Allocation filters SHALL NOT change this count.
+
+#### Scenario: SGT day boundaries
+- **WHEN** approval events fall immediately before, exactly at and after SGT midnight
+- **THEN** only events within the current SGT day contribute
+- **AND** task edits after approval do not alter the approval date
+
+### Requirement: Dashboard header and PM actions reuse existing flows
+The Header SHALL display verified account identity, avatar fallback and project role, with an accessible account/settings trigger. Only the PM SHALL receive New Task, Review Queue and Progress Report actions. New Task SHALL reuse the existing inline creation flow; Review Queue SHALL link to its existing page; Progress Report SHALL remain disabled with an explanation until task 8.3.
+
+#### Scenario: PM uses dashboard actions
+- **WHEN** the PM opens the dashboard
+- **THEN** New Task uses existing validation, creation and error behavior
+- **AND** Review Queue links to the current project's queue
+- **AND** Progress Report cannot navigate to an unimplemented page
+
+#### Scenario: Developer opens dashboard
+- **WHEN** a developer opens the dashboard
+- **THEN** PM actions and task-creation member-choice data are absent
+- **AND** the account menu remains available without granting project settings
+
+### Requirement: Dashboard failures do not fabricate progress
+A dashboard read failure SHALL show a safe accessible reload message without raw server details or fabricated zero metrics. Successful empty reads SHALL remain distinguishable from failures. User text SHALL render as plain text.
+
+#### Scenario: Aggregate read fails
+- **WHEN** dashboard data cannot be loaded
+- **THEN** the dashboard shows an unavailable message with reload guidance
+- **AND** it does not present the failed read as an empty project
+
 <!-- Task 4.6 approved by the human on 9 November 2026; decisions recorded in design.md. -->
 
 ### Requirement: Product-manager task control visibility
