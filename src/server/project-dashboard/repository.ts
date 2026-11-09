@@ -35,33 +35,31 @@ export class ProjectDashboardRepository {
     try {
       await connection.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
       try {
-        const [projectCounts, memberCountResult, membersResult, completedResult] = await Promise.all([
-          connection.query<CountRow>(
-            `SELECT ${COUNT_COLUMNS} FROM app.tasks t
-              WHERE t.project_id = $1::uuid AND t.deleted_at IS NULL`, [projectId]),
-          connection.query<{ member_count: unknown }>(
-            `SELECT count(*)::int AS member_count FROM app.memberships WHERE project_id = $1::uuid`, [projectId]),
-          connection.query<MemberRow>(
-            `SELECT m.person_id::text AS person_id, pe.github_username, m.role,
-                    count(t.id) FILTER (WHERE t.status = 'to_do')::int AS to_do,
-                    count(t.id) FILTER (WHERE t.status = 'in_progress')::int AS in_progress,
-                    count(t.id) FILTER (WHERE t.status = 'in_review')::int AS in_review,
-                    count(t.id) FILTER (WHERE t.status = 'done')::int AS done
-               FROM app.memberships m
-               JOIN app.people pe ON pe.id = m.person_id
-               LEFT JOIN app.tasks t ON t.project_id = m.project_id AND t.assignee_id = m.person_id AND t.deleted_at IS NULL
-              WHERE m.project_id = $1::uuid
-              GROUP BY m.person_id, pe.github_username, m.role
-              ORDER BY lower(pe.github_username), m.person_id`, [projectId]),
-          connection.query<{ completed_today: unknown }>(
-            `SELECT count(DISTINCT e.task_id)::int AS completed_today
-               FROM app.task_events e
-               JOIN app.tasks t ON t.id = e.task_id AND t.project_id = e.project_id
-              WHERE e.project_id = $1::uuid AND t.deleted_at IS NULL
-                AND e.event_type = 'state_change' AND e.to_status = 'done'
-                AND e.created_at >= date_trunc('day', CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Singapore') AT TIME ZONE 'Asia/Singapore'
-                AND e.created_at < (date_trunc('day', CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Singapore') + interval '1 day') AT TIME ZONE 'Asia/Singapore'`, [projectId]),
-        ]);
+        const projectCounts = await connection.query<CountRow>(
+          `SELECT ${COUNT_COLUMNS} FROM app.tasks t
+            WHERE t.project_id = $1::uuid AND t.deleted_at IS NULL`, [projectId]);
+        const memberCountResult = await connection.query<{ member_count: unknown }>(
+          `SELECT count(*)::int AS member_count FROM app.memberships WHERE project_id = $1::uuid`, [projectId]);
+        const membersResult = await connection.query<MemberRow>(
+          `SELECT m.person_id::text AS person_id, pe.github_username, m.role,
+                  count(t.id) FILTER (WHERE t.status = 'to_do')::int AS to_do,
+                  count(t.id) FILTER (WHERE t.status = 'in_progress')::int AS in_progress,
+                  count(t.id) FILTER (WHERE t.status = 'in_review')::int AS in_review,
+                  count(t.id) FILTER (WHERE t.status = 'done')::int AS done
+             FROM app.memberships m
+             JOIN app.people pe ON pe.id = m.person_id
+             LEFT JOIN app.tasks t ON t.project_id = m.project_id AND t.assignee_id = m.person_id AND t.deleted_at IS NULL
+            WHERE m.project_id = $1::uuid
+            GROUP BY m.person_id, pe.github_username, m.role
+            ORDER BY lower(pe.github_username), m.person_id`, [projectId]);
+        const completedResult = await connection.query<{ completed_today: unknown }>(
+          `SELECT count(DISTINCT e.task_id)::int AS completed_today
+             FROM app.task_events e
+             JOIN app.tasks t ON t.id = e.task_id
+            WHERE t.project_id = $1::uuid AND t.deleted_at IS NULL
+              AND e.event_type = 'state_change' AND e.to_status = 'done'
+              AND e.created_at >= date_trunc('day', CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Singapore') AT TIME ZONE 'Asia/Singapore'
+              AND e.created_at < (date_trunc('day', CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Singapore') + interval '1 day') AT TIME ZONE 'Asia/Singapore'`, [projectId]);
         const members: DashboardMember[] = membersResult.rows.map(row => ({
           personId: String(row.person_id), githubUsername: String(row.github_username), role: row.role,
           stateCounts: stateCounts(row),

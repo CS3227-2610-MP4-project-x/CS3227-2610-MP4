@@ -1,18 +1,22 @@
 # Agent task handoff
 
+## Latest runtime-fix commit authorization
+
+After the verified runtime fix, the human requested "commit for me". Root confirmed feat/projects-dashboard and a clean index. Same commit/PR agent /root/commit_specs_4_7 is assigned one scoped fix commit containing src/server/project-dashboard/repository.ts, tests/unit/project-dashboard/project-dashboard-repository.test.ts, this handoff, workflow/reflection-log.md and logs/2026-11-09-task-4.7-analysis.md. This supersedes prior uncommitted-fix status only upon successful commit; exact SHA/result is reported externally to avoid self-reference. next-env.d.ts and .claude/settings.local.json remain excluded. No push/PR/history rewrite. Provider-generated ID, tokens/tool-use totals/duration/cache/cost not available at documentation cutoff; no estimates. Existing passing checks and independent runtime-fix review remain applicable; no product change since review.
+
 ## Task record `[ORCH]`
 
 - Task ID: projects-dashboard-4-7
 - Summary: Task 4.7 project dashboard for project-task-management.
 - Human owner (Developer A / Developer B): Developer B
 - Requirement IDs: No requirement IDs were found; cite requirement titles and task 4.7.
-- Status: Task 4.7 human-closed and checkbox done; product committed as aaa32b7b5d91c0bb0ef35eafb923ae94c7d9e02c on feat/projects-dashboard. Documentation commit pending; final source findings zero; disclosed verification gaps retained.
-- Next human action: Same commit/PR agent completes authorized documentation-only phase2; root reports its SHA. No push/PR. Developer A cross-review and disclosed verification follow-up remain.
+- Status: Prior task closure/product and documentation commits preserved; user-reported runtime regression fixed in UNCOMMITTED source/tests. Fresh static review0/0/0, dashboard DB6 pass and bounded2227 pass; final runtime build and whitespace checks exit0; no source changes after review. Other disclosed gaps retained.
+- Next human action: Actual dashboard refresh remains unexercised; runtime build and whitespace checks pass. No automatic commit/push/PR for new runtime fix. Developer A cross-review and scoped follow-up remain.
 
 ## Source and scope `[ORCH]`
 
 - Repository / branch / worktree: CS3227-2610-MP4 / `feat/projects-dashboard` / shared repository worktree.
-- Source revision: Current product SHA aaa32b7b5d91c0bb0ef35eafb923ae94c7d9e02c; approved spec-only SHA ca3d1a26daeb0467d730c2405fa2612cc2cb8ce2 unchanged. Documentation phase2 pending.
+- Source revision: Current HEAD759be11591a797d900a8f9b252b73b2e1edee27d (completed documentation phase2); product aaa32b7b5d91c0bb0ef35eafb923ae94c7d9e02c and spec ca3d1a26daeb0467d730c2405fa2612cc2cb8ce2 preserved. Runtime fix is uncommitted working-tree delta.
 - Permitted paths and actions (historical seed phase; superseded by current closure ledger): Spec-only approval covered `openspec/changes/project-task-management/specs/task-management/spec.md` and `openspec/changes/project-task-management/design.md`. This seed session may create only `workflow/handoffs/projects-dashboard-4-7.md`.
 - Prohibited paths and actions (historical seed phase): No code/spec/test edits by this seed session. No code commit authorized; no push or PR creation authorized.
 - Dependencies and parallel work: Implementation/review completed; root and commit agent sequence authorized closure, preserving other edits.
@@ -473,6 +477,34 @@ Provider codex; Work ID projects-dashboard-4-7; human owner Developer B; same ag
 
 Provider codex; Work ID projects-dashboard-4-7; human owner Developer B; exact surfaced identifier /root/plan_handoff_4_7, same orchestrator as planning/closure. Provider-generated session ID, actual model/effort, input/output/total/cache tokens, cost, tool-use totals and session duration not available. Read existing handoff and root-supplied commit report; changed workflow/handoffs/projects-dashboard-4-7.md only. No source/tests/spec edits, dependencies, product checks, additional test reruns or subagents. Documentation-only: no follow-up tests needed. Consolidated current source revision/product commit, checkbox result, PR artifact and phase2 cutoff honestly. Role totals remain not available.
 
+## Runtime regression addendum - latest working tree [ORCH]
+
+Owner Developer B. Following prior closure/commits, user reported dashboard unavailable and a node-postgres concurrent-query warning. This is a runtime defect correction under existing approved behavior, not a new product decision/specification, schema/migration, UI or API change. Earlier source approvals did not catch the nonexistent event-column defect; prior warnings/skips/failures and review limitations remain evidence, not erased.
+
+Current HEAD is759be11591a797d900a8f9b252b73b2e1edee27d: prior phase2 documentation commit completed, containing the four authorized handoff/reflection/log/PR-draft files. Product commit aaa32b7b5d91c0bb0ef35eafb923ae94c7d9e02c and its22 paths remain preserved. Earlier phase2-pending statements are historical cutoff snapshots, now superseded. New runtime source/test fix is UNCOMMITTED; no automatic commit, push or PR authorized for it. Preserve user-owned next-env.d.ts and .claude/settings.local.json.
+
+### Defects, reproduction and correction
+
+- Repository launched four queries using Promise.all on one checked-out client, producing concurrent-query warning. Completion SQL referenced e.project_id, which does not exist: migrated task_events contains task_id. Existing migration is unchanged.
+- Root reproduced using all six existing dashboard database cases against a NEW separate disposable local PostgreSQL18 cluster: all six failed with42703 and the user's query warning. No application/production database accessed.
+- Installed PostgreSQL17 was incomplete and initial initdb failed. PostgreSQL18 initialized a temporary cluster and started on loopback port55487. After fix, same six migrated database tests passed, with no PostgreSQL concurrent-query warning. Server stopped successfully, exit0; temporary files retained, no deletion.
+- Implementation now awaits queries sequentially within the same REPEATABLE READ READ ONLY transaction. Completion events join through task ID and project filtering uses t.project_id; live-task/distinct/SGT semantics and rollback/release preserved.
+- This closes dashboard-specific database execution gap. Full353-test DB suite was not rerun; the other347 are not newly verified. User's actual UI refresh and authenticated browser experience not exercised.
+
+### Runtime exact inventory and sessions
+
+| Role / surfaced identifier | Phase, permitted writes and results | Resource reporting |
+|---|---|---|
+| Test-writer /root/tests_4_7 | Same writer runtime phase; ONLY new tests/unit/project-dashboard/project-dashboard-repository.test.ts. Nine regressions, red5 fail/4 pass, no module-load errors. Single-flight fake plus schema-aware SQL; fake is not DB proof. Focused lint/whitespace exit0. | Provider ID/model/effort/input-output-total tokens/cache/cost/tool-use totals/duration not available, exactly reported. |
+| Implementer /root/implement_4_7 | Same implementer runtime phase; ONLY src/server/project-dashboard/repository.ts. Sequential queries and valid event/task join/project filter; related three unit files32 pass, lint/type exit0. No scope blocks/dependencies/artifacts. | Provider ID/model/effort/tokens/cache/cost/tool-use totals/duration not available, exactly reported. Configured luna/medium is prior role configuration, not new runtime-model assertion. |
+| Reviewer /root/review_dashboard_runtime_fix | NEW independent read-only static review, no reruns/edits.0 must/0 should/0 nit; verified migrated schema/isolation/snapshot/SGT/cleanup/tests. | Provider ID/model/effort/tokens/cache/cost/duration unavailable. Explicitly reported four read-only tool executions; this is not inferred provider aggregate tool usage. |
+| Root /root | Runtime reproduction/DB proof and final broad checks, no production access. Bounded npm.cmd test -- --maxWorkers=4 exit0,54 files/2227 tests passed; npm.cmd run lint exit0. Worker npx.cmd tsc --noEmit exit0. Final npm.cmd run build exit0: compiled, type-checked and generated dashboard. Final git diff --check exit0; no source changes after review. Root owns same-chat log/reflection updates, no fresh summary. | Provider ID/model/effort/tokens/cache/cost/tool-use totals/session or wait durations not available; no estimates. |
+| Orchestrator /root/plan_handoff_4_7 | Same agent runtime consolidation; handoff-only permitted read/edit, no product exploration/tests/subagents. Recorded exact supplied reports/current state; no additional tests needed for this documentation edit. | Provider ID/model/effort/tokens/cache/cost/tool-use totals/duration not available. Role totals unavailable, resumed phases not double-counted. |
+
+New test inventory row: tests/unit/project-dashboard/project-dashboard-repository.test.ts. Modified source inventory row: src/server/project-dashboard/repository.ts (already in product inventory, now with an uncommitted runtime correction). Documentation changes in this handoff and root-owned existing log/reflection are uncommitted alongside fix.
+
+Generated/runtime artifacts: stopped disposable PostgreSQL18 cluster outside repository, retained temporary files, ignored .next output. No dependency/migration/schema/UI/API/cache change. Final npm.cmd run build exit0 (compiled, type-checked, generated dashboard); git diff --check exit0. No source changes after review. Production build regenerated next-env.d.ts imports; root used installed Next declaration writer to restore dev-mode .next/dev route/rootparams imports for the running development server. This preexisting modified user file remains outside runtime-fix scope; no manual authentication/product edits. Final application-source fix is only repository.ts plus nine unit regressions; documentation is the existing log/reflection/handoff. Cluster stopped exit0. Required follow-up: user refreshes actual dashboard if desired, and existing cross-review/full DB/journey/accessibility/default-concurrency gaps remain scoped as above. No new fix-round count is silently appended to prior task's completed two rounds; this is separately reported user runtime regression with a fresh reviewer.
+
 ## Change log `[ORCH]`
 
 | Date/time (SGT) | Role/session | Update |
@@ -480,3 +512,5 @@ Provider codex; Work ID projects-dashboard-4-7; human owner Developer B; exact s
 | 2026-11-09 (time not available) | orchestrator / /root/plan_handoff_4_7 | Confirmed candidate-derived exact paths, independent red-first pipeline, review limits and unavailable metrics; no implementation checks. |
 | 2026-11-09 (time not available) | orchestrator / /root/plan_handoff_4_7 closure | Consolidated reported agent/phases, unavailable metrics, exact validation/gaps and closure/commit authorization; no product edits/tests. |
 | 2026-11-09 (time not available) | orchestrator / /root/plan_handoff_4_7 final consolidation | Recorded product SHA, task25/33 checkbox closure, full-branch draft inventory and honest pending docs-commit cutoff; no product edits/tests. |
+| 2026-11-09 (time not available) | orchestrator / /root/plan_handoff_4_7 runtime | Recorded user regression, schema/query defects, red/green DB evidence, runtime sessions and uncommitted fix; build/diff results pending. |
+| 2026-11-09 (time not available) | orchestrator / /root/plan_handoff_4_7 runtime final | Build exit0 and diff-check exit0 recorded; no post-review source changes. Installed Next writer restored dev declarations outside fix scope; own runtime resource totals remain not available. |
