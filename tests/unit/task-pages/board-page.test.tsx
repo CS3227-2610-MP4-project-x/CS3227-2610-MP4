@@ -326,3 +326,15 @@ describe("Board status menu applies only permitted transitions", () => {
     }
   });
 });
+
+// Task 4.6 approved PM task controls.
+it("offers New Task only to the PM and never loads developer member choices", async () => {
+  const listMembers = vi.fn().mockResolvedValue([{ personId: ids.developer, githubUsername: usernames.developer, role: "developer" }]);
+  f.composition.projectService = { listMembers };
+  const { default: Page } = await import(PAGE);
+  const pmHtml = renderToStaticMarkup(await Page({ params: Promise.resolve({ projectId }) }));
+  expect(pmHtml).toContain("New Task"); expect(listMembers).toHaveBeenCalledWith(projectId, ids.pm);
+  listMembers.mockClear(); asDeveloper();
+  const devHtml = renderToStaticMarkup(await Page({ params: Promise.resolve({ projectId }) }));
+  expect(devHtml).not.toContain("New Task"); expect(listMembers).not.toHaveBeenCalled();
+});

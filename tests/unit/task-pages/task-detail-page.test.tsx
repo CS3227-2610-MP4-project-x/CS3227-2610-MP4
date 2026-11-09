@@ -291,3 +291,16 @@ describe("Task detail actions follow the role", () => {
     expect(visibleText(html)).not.toMatch(/check (?:completed|passed|succeeded)|all criteria (?:met|addressed)/i);
   });
 });
+
+// Task 4.6 approved PM task controls.
+it("offers edit/reassign/delete only to the PM without developer member reads", async () => {
+  const listMembers = vi.fn().mockResolvedValue([{ personId: ids.developer, githubUsername: usernames.developer, role: "developer" }]);
+  f.composition.projectService = { listMembers };
+  const { default: Page } = await import(PAGE);
+  const devHtml = renderToStaticMarkup(await Page({ params: Promise.resolve({ projectId, taskId }) }));
+  expect(devHtml).not.toContain(">Edit<"); expect(listMembers).not.toHaveBeenCalled();
+  f.findPerson.mockResolvedValue(ids.pm); f.findRole.mockResolvedValue("product_manager");
+  const pmHtml = renderToStaticMarkup(await Page({ params: Promise.resolve({ projectId, taskId }) }));
+  expect(pmHtml).toContain(">Edit<"); expect(pmHtml).toContain(">Reassign<"); expect(pmHtml).toContain(">Delete<");
+  expect(listMembers).toHaveBeenCalledWith(projectId, ids.pm);
+});
