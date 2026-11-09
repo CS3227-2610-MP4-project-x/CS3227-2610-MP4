@@ -8,7 +8,25 @@
 
 | 2026-11-09 | 8.1 | Normal | JIT analyst; spec gate/commit; seed and fresh plan; sequential workers; security; fresh re-review | E2: JIT analyst; one arm, no controlled comparison | 8/0/0; human: "I approve the spec delta and your recommendations for the decisions." | Initial 3 must/1 should/0 nit; round1 fresh re-review 0/0/0 | 2 test/spec conflicts resolved by human; 0 unresolved | Analyst/test-writer/implementer/reviewer/security/orchestrator/commit-pr/root: not available | not available | Final 2279 unit +357 PostgreSQL tests pass; lint/type/build pass. Fresh review/security0open. Strict validation retains6pre-existing warnings. Overlapping-check unit run2270pass9fail; isolated unchanged rerun2279pass. Implementation committed by human authorization; closure log verification/cross-review pending. |
 
+| 2026-11-09 | 8.2 | Normal | JIT analyst; approved spec commit; seeded/fresh plan; sequential tests/implementation; functional/security review | E2: JIT context; one arm | 8/0/0; human: "I approve the spec delta and your recommendations for the decisions." | Initial 3/1/0; fresh R1 2/0/0; fresh R2 0/0/0 (must/should/nit), 2 fix rounds | 0 disputes; idle-worker dispatch corrected; helper scope corrected | Analyst/test-writer/implementer/reviewer/security/orchestrator/commit-pr/root: not available | not available | Final unit2343/PG369; lint/type/build pass. Strict6preexisting warnings. Human approved result and authorized task-branch commits; log verification/cross-review pending. |
+
 ## Notes per task
+
+### 8.2 - JIT intake and sequential pipeline
+
+- Scope: Normal; one backend report-generation capability spanning citation validation, activity-aware caching, API authorization and tests.
+- Planned experiment: E2, JIT analyst exploration. Context-mode placeholder was unresolved; root selected and disclosed JIT before dispatch. One arm only; no controlled comparison claimed.
+- Final phase: D1-D8 accepted 8/0/0 with approval sentence in row; spec-only commit db945fce6fc38b55abf395089a2b6bc3f7b3478e. Task implemented and reviewed with zero final findings. Human subsequently approved result and authorized task-branch commits/local PR draft; no push or PR creation. Resource metrics not available.
+
+- What worked: Independent tests established63unit+7PG executed failures before implementation. Security review found the role-transfer race; fresh reviews found omitted insertion-conflict branches. Final103reportunit+12PG focused and full2343unit+369PG passed.
+- Review evidence: Initial3must/1should/0nit; freshR1 found2must insertion-conflict gaps; freshR2 returned0/0/0. Two fix rounds used, no unresolved disputes. Same workers wrote fixes/regressions; fresh reviewers deliberately reread source for independence, exact cost unavailable.
+- Waste: queued SendMessage to idle worker did not restart it; root corrected using followup_task after inventory. Repeated progress polling and avoidable idle are disclosed, not timed. Root verified declarations after initial seam gaps; helper query-object call error caused intermediate5PGfailures before correction.
+- Scope correction: new report-local database-fingerprint.ts helper initially outside exact paths; root paused edits and orchestrator added D5 rationale/path. No automated guard block surfaced. No file deletion/dependencies.
+- Context: Seed preserved analyst sources and accepted decisions; fresh planning used handoff/specs. Missing concrete DTO/gateway/auth/harness details required declaration-only intake; testwriter never read product source. Next time provide these at seed and check every database wait branch before review.
+- Limits: one JIT arm, no controlled comparison; all token/tool/duration/cache/cost totals unavailable. Human log verification, Developer A API/composition cross-review and controlled release remain pending. Live provider, authenticated E2E, adversarial evaluation and production migration/deployment not run. Frontend skipped for backend-only scope; canned fake mode deferred.
+
+
+- Closure: Human approved the result and authorized commits on feat/reports-generation. Implementation/tests/task checkbox committed as165df9cae7dfbfa1f74156be1633a0f33619aa2f; prior specdb945fce6fc38b55abf395089a2b6bc3f7b3478e preserved. Local full-branch PR draft at workflow/plans/reports-generation-8-2-pr.md; no push/PR. Closure evidence is committed separately; resulting SHA reported in chat. Log verification and human cross-review remain pending.
 
 ### 4.7 - sequential pipeline and two fix rounds
 
