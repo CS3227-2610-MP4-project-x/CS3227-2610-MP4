@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 export type AccountControlProps = Readonly<{
   githubUsername: string;
@@ -50,8 +51,9 @@ export function AccountControl({ githubUsername, avatarUrl }: AccountControlProp
       </summary>
       <div className="account-menu">
         {hasSignOutError && <p className="account-error" role="alert">Try again later</p>}
-        <button className="sign-out-button" type="button" onClick={signOut} disabled={isSigningOut}>
+        <button className="sign-out-button" type="button" onClick={signOut} disabled={isSigningOut} aria-busy={isSigningOut}>
           {isSigningOut ? "Signing out…" : "Sign out"}
+          {isSigningOut && <LoadingSpinner />}
         </button>
       </div>
     </details>

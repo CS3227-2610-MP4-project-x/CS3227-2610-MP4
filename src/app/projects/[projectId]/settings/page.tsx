@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PendingLink } from "@/components/ui/pending-link";
 import { notFound } from "next/navigation";
 import { createRequestSupabaseClient } from "@/server/auth/supabase-auth";
 import { requireProjectPageAccess } from "@/server/auth";
@@ -37,7 +37,7 @@ export default async function ProjectSettingsPage({ params, searchParams }: {
     }
   }
   return <main className="min-h-screen bg-[#1a1a1a] px-5 py-10 text-neutral-100 sm:px-8"><div className="mx-auto max-w-5xl">
-    <nav aria-label="Breadcrumb" className="mb-8 text-sm text-neutral-400"><Link href="/" className="hover:text-white">Workspace</Link><span aria-hidden="true"> / </span><span>Project settings</span></nav>
+    <nav aria-label="Breadcrumb" className="mb-8 text-sm text-neutral-400"><PendingLink href="/" className="hover:text-white">Workspace</PendingLink><span aria-hidden="true"> / </span><span>Project settings</span></nav>
     <h1 className="mb-6 text-3xl font-semibold tracking-tight">Project settings</h1>
     {access.role === "product_manager" ? membersUnavailable
       ? <section aria-labelledby="project-members-heading" className="mb-6 rounded-2xl border border-white/10 bg-[#222] p-6 sm:p-9">

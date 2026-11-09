@@ -3,6 +3,8 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { validateTaskDraft, type TaskDraft } from "./task-management-input";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { PendingReloadButton } from "@/components/ui/pending-reload-button";
 
 // Deliberately UI-owned projections, containing only the values these controls need.
 type MemberChoice = Readonly<{ personId: string; githubUsername: string; role: string }>;
@@ -30,6 +32,7 @@ export function TaskManager({ projectId, task, members }: Props) {
   const [formVersion, setFormVersion] = useState(task?.version);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"save" | "delete" | null>(null);
   const [refreshing, startTransition] = useTransition();
   const inFlight = useRef(false);
   const snapshot = task ?? members;
@@ -55,9 +58,9 @@ export function TaskManager({ projectId, task, members }: Props) {
     setMessage("The task request outcome could not be confirmed. Reload the page before trying again.");
   }
 
-  async function send(url: string, method: string, body: object, expectedStatus: 200 | 201 | 204, success: (response: Response) => Promise<void>) {
+  async function send(url: string, method: string, body: object, expectedStatus: 200 | 201 | 204, success: (response: Response) => Promise<void>, action: "save" | "delete") {
     if (inFlight.current || disabled) return;
-    inFlight.current = true; setBusy(true); setMessage("");
+    inFlight.current = true; setBusy(true); setPendingAction(action); setMessage("");
     try {
       const response = await fetch(url, { method, cache: "no-store", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(body) });
       if (response.status === expectedStatus) { await success(response); return; }
@@ -75,7 +78,7 @@ export function TaskManager({ projectId, task, members }: Props) {
         setMessage(code === "ACCEPTANCE_CRITERIA_REQUIRED" ? "At least one acceptance criterion is required." : "Check the task fields and acceptance criteria, then try again.");
       } else { refuseUncertain(); }
     } catch { refuseUncertain(); }
-    finally { inFlight.current = false; setBusy(false); }
+    finally { inFlight.current = false; setBusy(false); setPendingAction(null); }
   }
 
   async function save(event: { preventDefault(): void }) {
@@ -83,7 +86,7 @@ export function TaskManager({ projectId, task, members }: Props) {
     if (disabled || inFlight.current || !mode) return;
     if (mode === "reassign") {
       if (!task || !developers.some(member => member.personId === assigneeId)) { setMessage("Choose a current developer in this project."); return; }
-      await send(`${taskUrl}/assignee`, "PUT", { assigneeId, version: formVersion }, 200, async () => { setMode(null); setMessage("Assignment saved. Refreshing task."); refresh(); });
+      await send(`${taskUrl}/assignee`, "PUT", { assigneeId, version: formVersion }, 200, async () => { setMode(null); setMessage("Assignment saved. Refreshing task."); refresh(); }, "save");
       return;
     }
     const error = validateTaskDraft(draft);
@@ -96,9 +99,9 @@ export function TaskManager({ projectId, task, members }: Props) {
         if (typeof created.id !== "string" || !created.id) { refuseUncertain(); return; }
         setMode(null); setUncertain(true);
         router.push(`/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(created.id)}`); router.refresh();
-      });
+      }, "save");
     } else if (task) {
-      await send(taskUrl, "PATCH", { ...fields, version: formVersion, acceptanceCriteria: draft.acceptanceCriteria.map(c => ({ ...(c.id ? { id: c.id } : {}), description: c.description.trim() })) }, 200, async () => { setMode(null); setMessage("Task saved. Refreshing detail."); refresh(); });
+      await send(taskUrl, "PATCH", { ...fields, version: formVersion, acceptanceCriteria: draft.acceptanceCriteria.map(c => ({ ...(c.id ? { id: c.id } : {}), description: c.description.trim() })) }, 200, async () => { setMode(null); setMessage("Task saved. Refreshing detail."); refresh(); }, "save");
     }
   }
 
@@ -107,7 +110,7 @@ export function TaskManager({ projectId, task, members }: Props) {
     if (!window.confirm(`Delete ${task.taskKey}? This removes the task from the board.`)) return;
     await send(taskUrl, "DELETE", { version: task.version }, 204, async () => {
       setMode(null); setUncertain(true); router.push(boardUrl); router.refresh();
-    });
+    }, "delete");
   }
 
   function field(name: "title" | "description" | "dueDate" | "branchName", label: string) {
@@ -120,7 +123,7 @@ export function TaskManager({ projectId, task, members }: Props) {
 
   return <section aria-label="Task management" className="my-6 rounded-2xl border border-white/10 bg-[#222] p-5 text-neutral-100">
     <div className="flex flex-wrap gap-3">
-      {task ? <><button type="button" className={buttonStyle} onClick={() => open("edit")} disabled={disabled}>Edit</button><button type="button" className={buttonStyle} onClick={() => open("reassign")} disabled={disabled || !choicesAvailable}>Reassign</button><button type="button" className={buttonStyle} onClick={remove} disabled={disabled}>Delete</button></>
+      {task ? <><button type="button" className={buttonStyle} onClick={() => open("edit")} disabled={disabled}>Edit</button><button type="button" className={buttonStyle} onClick={() => open("reassign")} disabled={disabled || !choicesAvailable}>Reassign</button><button type="button" className={buttonStyle} onClick={remove} disabled={disabled} aria-busy={pendingAction === "delete"}>Delete{pendingAction === "delete" && <LoadingSpinner />}</button></>
         : <button type="button" className={buttonStyle} onClick={() => open("create")} disabled={disabled || !choicesAvailable}>New Task</button>}
     </div>
     {!choicesAvailable && <p className="mt-3 text-sm text-neutral-300">{members === null ? "Developer choices could not be loaded. Reload the page to try again." : "Add a developer in Settings before creating or reassigning a task."}</p>}
@@ -135,9 +138,9 @@ export function TaskManager({ projectId, task, members }: Props) {
           <button type="button" className={buttonStyle} disabled={disabled || draft.acceptanceCriteria.length >= 20} onClick={() => setDraft({ ...draft, acceptanceCriteria: [...draft.acceptanceCriteria, { description: "" }] })}>Add criterion</button>
         </fieldset></>}
       {mode !== "edit" && assignee}
-      <div className="flex flex-wrap gap-3"><button type="submit" className={buttonStyle} disabled={disabled || (mode !== "edit" && !choicesAvailable)}>{busy ? "Saving…" : mode === "create" ? "Create task" : mode === "edit" ? "Save task" : "Save assignment"}</button><button type="button" className={buttonStyle} disabled={busy} onClick={() => { setMode(null); setDraft(initialDraft(task)); setMessage(""); }}>Cancel</button></div>
+      <div className="flex flex-wrap gap-3"><button type="submit" className={buttonStyle} disabled={disabled || (mode !== "edit" && !choicesAvailable)} aria-busy={pendingAction === "save"}>{busy ? "Saving…" : mode === "create" ? "Create task" : mode === "edit" ? "Save task" : "Save assignment"}{pendingAction === "save" && <LoadingSpinner />}</button><button type="button" className={buttonStyle} disabled={busy} onClick={() => { setMode(null); setDraft(initialDraft(task)); setMessage(""); }}>Cancel</button></div>
     </form>}
     {message && <p role="alert" aria-live="polite" className="mt-4 text-sm text-amber-200">{message}</p>}
-    {uncertain && <button type="button" className={`${buttonStyle} mt-3`} onClick={() => window.location.reload()}>Reload page</button>}
+    {uncertain && <PendingReloadButton className={`${buttonStyle} mt-3`}>Reload page</PendingReloadButton>}
   </section>;
 }

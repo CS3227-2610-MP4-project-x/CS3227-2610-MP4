@@ -554,6 +554,10 @@ GitHub warns that the setup URL's `installation_id` can be spoofed and documents
 
 The setup callback, snapshot-read, and final-link route identifiers and payloads in the spec are approved. The state and persistence model, normalized attempt/snapshot relationship, expiry, stale-access behavior, and commit pagination/dedup behavior are also approved. Exact database column names and constraints remain subject to schema review. Developer A owns all Section 5 work and migrations by explicit human-approved exception to the general AGENTS.md assignment of database/migration ownership to Developer B. PostgreSQL migration and integrity execution remains an unverified validation gap.
 
+## Shared Loading Feedback
+
+The approved `interaction-feedback` capability applies to every currently rendered screen and to screens added later. Keep existing pending labels, disabled states, error handling, and request lifecycles. Add one small decorative spinner component and place it after the existing action label whenever an asynchronous action is pending. Use a shared client link for internal navigation so the spinner starts only for same-origin navigation and clears when the route changes; preserve normal modified-click and new-tab behavior. The GitHub sign-in action uses a client link wrapper because it is an anchor to an authentication route rather than a Next.js `Link`. Immediate controls such as menu/dialog toggles, local form edits, and cancellation do not show a spinner. The spinner is hidden from assistive technology, the control exposes its busy state, and CSS disables continuous motion when reduced motion is requested. No dependency or API change is needed.
+
 The UI visual reference is the approved product manager Project Settings mockup: the unlinked repository panel shows status, brief setup guidance, and an install/configure action; the selected installation's repositories are presented in-app after verification; the linked state identifies the repository and offers a change action. The developer commit picker follows the approved developer mockups and the API contracts in the active spec.
 
 ### Section 5.3 Minimal Task-detail Host Page

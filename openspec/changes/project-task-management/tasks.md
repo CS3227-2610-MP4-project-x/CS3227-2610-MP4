@@ -102,3 +102,7 @@ Depends on: all groups above.
 - [ ] 9.3 **[P]** Run accessibility checks on the main pages and record results.
 - [ ] 9.4 Deploy to production, run the release checks (including one real SoC LLM call from each environment, after confirming with `GET /v1/models` that each key can use the pinned model, and a GitHub sign-in on each environment that returns to that environment's own URL), and record commands, revision, environment, results, and evidence paths.
 - [ ] 9.5 Run OpenSpec validation and all lint, type-check, test, and build checks; resolve findings and record the final results.
+
+## 10. Shared Interaction Feedback
+
+- [x] 10.1 Add a shared trailing loading indicator for pending action buttons and internal navigation across currently rendered screens; preserve immediate controls and existing pending/error behavior, then inspect every affected screen and action for consistent placement and reduced-motion support.

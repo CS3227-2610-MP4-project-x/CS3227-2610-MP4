@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PendingLink } from "@/components/ui/pending-link";
 import type { ReactNode } from "react";
 
 // Presentational pieces shared by the board, task-detail and review-queue pages. No data access.
@@ -23,7 +23,7 @@ export function TaskPageShell({ crumb, children }: Readonly<{ crumb: string; chi
     <main className="px-5 pb-16 pt-6 sm:px-8">
       <div className="mx-auto max-w-5xl">
         <nav aria-label="Breadcrumb" className="mb-6 text-sm text-neutral-400">
-          <Link href="/" className="hover:text-white">Workspace</Link><span aria-hidden="true"> / </span><span>{crumb}</span>
+          <PendingLink href="/" className="hover:text-white">Workspace</PendingLink><span aria-hidden="true"> / </span><span>{crumb}</span>
         </nav>
         {children}
       </div>

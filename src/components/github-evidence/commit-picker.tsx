@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 type Branches = Readonly<{ defaultBranch: string; branches: readonly { name: string }[] }>;
 type Commit = Readonly<{ sha: string; shortSha: string; message: string; authoredAt: string; mentionsTaskId: boolean }>;
@@ -26,6 +27,7 @@ export function CommitPicker({ projectId, taskId, onAttached }: { projectId: str
   const [data, setData] = useState<CommitPage | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [loadingPage, setLoadingPage] = useState<"previous" | "next" | null>(null);
   const [message, setMessage] = useState("");
   const seenCommits = useRef<Set<string>>(new Set());
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -39,6 +41,7 @@ export function CommitPicker({ projectId, taskId, onAttached }: { projectId: str
 
   function closeDialog() {
     setOpen(false);
+    setLoadingPage(null);
     triggerRef.current?.focus();
   }
 
@@ -91,14 +94,14 @@ export function CommitPicker({ projectId, taskId, onAttached }: { projectId: str
         }
         return next;
       });
-    }).catch((error: unknown) => { if (!cancelled) setMessage(error instanceof Error ? error.message : "Repository evidence is unavailable."); })
-      .finally(() => { if (!cancelled) setBusy(false); });
+    }).catch((error: unknown) => { if (!cancelled) { setData(null); setMessage(error instanceof Error ? error.message : "Repository evidence is unavailable."); } })
+      .finally(() => { if (!cancelled) { setBusy(false); setLoadingPage(null); } });
     return () => { cancelled = true; };
   }, [open, api, query, branch, branchData, dateRangeValid]);
 
-  function changeFilter(update: () => void) { update(); setPage(1); setData(null); setMessage(""); }
-  function changePage(nextPage: number) { setPage(nextPage); setData(null); setMessage(""); }
-  const loading = busy || (open && dateRangeValid && data === null && message === "");
+  function changeFilter(update: () => void) { update(); setLoadingPage(null); setPage(1); setData(null); setMessage(""); }
+  function changePage(nextPage: number) { setLoadingPage(nextPage < page ? "previous" : "next"); setPage(nextPage); setMessage(""); }
+  const loading = busy || loadingPage !== null || (open && dateRangeValid && data === null && message === "");
   async function attach() {
     setBusy(true); setMessage("");
     try {
@@ -123,13 +126,13 @@ export function CommitPicker({ projectId, taskId, onAttached }: { projectId: str
         {!dateRangeValid && <p role="alert" className="mt-4 text-sm text-amber-300">Choose an end date on or after the start date.</p>}
         {loading && <p role="status" className="mt-5 text-sm text-neutral-400">Loading repository evidence…</p>}
         {!loading && data?.commits.length === 0 && <p className="mt-5 rounded-lg bg-white/5 p-4 text-sm text-neutral-300">No commits found for this date and branch.</p>}
-        {data && data.commits.length > 0 && <div className="mt-5 divide-y divide-white/10 rounded-lg border border-white/10">{data.commits.map((commit) => <label key={commit.sha} className="flex cursor-pointer items-start gap-3 p-4 hover:bg-white/[.03]">
+        {data && !loading && data.commits.length > 0 && <div className="mt-5 divide-y divide-white/10 rounded-lg border border-white/10">{data.commits.map((commit) => <label key={commit.sha} className="flex cursor-pointer items-start gap-3 p-4 hover:bg-white/[.03]">
           <input type="checkbox" checked={selected.has(commit.sha)} onChange={(event) => setSelected((current) => { const next = new Set(current); if (event.target.checked) next.add(commit.sha); else next.delete(commit.sha); return next; })} className="mt-1 accent-emerald-400" />
           <span className="min-w-0 flex-1"><span className="block text-sm leading-5 text-neutral-100">{commit.message}</span><span className="mt-2 flex flex-wrap gap-x-3 text-xs text-neutral-400"><span className="font-mono">{commit.shortSha}</span><time dateTime={commit.authoredAt}>{new Date(commit.authoredAt).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })}</time>{commit.mentionsTaskId && <span className="text-emerald-300">Matches this task</span>}</span></span>
         </label>)}</div>}
-        {data && <div className="mt-4 flex items-center justify-between"><button type="button" disabled={page <= 1 || loading} onClick={() => changePage(page - 1)} className="rounded-md border border-white/10 px-3 py-2 text-sm disabled:opacity-40">Previous</button><span className="text-xs text-neutral-400">Page {page} · {selected.size} selected</span><button type="button" disabled={!data.nextPage || loading} onClick={() => changePage(data.nextPage!)} className="rounded-md border border-white/10 px-3 py-2 text-sm disabled:opacity-40">Next</button></div>}
+        {data && <div className="mt-4 flex items-center justify-between"><button type="button" disabled={page <= 1 || loading} aria-busy={loadingPage === "previous"} onClick={() => changePage(page - 1)} className="rounded-md border border-white/10 px-3 py-2 text-sm disabled:opacity-40">Previous{loadingPage === "previous" && <LoadingSpinner />}</button><span className="text-xs text-neutral-400">Page {page} · {selected.size} selected</span><button type="button" disabled={!data.nextPage || loading} aria-busy={loadingPage === "next"} onClick={() => changePage(data.nextPage!)} className="rounded-md border border-white/10 px-3 py-2 text-sm disabled:opacity-40">Next{loadingPage === "next" && <LoadingSpinner />}</button></div>}
         {message && <p role="status" aria-live="polite" className="mt-4 rounded-md bg-white/5 p-3 text-sm text-neutral-300">{message}</p>}
-        <div className="mt-6 flex justify-end gap-3 border-t border-white/10 pt-5"><button type="button" onClick={closeDialog} className="rounded-lg border border-white/10 px-4 py-2 text-sm">Cancel</button><button type="button" disabled={busy || selected.size === 0} onClick={attach} className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-50">Attach commits</button></div>
+        <div className="mt-6 flex justify-end gap-3 border-t border-white/10 pt-5"><button type="button" onClick={closeDialog} className="rounded-lg border border-white/10 px-4 py-2 text-sm">Cancel</button><button type="button" disabled={busy || selected.size === 0} aria-busy={busy} onClick={attach} className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-50">Attach commits{busy && <LoadingSpinner />}</button></div>
       </section>
     </div>}
   </>;

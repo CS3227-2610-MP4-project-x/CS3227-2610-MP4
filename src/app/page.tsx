@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PendingLink } from "@/components/ui/pending-link";
 import { AccountControl } from "@/components/auth/account-control";
 import { requireWorkspaceSession } from "@/server/auth";
 import { getServerComposition } from "@/server/composition";
@@ -32,7 +32,7 @@ export default async function Home() {
         </header>
 
         <nav className="workspace-nav" aria-label="Main navigation">
-          <Link className="workspace-nav-link workspace-nav-link-active" href="/" aria-current="page">Dashboard</Link>
+          <PendingLink className="workspace-nav-link workspace-nav-link-active" href="/" aria-current="page">Dashboard</PendingLink>
           <span className="workspace-nav-link workspace-nav-link-disabled" aria-disabled="true">Board</span>
         </nav>
 
@@ -52,7 +52,7 @@ export default async function Home() {
           <p className="workspace-kicker">PROJECTS</p>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 id="my-projects-title">My Projects</h2>
-            <Link className="workspace-project-link" href="/projects/new">Create project</Link>
+            <PendingLink className="workspace-project-link" href="/projects/new">Create project</PendingLink>
           </div>
           {projects === null ? (
             <p className="workspace-projects-message" role="alert">Your projects could not be loaded. Reload the page to try again.</p>
@@ -66,7 +66,7 @@ export default async function Home() {
                     <span className="workspace-project-name">{project.name}</span>
                     <span className="workspace-project-meta">{project.key} · {ROLE_NAMES[project.role]}</span>
                   </div>
-                  <Link className="workspace-project-link" href={`/projects/${encodeURIComponent(project.id)}/board`}>Open board</Link>
+                  <PendingLink className="workspace-project-link" href={`/projects/${encodeURIComponent(project.id)}/board`}>Open board</PendingLink>
                 </li>
               ))}
             </ul>

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { PendingLink } from "@/components/ui/pending-link";
 import { useSelectedLayoutSegment } from "next/navigation";
 
 export type ProjectNavigationProps = Readonly<{ projectId: string; role: "product_manager" | "developer" }>;
@@ -30,7 +30,7 @@ export function ProjectNavigation({ projectId, role }: ProjectNavigationProps) {
   return (
     <>
       <div className="mb-3">
-        <Link className="workspace-project-link" href="/">Back to Project Space</Link>
+        <PendingLink className="workspace-project-link" href="/">Back to Project Space</PendingLink>
       </div>
       <nav className="workspace-nav project-nav" aria-label="Project navigation">
         {tabs.map((tab) => tab.segment === null
@@ -38,12 +38,12 @@ export function ProjectNavigation({ projectId, role }: ProjectNavigationProps) {
           ? <span key={tab.label} className="workspace-nav-link project-nav-link-disabled" aria-disabled="true" title="Coming soon">
               {tab.label}<span className="sr-only"> (coming soon)</span>
             </span>
-          : <Link key={tab.label}
+          : <PendingLink key={tab.label}
               className={tab.segment === active ? "workspace-nav-link workspace-nav-link-active" : "workspace-nav-link"}
               href={`/projects/${encodeURIComponent(projectId)}/${tab.segment}`}
               aria-current={tab.segment === active ? "page" : undefined}>
               {tab.label}
-            </Link>)}
+            </PendingLink>)}
       </nav>
     </>
   );

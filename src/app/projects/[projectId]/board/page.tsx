@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
+import { PendingLink } from "@/components/ui/pending-link";
 import { developerBoardMove } from "@/components/tasks/board-moves";
 import { BoardStatusMenu } from "@/components/tasks/board-status-menu";
 import { ReadFailureNotice, TaskPageShell, formatDueDate } from "@/components/tasks/task-page-parts";
@@ -18,9 +18,9 @@ type CardAction = (projectId: string, card: BoardCard) => ReactNode;
 function managerCardAction(projectId: string, card: BoardCard): ReactNode {
   if (card.state !== "In Review") return null;
   return (
-    <Link href={`/projects/${encodeURIComponent(projectId)}/review-queue`} className="mt-3 inline-block text-xs font-medium text-neutral-200 underline decoration-white/30 underline-offset-4 hover:text-white">
+    <PendingLink href={`/projects/${encodeURIComponent(projectId)}/review-queue`} className="mt-3 inline-block text-xs font-medium text-neutral-200 underline decoration-white/30 underline-offset-4 hover:text-white">
       Review in the queue →
-    </Link>
+    </PendingLink>
   );
 }
 
@@ -87,7 +87,7 @@ function TaskCard({ projectId, card, children }: Readonly<{ projectId: string; c
       <span className="font-mono text-xs text-neutral-400">{card.taskKey}</span>
       <span className="sr-only">State: {card.state}</span>
       <h3 className="mt-2 text-sm font-medium leading-6 text-neutral-100">
-        <Link href={detailHref} className="hover:underline">{card.title}</Link>
+        <PendingLink href={detailHref} className="hover:underline">{card.title}</PendingLink>
       </h3>
       <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs text-neutral-400">
         <dt>Assignee</dt><dd className="text-neutral-200">{card.assignee.githubUsername}</dd>
