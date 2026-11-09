@@ -127,6 +127,41 @@ body {
 .sign-out-button:disabled { color:#a1a1a1; cursor:wait; }
 .account-error,.sign-in-error { color:#f3f3f3; font-size:13px; line-height:1.5; }
 .account-error { margin:0 0 11px; }
+.account-settings-trigger { display:grid; width:48px; height:48px; place-items:center; border:1px solid rgba(255,255,255,.08); border-radius:50%; background:#242424; color:#d4d4d4; cursor:pointer; list-style:none; box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 5px 16px rgba(0,0,0,.2); }
+.account-settings-trigger::-webkit-details-marker { display:none; }
+
+/* Task 4.7 dashboard: compact action and summary surfaces that follow the existing palette. */
+.dashboard-header { display:flex; align-items:center; justify-content:space-between; gap:24px; }
+.dashboard-account-area { display:flex; align-items:center; gap:16px; }
+.dashboard-identity { display:flex; align-items:center; gap:11px; }
+.dashboard-avatar { width:42px; height:42px; flex:none; border-radius:50%; object-fit:cover; background:#333; }
+.dashboard-avatar-fallback { display:grid; place-items:center; color:#d3f3da; font-size:15px; font-weight:600; }
+.dashboard-identity > div { display:flex; flex-direction:column; gap:3px; }
+.dashboard-username { color:#f3f3f3; font-size:13px; font-weight:500; }
+.dashboard-role { color:#949494; font-size:11px; }
+.dashboard-card { padding:22px 24px; border:1px solid rgba(255,255,255,.04); border-radius:22px; background:#222; box-shadow:inset 0 1px 0 rgba(255,255,255,.03),0 8px 24px rgba(0,0,0,.28); }
+.dashboard-progress-track,.dashboard-allocation-track { display:block; height:7px; overflow:hidden; border-radius:999px; background:#353535; }
+.dashboard-progress-track { margin-top:16px; }
+.dashboard-progress-track > span,.dashboard-allocation-track > span { display:block; height:100%; border-radius:inherit; background:var(--accent); }
+.dashboard-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.dashboard-action { display:flex; min-height:92px; flex-direction:column; align-items:flex-start; justify-content:center; gap:10px; padding:14px 18px; border:1px solid rgba(255,255,255,.04); border-radius:18px; background:#242424; color:#e5e5e5; text-decoration:none; box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 5px 14px rgba(0,0,0,.18); }
+.dashboard-action > span:first-child { color:#a1a1a1; font-size:18px; line-height:1; }
+.dashboard-action > span:last-child { font-size:14px; }
+.dashboard-create-action { margin:0; color:#e5e5e5; }
+.dashboard-create-action::before { content:"＋"; color:#a1a1a1; font-size:18px; line-height:1; }
+.dashboard-create-action-expanded { grid-column:1 / -1; align-self:stretch; }
+.dashboard-action-disabled { color:#8a8a8a; cursor:not-allowed; }
+.dashboard-filter { min-height:34px; padding:0 14px; border:1px solid rgba(255,255,255,.07); border-radius:999px; background:#292929; color:#aaa; font-size:12px; }
+.dashboard-filter[aria-pressed="true"] { background:#353535; color:#f3f3f3; }
+.dashboard-chip { padding:7px 11px; border-radius:999px; background:#2c2c2c; color:#bdbdbd; font-size:12px; }
+.dashboard-allocation-person { display:flex; min-width:0; align-items:center; gap:10px; }
+.dashboard-allocation-dot { width:8px; height:8px; flex:none; border-radius:50%; background:#65b879; box-shadow:0 0 0 3px rgba(101,184,121,.12); }
+@media (max-width:600px) {
+  .dashboard-header { align-items:flex-start; }
+  .dashboard-account-area { flex-direction:column-reverse; align-items:flex-end; gap:8px; }
+  .dashboard-actions { grid-template-columns:1fr; }
+  .dashboard-card { padding:20px 18px; }
+}
 
 .sign-in-page { display:grid; place-items:center; padding:30px 22px; }
 .sign-in-shell { width:min(100%, 460px); }

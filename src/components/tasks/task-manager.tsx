@@ -13,7 +13,10 @@ export type ManagedTask = Readonly<{
   dueDate: string; branchName: string | null; assignee: Readonly<{ id: string; githubUsername: string }>;
   acceptanceCriteria: readonly Readonly<{ id: string; description: string }>[];
 }>;
-type Props = Readonly<{ projectId: string; task?: ManagedTask; members: readonly MemberChoice[] | null }>;
+type Props = Readonly<{
+  projectId: string; task?: ManagedTask; members: readonly MemberChoice[] | null;
+  className?: string; expandedClassName?: string;
+}>;
 type Mode = "create" | "edit" | "reassign" | null;
 const control = "min-h-11 rounded-lg border border-white/15 bg-[#1a1a1a] px-3 py-2 text-sm text-neutral-100 focus-visible:outline-2 focus-visible:outline-emerald-400 disabled:opacity-50";
 const buttonStyle = "min-h-11 rounded-lg border border-white/15 px-4 py-2 text-sm font-medium hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed";
@@ -24,7 +27,7 @@ function initialDraft(task?: ManagedTask): TaskDraft {
 }
 
 /** PM-only host pages mount these controls; the existing routes enforce authorization again. */
-export function TaskManager({ projectId, task, members }: Props) {
+export function TaskManager({ projectId, task, members, className, expandedClassName }: Props) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>(null);
   const [draft, setDraft] = useState<TaskDraft>(() => initialDraft(task));
@@ -39,6 +42,8 @@ export function TaskManager({ projectId, task, members }: Props) {
   const [awaitingSnapshot, setAwaitingSnapshot] = useState<typeof snapshot | undefined>(undefined);
   const [uncertain, setUncertain] = useState(false);
   const disabled = busy || refreshing || uncertain || (awaitingSnapshot !== undefined && awaitingSnapshot === snapshot);
+  const sectionClassName = [className ?? "my-6 rounded-2xl border border-white/10 bg-[#222] p-5 text-neutral-100",
+    mode !== null ? expandedClassName : undefined].filter(Boolean).join(" ");
   const developers = members?.filter(member => member.role === "developer") ?? [];
   const choicesAvailable = members !== null && developers.length > 0;
   const boardUrl = `/projects/${encodeURIComponent(projectId)}/board`;
@@ -121,7 +126,7 @@ export function TaskManager({ projectId, task, members }: Props) {
     <option value="">Choose a developer</option>{developers.map(member => <option key={member.personId} value={member.personId}>{member.githubUsername}</option>)}
   </select></label>;
 
-  return <section aria-label="Task management" className="my-6 rounded-2xl border border-white/10 bg-[#222] p-5 text-neutral-100">
+  return <section aria-label="Task management" className={sectionClassName}>
     <div className="flex flex-wrap gap-3">
       {task ? <><button type="button" className={buttonStyle} onClick={() => open("edit")} disabled={disabled}>Edit</button><button type="button" className={buttonStyle} onClick={() => open("reassign")} disabled={disabled || !choicesAvailable}>Reassign</button><button type="button" className={buttonStyle} onClick={remove} disabled={disabled} aria-busy={pendingAction === "delete"}>Delete{pendingAction === "delete" && <LoadingSpinner />}</button></>
         : <button type="button" className={buttonStyle} onClick={() => open("create")} disabled={disabled || !choicesAvailable}>New Task</button>}

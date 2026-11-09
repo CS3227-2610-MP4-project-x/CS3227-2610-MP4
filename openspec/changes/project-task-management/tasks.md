@@ -34,7 +34,7 @@ Depends on: 3.
 - [x] 4.4 Build the board, task detail, and review queue pages following `specs/ui-spec.md`.
 - [x] 4.5 Build the create-project page and the product-manager members screen: list the project's members, add a member by GitHub username, and transfer the product-manager role, using the 4.1 routes. Add a member-listing read (left to 4.4 by D4 and deferred by B1/C4). Draft and get human approval for the spec delta and any read or route decision before implementing; add page, read-service, and authorization tests. Also add the human-approved shared "Back to Project Space" link above project tabs for both roles, pointing to `/`.
 - [x] 4.6 Build the product-manager New Task, edit, reassign, and delete controls on the board and task-detail pages, using the 4.2 routes and the task's current `version` (deferred by B1). Draft and get human approval for the spec delta before implementing; add rendering, role-visibility, validation, and stale-version tests.
-- [ ] 4.7 Build the project dashboard (Header, Project Progress, Action Buttons for the product manager, Task Summary Card, Task Allocation) following `specs/ui-spec.md`, and enable its navigation tab (deferred by B1/B4). Draft and get human approval for the spec delta and its read service before implementing; add read-service and rendering tests.
+- [x] 4.7 Build the project dashboard (Header, Project Progress, Action Buttons for the product manager, Task Summary Card, Task Allocation) following `specs/ui-spec.md`, and enable its navigation tab (deferred by B1/B4). Draft and get human approval for the spec delta and its read service before implementing; add read-service and rendering tests.
 
 ### Tracking note for tasks 4.5 to 4.7
 

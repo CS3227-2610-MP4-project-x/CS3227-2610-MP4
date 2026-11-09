@@ -28,6 +28,7 @@ import {
 import { TaskDetailReadRepository, TaskDetailService } from "@/server/task-detail";
 import { TaskBoardRepository, TaskBoardService } from "@/server/task-board";
 import { ReviewQueueRepository, ReviewQueueService } from "@/server/review-queue";
+import { ProjectDashboardRepository, ProjectDashboardService } from "@/server/project-dashboard";
 
 export type ServerComposition = Readonly<{
   authService: AuthService;
@@ -43,6 +44,7 @@ export type ServerComposition = Readonly<{
   taskDetailService: TaskDetailService;
   taskBoardService: TaskBoardService;
   reviewQueueService: ReviewQueueService;
+  projectDashboardService: ProjectDashboardService;
   config: ReturnType<typeof getServerConfig>;
   llmGateway: LlmGateway;
 }>;
@@ -110,6 +112,7 @@ export function getServerComposition(): ServerComposition {
   // design.md B2, B6: the board and review-queue page reads (task 4.4).
   const taskBoardService = new TaskBoardService(new TaskBoardRepository(pool));
   const reviewQueueService = new ReviewQueueService(new ReviewQueueRepository(pool), completionAssessmentService);
+  const projectDashboardService = new ProjectDashboardService(new ProjectDashboardRepository(pool), projectAccessRepository);
   composition = Object.freeze({
     authService: new AuthService(config.appOrigin, peopleRepository),
     peopleRepository,
@@ -124,6 +127,7 @@ export function getServerComposition(): ServerComposition {
     taskDetailService,
     taskBoardService,
     reviewQueueService,
+    projectDashboardService,
     config,
     llmGateway,
   });
