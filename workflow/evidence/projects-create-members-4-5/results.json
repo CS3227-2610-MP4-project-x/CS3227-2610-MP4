@@ -1,0 +1,251 @@
+[
+  {
+    "label": "create invalid retains lowercase",
+    "text": "Project key\n\nUse 2–10 uppercase letters and digits, starting with a letter. Lowercase keys are not changed automatically.\n\nProject name\n\nCheck the project key and name, then try again.\n\nCreate project",
+    "calls": [
+      [
+        "/api/v1/projects",
+        {
+          "key": "lower",
+          "name": "Synthetic project"
+        }
+      ]
+    ],
+    "events": []
+  },
+  {
+    "label": "create conflict",
+    "text": "Project key\n\nUse 2–10 uppercase letters and digits, starting with a letter. Lowercase keys are not changed automatically.\n\nProject name\n\nThat project key is already in use. Choose another key.\n\nCreate project",
+    "calls": [
+      [
+        "/api/v1/projects",
+        {
+          "key": "lower",
+          "name": "Synthetic project"
+        }
+      ],
+      [
+        "/api/v1/projects",
+        {
+          "key": "lower",
+          "name": "Synthetic project"
+        }
+      ]
+    ],
+    "events": []
+  },
+  {
+    "label": "create pending",
+    "disabled": true
+  },
+  {
+    "label": "create success",
+    "text": "Project key\n\nUse 2–10 uppercase letters and digits, starting with a letter. Lowercase keys are not changed automatically.\n\nProject name\nCreate project",
+    "calls": [
+      [
+        "/api/v1/projects",
+        {
+          "key": "lower",
+          "name": "Synthetic project"
+        }
+      ],
+      [
+        "/api/v1/projects",
+        {
+          "key": "lower",
+          "name": "Synthetic project"
+        }
+      ],
+      [
+        "/api/v1/projects",
+        {
+          "key": "lower",
+          "name": "Synthetic project"
+        }
+      ]
+    ],
+    "events": [
+      [
+        "push",
+        "/projects/returned-id/board"
+      ],
+      [
+        "refresh"
+      ]
+    ]
+  },
+  {
+    "label": "mobile overflow",
+    "overflow": false
+  },
+  {
+    "label": "unknown user correction",
+    "inputDisabled": true,
+    "addDisabled": true
+  },
+  {
+    "label": "member not found",
+    "text": "PROJECT ACCESS\n\nMembers\n\nManage who can work in this project and choose its product manager.\n\nalpha\nDeveloper\npm-user\nProduct manager\nAdd member\n\nAdd a registered GitHub user as a developer.\n\nGitHub username\nAdd member\nTransfer product manager\n\nChoose a current developer. They cannot take over while they have open tasks assigned to them.\n\nChoose developer\nChoose a developer\nalpha\nTransfer product manager\n\nNo registered person was found for that GitHub username.",
+    "calls": [
+      [
+        "/api/v1/projects/synthetic-project/members",
+        {
+          "githubUsername": "unknown-user"
+        }
+      ]
+    ],
+    "events": [
+      [
+        "refresh"
+      ]
+    ]
+  },
+  {
+    "label": "add success clear",
+    "value": ""
+  },
+  {
+    "label": "add success",
+    "text": "PROJECT ACCESS\n\nMembers\n\nManage who can work in this project and choose its product manager.\n\nalpha\nDeveloper\npm-user\nProduct manager\nAdd member\n\nAdd a registered GitHub user as a developer.\n\nGitHub username\nAdd member\nTransfer product manager\n\nChoose a current developer. They cannot take over while they have open tasks assigned to them.\n\nChoose developer\nChoose a developer\nalpha\nTransfer product manager\n\nMember added. The list is refreshing.",
+    "calls": [
+      [
+        "/api/v1/projects/synthetic-project/members",
+        {
+          "githubUsername": "new-user"
+        }
+      ]
+    ],
+    "events": [
+      [
+        "refresh"
+      ]
+    ]
+  },
+  {
+    "label": "cancel confirmation",
+    "text": "Transfer product manager to alpha? alpha will become product manager, and you will become a developer."
+  },
+  {
+    "label": "cancel no request",
+    "text": "PROJECT ACCESS\n\nMembers\n\nManage who can work in this project and choose its product manager.\n\nalpha\nDeveloper\npm-user\nProduct manager\nAdd member\n\nAdd a registered GitHub user as a developer.\n\nGitHub username\nAdd member\nTransfer product manager\n\nChoose a current developer. They cannot take over while they have open tasks assigned to them.\n\nChoose developer\nChoose a developer\nalpha\nTransfer product manager\n\nMember added. The list is refreshing.",
+    "calls": [
+      [
+        "/api/v1/projects/synthetic-project/members",
+        {
+          "githubUsername": "new-user"
+        }
+      ]
+    ],
+    "events": [
+      [
+        "refresh"
+      ]
+    ]
+  },
+  {
+    "label": "transfer refused",
+    "text": "PROJECT ACCESS\n\nMembers\n\nManage who can work in this project and choose its product manager.\n\nalpha\nDeveloper\npm-user\nProduct manager\nAdd member\n\nAdd a registered GitHub user as a developer.\n\nGitHub username\nAdd member\nTransfer product manager\n\nChoose a current developer. They cannot take over while they have open tasks assigned to them.\n\nChoose developer\nChoose a developer\nalpha\nTransfer product manager\n\nReassign this developer’s open tasks before transferring the product manager role.",
+    "calls": [
+      [
+        "/api/v1/projects/synthetic-project/members",
+        {
+          "githubUsername": "new-user"
+        }
+      ],
+      [
+        "/api/v1/projects/synthetic-project/product-manager-transfer",
+        {
+          "githubUsername": "alpha"
+        }
+      ]
+    ],
+    "events": [
+      [
+        "refresh"
+      ]
+    ]
+  },
+  {
+    "label": "transfer pending",
+    "addLabel": "Adding member…",
+    "transferDisabled": true
+  },
+  {
+    "label": "transfer success",
+    "text": "PROJECT ACCESS\n\nMembers\n\nManage who can work in this project and choose its product manager.\n\nalpha\nDeveloper\npm-user\nProduct manager\nAdd member\n\nAdd a registered GitHub user as a developer.\n\nGitHub username\nAdd member\nTransfer product manager\n\nChoose a current developer. They cannot take over while they have open tasks assigned to them.\n\nChoose developer\nChoose a developer\nalpha\nTransfer product manager",
+    "calls": [
+      [
+        "/api/v1/projects/synthetic-project/members",
+        {
+          "githubUsername": "new-user"
+        }
+      ],
+      [
+        "/api/v1/projects/synthetic-project/product-manager-transfer",
+        {
+          "githubUsername": "alpha"
+        }
+      ],
+      [
+        "/api/v1/projects/synthetic-project/product-manager-transfer",
+        {
+          "githubUsername": "alpha"
+        }
+      ]
+    ],
+    "events": [
+      [
+        "refresh"
+      ],
+      [
+        "push",
+        "/projects/synthetic-project/board"
+      ],
+      [
+        "refresh"
+      ]
+    ]
+  },
+  {
+    "label": "empty native validation",
+    "calls": 0,
+    "valid": false,
+    "overflow": false
+  },
+  {
+    "label": "create network failure",
+    "text": "Project key\n\nUse 2–10 uppercase letters and digits, starting with a letter. Lowercase keys are not changed automatically.\n\nProject name\n\nThe project could not be created. Check your connection and try again.\n\nCreate project",
+    "calls": [
+      [
+        "/api/v1/projects",
+        {
+          "key": "WEB",
+          "name": "Synthetic"
+        }
+      ]
+    ],
+    "events": []
+  },
+  {
+    "label": "add pending",
+    "inputDisabled": true,
+    "buttonDisabled": true
+  },
+  {
+    "label": "add forbidden refresh",
+    "text": "PROJECT ACCESS\n\nMembers\n\nManage who can work in this project and choose its product manager.\n\nalpha\nDeveloper\npm-user\nProduct manager\nAdd member\n\nAdd a registered GitHub user as a developer.\n\nGitHub username\nAdd member\nTransfer product manager\n\nChoose a current developer. They cannot take over while they have open tasks assigned to them.\n\nChoose developer\nChoose a developer\nalpha\nTransfer product manager\n\nYour project access changed. Reloading access settings…",
+    "calls": [
+      [
+        "/api/v1/projects/synthetic-project/members",
+        {
+          "githubUsername": "new-user"
+        }
+      ]
+    ],
+    "events": [
+      [
+        "refresh"
+      ]
+    ]
+  }
+]
