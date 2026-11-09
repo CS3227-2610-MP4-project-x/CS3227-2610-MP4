@@ -1,0 +1,83 @@
+[
+  {
+    "label": "404 blocks and requests refresh",
+    "pass": true,
+    "events": [
+      [
+        "refresh"
+      ]
+    ]
+  },
+  {
+    "label": "404 same snapshot remains blocked",
+    "pass": true
+  },
+  {
+    "label": "fresh authorized snapshot unblocks",
+    "pass": true
+  },
+  {
+    "label": "corrected retry succeeds",
+    "pass": true,
+    "calls": [
+      [
+        "/api/v1/projects/synthetic-project/members",
+        {
+          "githubUsername": "unknown-user"
+        }
+      ],
+      [
+        "/api/v1/projects/synthetic-project/members",
+        {
+          "githubUsername": "corrected-user"
+        }
+      ]
+    ]
+  },
+  {
+    "label": "401 unchanged props blocked",
+    "pass": true,
+    "events": [
+      [
+        "refresh"
+      ]
+    ]
+  },
+  {
+    "label": "403 unchanged props blocked",
+    "pass": true,
+    "events": [
+      [
+        "refresh"
+      ]
+    ]
+  },
+  {
+    "label": "transfer pending labels",
+    "pass": true
+  },
+  {
+    "label": "members mobile no overflow",
+    "pass": true
+  },
+  {
+    "label": "native accepts 60 astral codepoints",
+    "pass": true
+  },
+  {
+    "label": "payload preserves name 60",
+    "pass": true
+  },
+  {
+    "label": "native accepts 100 astral codepoints",
+    "pass": true
+  },
+  {
+    "label": "payload preserves name 100",
+    "pass": true
+  },
+  {
+    "label": "create mobile no overflow",
+    "pass": true
+  }
+]

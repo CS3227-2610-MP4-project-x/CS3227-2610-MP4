@@ -1,0 +1,25 @@
+{
+  "pass": true,
+  "nativeAccepted": true,
+  "rawLength": 43,
+  "trimmedLength": 39,
+  "calls": [
+    [
+      "/api/v1/projects/synthetic-project/members",
+      {
+        "githubUsername": "  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  "
+      }
+    ]
+  ],
+  "events": [
+    [
+      "refresh"
+    ]
+  ],
+  "inputCleared": true,
+  "browser": "156.0.8078.4",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  }
+}

@@ -6,6 +6,85 @@ Defines how project members are organized and how product managers and developer
 
 ## ADDED Requirements
 
+### Requirement: Return to Project Space
+The shared project-page navigation SHALL expose a "Back to Project Space" link with href `/`, above the project tabs for both developers and product managers. Existing tab order, active states and server access checks SHALL remain unchanged.
+
+#### Scenario: Developer returns to Project Space
+- **WHEN** an authorized developer opens a project board or task-detail page
+- **THEN** the shared navigation shows "Back to Project Space" above the tabs linking directly to `/`
+
+#### Scenario: Product manager returns to Project Space
+- **WHEN** an authorized product manager opens a project page
+- **THEN** the shared navigation shows the same return link above the tabs
+- **AND** role-specific tab visibility and active states remain unchanged
+
+### Requirement: Signed-in people use the create-project page
+The system SHALL provide dynamically rendered `/projects/new`, reachable from My projects for every signed-in person, including those with no projects. Labeled key and name inputs SHALL submit exactly `{key,name}` to `POST /api/v1/projects`, following "Signed-in people create projects" validation without normalizing lowercase keys.
+
+#### Scenario: Successful creation through the page
+- **WHEN** a signed-in person submits a valid key and name
+- **THEN** the existing route atomically creates the project and sole PM membership
+- **AND** the UI navigates to `/projects/{returned id}/board`
+
+#### Scenario: Invalid or duplicate project through the page
+- **WHEN** input is invalid or the route returns `PROJECT_KEY_TAKEN`
+- **THEN** the form preserves entered values and shows a safe validation or conflict message
+
+#### Scenario: Signed-out create-page visitor
+- **WHEN** a person without a valid session opens `/projects/new`
+- **THEN** they are redirected to `/sign-in`
+
+#### Scenario: Pending or failed creation request
+- **WHEN** submission is pending
+- **THEN** repeat submission is disabled
+- **AND** a failed request shows a safe message without claiming success or automatically repeating the mutation
+
+### Requirement: Product manager reads project members
+The system SHALL provide a server-only projects-module read that independently checks current membership and PM authorization. It SHALL return only `{personId, githubUsername, role}`, including the PM, ordered by case-insensitive username then person ID ascending. It SHALL return all members without pagination, perform no writes, expose no new HTTP route and use no persistent cache.
+
+#### Scenario: Product manager lists members
+- **WHEN** the current PM opens project settings
+- **THEN** the members section shows all members and their roles in the recorded order
+
+#### Scenario: Unauthorized direct member read
+- **WHEN** a developer invokes the member read
+- **THEN** it refuses with `FORBIDDEN` and no member data
+- **AND** a nonmember or missing project receives `NOT_FOUND`
+
+#### Scenario: Safe members page access outcomes
+- **WHEN** the page has no valid session, no project access, or insufficient role
+- **THEN** it respectively redirects to `/sign-in`, shows safe not-found, or shows a safe unavailable members view without member data
+
+#### Scenario: Member loading operational failure
+- **WHEN** member loading fails operationally
+- **THEN** the section shows a safe retry message without raw errors or member data
+
+### Requirement: Product manager manages members through settings
+The system SHALL provide the member list, Add member form and PM-transfer control within `/projects/{projectId}/settings`, preserving the repository panel. Client actions SHALL use existing 4.1 routes, payloads and safe errors. Member removal and standalone role changes SHALL NOT be offered.
+
+#### Scenario: Add registered developer through settings
+- **WHEN** the PM submits a GitHub username
+- **THEN** the UI sends exactly `{githubUsername}` to the existing members POST route
+- **AND** success refreshes the server member list and clears the successful input
+
+#### Scenario: Refused member addition through settings
+- **WHEN** addition returns invalid input, unregistered or ambiguous username, or already-member errors
+- **THEN** a safe actionable message appears, input is preserved and success is not displayed
+
+#### Scenario: Confirm product-manager transfer
+- **WHEN** the PM selects an existing developer from the member list
+- **THEN** explicit confirmation names the target and explains that the caller becomes a developer
+- **AND** only confirmation sends exactly `{githubUsername}` to the existing transfer route
+
+#### Scenario: Successful transfer through settings
+- **WHEN** transfer succeeds
+- **THEN** the UI navigates to the board and refreshes server-rendered access and navigation so outgoing-PM controls disappear
+
+#### Scenario: Refused transfer or changed access
+- **WHEN** transfer is blocked by open tasks or another existing domain error
+- **THEN** the UI displays the safe reason without claiming a role change
+- **AND** authorization failures trigger fresh server access evaluation without keeping actionable PM controls
+
 ### Requirement: Signed-in people create projects
 The system SHALL allow any signed-in person to create a project with a key and a name through `POST /api/v1/projects`. The creator SHALL become the project's only product manager, and the project and that membership SHALL be created together or not at all.
 

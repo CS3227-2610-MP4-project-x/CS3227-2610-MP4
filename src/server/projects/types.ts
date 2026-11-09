@@ -10,6 +10,9 @@ export type ProjectView = Readonly<{ id: string; key: string; name: string; role
 /** The person a product manager added as a developer (design.md Q1). */
 export type MemberView = Readonly<{ personId: string; githubUsername: string; role: "developer" }>;
 
+/** Public member-list projection (task 4.5 D3/D4). */
+export type ProjectMemberView = Readonly<{ personId: string; githubUsername: string; role: ProjectRole }>;
+
 /** A registered person matched by GitHub username (design.md S4). */
 export type PersonMatch = Readonly<{ id: string; githubUsername: string }>;
 

@@ -509,6 +509,23 @@ Recorded on 2 November 2026 during task 6.3. `AGENTS.md` refers to an API error 
 - **SoCLaaS does not document prompt retention.** Prompts carry task text and diffs, so secret redaction and small, task-focused prompts matter even more.
 - **Large diffs exceed the input budget.** The check assesses what fits and lists the files it skipped, instead of silently truncating.
 
+## Create-project and Members UI Decisions (4.5)
+
+Approved by the human in this chat on 9 November 2026: the task 4.5 spec delta and all analyst recommendations D1–D8 were accepted. These decisions refine the existing project/membership contracts; they do not complete task 4.4 or authorize implementation or commits. Developer B owns this task, with Developer A cross-review for shared/authentication and repository-settings host changes.
+
+- **D1 Create entry and destination.** Use `/projects/new`, with Create project beside My projects for every signed-in person, including those with no projects. Successful creation opens the returned project's board. The static route must not use the project-ID layout.
+- **D2 Members placement.** Add Members within existing `/projects/{projectId}/settings`, preserving the repository panel and existing navigation; no new tab.
+- **D3 Member-read transport and access.** Use a server-only read in the projects module with no GET route. Independently verify current PM authorization inside the read: developer → `FORBIDDEN`; nonmember or missing project → `NOT_FOUND`. No writes or persistent cache.
+- **D4 Member projection, order and size.** Return only `{personId, githubUsername, role}` for all members, including the PM, ordered by `lower(githubUsername)` then person ID ascending. No pagination initially; loading all members is an accepted large-project limitation. Keep the existing add-member `MemberView` unchanged or introduce a separate list DTO because its role currently permits only `developer`.
+- **D5 Transfer selection and confirmation.** Select an existing developer from the member list and send their stored username through the existing route. Require explicit confirmation naming the target and explaining both resulting roles. The server remains authoritative for the open-task check.
+- **D6 Mutation feedback and recovery.** Add success refreshes the server list and clears input; transfer success navigates to the board and refreshes access/navigation. Preserve refused inputs, map existing codes to safe messages, disable pending submissions, never automatically retry writes, and re-evaluate server page access after authorization failures.
+- **D7 Settings access scope.** Apply the shared helper and PM guard to members, preserving the repository panel's safe unavailable behavior. Avoid broad refactoring of Developer A's repository feature; host-page changes require cross-review.
+- **D8 Verification and dependency baseline.** Add Node-rendering tests, member-read authorization/projection tests, existing-route reuse/error tests, and PostgreSQL listing/isolation/order tests. No dependency or migration is planned. Acceptance of this recommendation confirms task 4.4's existing helpers as the task 4.5 baseline despite its unchecked checkbox and pending cross-review; it does not mark 4.4 complete or waive cross-review. Full journeys and accessibility verification retain tasks 9.2 and 9.3 ownership.
+
+### Task 4.5 approved return-navigation addendum
+
+On 9 November 2026 the human requested a back button from the developer project workspace to the main Project Space page, then explicitly chose "Both developer and product-manager project pages" when asked about visibility. Add a "Back to Project Space" link above the shared project tabs, pointing directly to `/` rather than browser history. Implement it in the existing project-navigation component; preserve project-name placement, tab ordering, role visibility, active states and server authorization. This is an approved task 4.5 scope extension. It remains uncommitted because the single authorized spec-only commit has already been made.
+
 ## Open Questions
 
 - Tester accounts for the deployed environments.
