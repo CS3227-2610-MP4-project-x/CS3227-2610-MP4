@@ -1,0 +1,45 @@
+{
+  "source": "normalized agent-usage dashboard; no transcript content",
+  "report_path": "C:\\Users\\gabri\\.agent-usage-dashboard\\reports\\index.html",
+  "generated_at": "2026-11-09T06:40:42.092715Z",
+  "scope": "root session only, snapshot before closure commits; excludes unattributed child usage",
+  "identity_evidence": "CODEX_THREAD_ID and CODEX_SESSION_ID both match session_id",
+  "provider": "codex",
+  "session_id": "01a1bdda-0d10-7913-ba76-c2074ee28fe3",
+  "models": [
+    "gpt-6.1-sol"
+  ],
+  "response_records": 83,
+  "first_observed_response_at": "2026-11-09T01:09:27.701000Z",
+  "last_observed_response_at": "2026-11-09T06:40:12.061000Z",
+  "observed_response_span_seconds": 19844.36,
+  "task_wall_time": "not available",
+  "metrics": {
+    "input_tokens": 10121936,
+    "output_tokens": 34816,
+    "cached_input_tokens": 9967104,
+    "cache_write_tokens": 0,
+    "reasoning_tokens": 4489,
+    "tool_calls": "not available"
+  },
+  "total_input_plus_output": 10156752,
+  "cache_read_percent": 98.47033215780064,
+  "cost": "not available",
+  "child_usage": "not available",
+  "captured_subagent_calls": 0,
+  "coverage": {
+    "responses_by_provider": {
+      "claude": 12029,
+      "codex": 2459
+    },
+    "diagnostic_counts": {
+      "codex/unsupported_record": 175,
+      "codex/missing_usage": 2,
+      "codex/optional_metric_unavailable": 1,
+      "codex/incomplete_usage": 1,
+      "claude/unsupported_record": 16840,
+      "claude/optional_metric_unavailable": 5
+    },
+    "scan_seconds": 24.204
+  }
+}

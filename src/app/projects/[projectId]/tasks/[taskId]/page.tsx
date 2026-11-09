@@ -6,6 +6,8 @@ import { ProgressUpdateForm } from "@/components/tasks/progress-update-form";
 import { SubmitForReviewButton } from "@/components/tasks/submit-for-review-button";
 import { TaskCommitPicker } from "@/components/tasks/task-commit-picker";
 import { TaskStatusProvider } from "@/components/tasks/task-status";
+import { TaskManager } from "@/components/tasks/task-manager";
+import type { ProjectMemberView } from "@/server/projects";
 import {
   AttachedCommitList, ReadFailureNotice, StateBadge, TaskPageShell, UnavailableNotice, formatDueDate, formatTimestamp,
 } from "@/components/tasks/task-page-parts";
@@ -48,6 +50,11 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ pro
   const { task, attachedCommits, progressUpdates, reviewFeedback, checkHistory } = outcome.detail;
   const isAssignedDeveloper = access.role === "developer";
   const state = taskStateName(task.status);
+  let members: readonly ProjectMemberView[] | null = null;
+  if (access.role === "product_manager") {
+    try { members = await composition.projectService.listMembers(projectId, access.personId); }
+    catch { /* Edit and delete remain available without assignee choices. */ }
+  }
 
   return (
     <TaskPageShell crumb={task.taskKey}>
@@ -67,6 +74,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ pro
           <div className="mt-6"><SubmitForReviewButton projectId={projectId} taskId={task.id} taskKey={task.taskKey} version={task.version} /></div>
         )}
       </header>
+      {access.role === "product_manager" && <TaskManager projectId={projectId} task={task} members={members} />}
 
       <div className="mt-8 grid gap-6">
         <Panel title="Description">

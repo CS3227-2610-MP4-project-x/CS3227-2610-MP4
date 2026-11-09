@@ -4,6 +4,8 @@ import { developerBoardMove } from "@/components/tasks/board-moves";
 import { BoardStatusMenu } from "@/components/tasks/board-status-menu";
 import { ReadFailureNotice, TaskPageShell, formatDueDate } from "@/components/tasks/task-page-parts";
 import { TaskStatusProvider } from "@/components/tasks/task-status";
+import { TaskManager } from "@/components/tasks/task-manager";
+import type { ProjectMemberView } from "@/server/projects";
 import { requireProjectPageAccess } from "@/server/auth";
 import { getServerComposition } from "@/server/composition";
 import type { BoardCard, TaskBoardView } from "@/server/task-board";
@@ -38,6 +40,11 @@ export default async function BoardPage({ params }: { params: Promise<{ projectI
   try { board = await composition.taskBoardService.getBoard(projectId, access); }
   catch { board = null; }
   const isManager = access.role === "product_manager";
+  let members: readonly ProjectMemberView[] | null = null;
+  if (isManager) {
+    try { members = await composition.projectService.listMembers(projectId, access.personId); }
+    catch { /* Task creation stays disabled when member choices cannot be read. */ }
+  }
   const cardAction: CardAction = isManager ? managerCardAction : developerCardAction;
 
   return (
@@ -48,6 +55,7 @@ export default async function BoardPage({ params }: { params: Promise<{ projectI
           {isManager ? "Every task in this project, by state." : "Your tasks in this project, by state."}
         </p>
       </header>
+      {isManager && <TaskManager projectId={projectId} members={members} />}
       {board ? (
         <TaskStatusProvider>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
