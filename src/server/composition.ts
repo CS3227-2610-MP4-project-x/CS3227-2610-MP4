@@ -26,6 +26,8 @@ import {
   TaskSnapshotService,
 } from "@/server/completion-assessment";
 import { TaskDetailReadRepository, TaskDetailService } from "@/server/task-detail";
+import { TaskBoardRepository, TaskBoardService } from "@/server/task-board";
+import { ReviewQueueRepository, ReviewQueueService } from "@/server/review-queue";
 
 export type ServerComposition = Readonly<{
   authService: AuthService;
@@ -39,6 +41,8 @@ export type ServerComposition = Readonly<{
   githubEvidenceService: GitHubEvidenceService;
   completionAssessmentService: CompletionAssessmentService;
   taskDetailService: TaskDetailService;
+  taskBoardService: TaskBoardService;
+  reviewQueueService: ReviewQueueService;
   config: ReturnType<typeof getServerConfig>;
   llmGateway: LlmGateway;
 }>;
@@ -103,6 +107,9 @@ export function getServerComposition(): ServerComposition {
   });
   const taskLifecycleService = new TaskLifecycleService(taskRepository, submissionTipLookup);
   const taskDetailService = new TaskDetailService(new TaskDetailReadRepository(pool), completionAssessmentService);
+  // design.md B2, B6: the board and review-queue page reads (task 4.4).
+  const taskBoardService = new TaskBoardService(new TaskBoardRepository(pool));
+  const reviewQueueService = new ReviewQueueService(new ReviewQueueRepository(pool), completionAssessmentService);
   composition = Object.freeze({
     authService: new AuthService(config.appOrigin, peopleRepository),
     peopleRepository,
@@ -115,6 +122,8 @@ export function getServerComposition(): ServerComposition {
     githubEvidenceService,
     completionAssessmentService,
     taskDetailService,
+    taskBoardService,
+    reviewQueueService,
     config,
     llmGateway,
   });

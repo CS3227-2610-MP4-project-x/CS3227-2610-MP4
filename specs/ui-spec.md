@@ -82,7 +82,7 @@ Recommended spacing:
 | Acceptance Criteria Check | Developer (product manager read-only) | One row per criterion with status (addressed / not addressed / unclear) and expandable diff evidence, then a list of possible gaps. No numeric score. Provide access to distinct check history; exact-set reuse displays the existing result with a brief notice. Show a brief redaction note only when secrets were redacted before assessment. |
 | Review queue | Product manager | Tasks in In Review, each with commits, the result referenced by the submission, and distinct check history; Approve and Request changes (with required feedback) actions. Check access is read-only. |
 | Progress Report | Product manager | Date range picker (default: today, SGT), report grouped by developer, task-ID citations that link to the tasks |
-| Project settings | Product manager | Linked repository, token status (never the token itself), members, AI usage per feature per day |
+| Project settings | Product manager | Linked repository and GitHub App connection status (unlinked, linked, or unavailable; never any access token), members, AI usage per feature per day |
 
 Status colors on the board follow the Color System: monochrome for To Do, In Progress, and In Review, and the green accent only for Done.
 

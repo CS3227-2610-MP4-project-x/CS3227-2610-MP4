@@ -450,3 +450,108 @@ The system SHALL let the assigned developer post a free-text progress update thr
 #### Scenario: Progress responses are not cached
 - **WHEN** the route returns any response
 - **THEN** the response sends `Cache-Control: no-store`
+
+### Requirement: Project members read the task board
+The system SHALL show a project's task board at `/projects/{projectId}/board` to its members, grouped into the columns To Do, In Progress, In Review and Done. The project's product manager SHALL see every non-deleted task in the project, and a developer SHALL see only the non-deleted tasks assigned to them. Tasks in a column SHALL be ordered by task number ascending, then task `id`.
+
+#### Scenario: Product manager sees every task
+- **WHEN** the product manager opens the board of a project with tasks in several states assigned to several developers
+- **THEN** each non-deleted task appears once, in the column for its state
+
+#### Scenario: Developer sees only own tasks
+- **WHEN** a developer opens the board
+- **THEN** only tasks assigned to that developer appear
+- **AND** no other developer's task keys, titles or assignees are sent to the browser
+
+#### Scenario: Deleted tasks are absent
+- **WHEN** a task has been deleted
+- **THEN** it appears on no board
+
+### Requirement: Board cards and board reads
+Each board card SHALL show the task key, title, assignee GitHub username, due date and state name, and the page SHALL carry the task's `id` and current `version`. The page SHALL read through a server-side read service that checks membership and role itself, SHALL add no `/api/v1` route, and SHALL NOT be cached.
+
+#### Scenario: Board access is enforced on the server
+- **WHEN** a nonmember opens the board
+- **THEN** the system shows the safe not-found result without project contents
+- **AND** a request without a valid session is redirected to `/sign-in`
+
+#### Scenario: Stored status is shown as a state name
+- **WHEN** a task's stored status is `in_review`
+- **THEN** the board places it in the In Review column and labels it "In Review"
+
+### Requirement: Board status menu applies only permitted transitions
+The board SHALL let the assigned developer move their own task from To Do to In Progress and from In Progress to In Review through a status menu that calls the task state route with the task's current `version`. The menu SHALL offer no transition the person may not make. The product manager's Approve and Request changes SHALL be performed from the review queue or task detail, and a product manager's In Review card SHALL link to the review queue. Drag-and-drop is not required.
+
+#### Scenario: Developer starts a task from the board
+- **WHEN** the assigned developer chooses In Progress from a To Do card's menu
+- **THEN** the card appears in the In Progress column after the board reloads, and the next action uses the task's new `version`
+
+#### Scenario: Refused or stale move
+- **WHEN** the state route returns 403 `FORBIDDEN` or 409 `VERSION_CONFLICT`
+- **THEN** the page shows a short message asking the person to reload, reloads the board data, and changes no card locally
+
+#### Scenario: Menu hides forbidden moves
+- **WHEN** the product manager or an unassigned developer opens a card's menu
+- **THEN** no To Do to In Progress or In Progress to In Review option is offered
+
+### Requirement: Task detail page
+The system SHALL show a task-detail page at `/projects/{projectId}/tasks/{taskId}` to the assigned developer and the project's product manager, using the task-detail read. It SHALL show the title, description, acceptance criteria, assignee, due date, branch, progress updates, attached commits, review feedback and distinct check history, and SHALL display the stored status as its state name.
+
+#### Scenario: Unassigned developer or nonmember
+- **WHEN** a developer who is not assigned to the task opens it
+- **THEN** the page shows a safe unavailable view and no task or check data
+- **AND** a nonmember, a missing task or a deleted task shows the safe not-found result
+
+### Requirement: Task detail actions follow the role
+The assigned developer SHALL see Run check, the commit picker, a progress-update form and, while the task is In Progress, a Submit for review action that is not blocked when no matching check exists. The product manager SHALL see none of those actions and SHALL read check history only.
+
+#### Scenario: Assigned developer opens a task
+- **WHEN** the assigned developer opens an In Progress task
+- **THEN** the page shows the detail fields and the developer actions above
+
+#### Scenario: Product manager opens the same task
+- **WHEN** the product manager opens it
+- **THEN** the page shows the same detail and check history and offers no run, attach, progress-update or submit action
+
+#### Scenario: Submit for review without a matching check
+- **WHEN** the assigned developer submits a task that has no attached commits or no matching check
+- **THEN** the task moves to In Review and the page does not present a check as completed
+
+#### Scenario: Progress update appears
+- **WHEN** the assigned developer posts a progress update
+- **THEN** it appears in the task's progress updates after the page refreshes, in `createdAt` order
+
+### Requirement: Product manager reads the review queue
+The system SHALL show the project's product manager the review queue at `/projects/{projectId}/review-queue`: every non-deleted task in In Review, each with its attached commits, its `checkHistory` in the existing entry shape, and the check result referenced by the task's most recent `submission` event (if any). The referenced result SHALL be exposed by the review read only, not by the task-detail read.
+
+#### Scenario: Submitted task appears in the queue
+- **WHEN** a task moves to In Review
+- **THEN** it appears in the queue with its attached commits and the referenced result, if any
+
+#### Scenario: Resubmitted task references its latest submission
+- **WHEN** a task has more than one `submission` event
+- **THEN** the queue entry presents the result referenced by the most recent one
+
+#### Scenario: No referenced result
+- **WHEN** the most recent submission event has no check reference
+- **THEN** the entry shows the commits and distinct check history and states that no result is referenced
+
+### Requirement: Review queue actions and access
+Each review queue entry SHALL offer Approve and Request changes, and Request changes SHALL require feedback that trims to 1 to 5,000 characters before it is sent. Developers and nonmembers SHALL receive no queue data. The page SHALL read through a server-side read service, SHALL add no `/api/v1` route, SHALL start no check, and SHALL change task state only through the task state route when the product manager acts.
+
+#### Scenario: Approve
+- **WHEN** the product manager approves an entry with its current `version`
+- **THEN** the task moves to Done and leaves the queue after the page reloads
+
+#### Scenario: Request changes needs feedback
+- **WHEN** the product manager requests changes
+- **THEN** the page requires non-blank feedback before sending, the task returns to In Progress, and the entry leaves the queue after the page reloads
+
+#### Scenario: Queue access is enforced on the server
+- **WHEN** a developer opens the queue
+- **THEN** the page shows a safe unavailable view and exposes no entries
+- **AND** a nonmember sees the safe not-found result, and a request without a valid session is redirected to `/sign-in`
+
+#### Scenario: Another reviewer acted first
+- **WHEN** an approve or request-changes action returns 403 or 409
+- **THEN** the page tells the product manager to reload and reloads the queue

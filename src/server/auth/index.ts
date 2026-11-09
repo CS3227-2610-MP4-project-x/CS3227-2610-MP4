@@ -8,3 +8,5 @@ export {
   resolveSessionPerson,
   type AccessResult,
 } from "./request-access";
+// design.md B6, B10: the Server Component mapping of resolveProjectAccess.
+export { requirePagePathId, requireProjectPageAccess, requireWorkspaceSession, type WorkspaceSession } from "./page-access";

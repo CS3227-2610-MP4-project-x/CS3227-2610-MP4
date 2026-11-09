@@ -20,7 +20,11 @@ export type CheckHistoryEntry = Readonly<{
   payload: CheckPayload;
 }>;
 
-export type CheckHistoryProps = Readonly<{ checkHistory: readonly CheckHistoryEntry[] }>;
+export type CheckHistoryProps = Readonly<{
+  checkHistory: readonly CheckHistoryEntry[];
+  /** Task 4.4 F1: the stored result the task's latest submission references, marked in the list. */
+  referencedResultId?: string | null;
+}>;
 
 const STATUS: Readonly<Record<CheckCriterion["status"], { label: string; styles: string }>> = {
   addressed: { label: "Addressed", styles: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" },
@@ -33,10 +37,13 @@ function formatTimestamp(value: string): string {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString("en-SG", { timeZone: "Asia/Singapore", dateStyle: "medium", timeStyle: "short" });
 }
 
-function CheckResult({ result }: { result: CheckHistoryEntry }) {
+function CheckResult({ result, note }: { result: CheckHistoryEntry; note?: string }) {
   return (
     <article className="overflow-hidden rounded-2xl border border-white/10 bg-[#202020] shadow-[inset_0_1px_0_rgba(255,255,255,.025)]">
-      <p className="px-5 pt-4 text-xs font-medium uppercase tracking-[.14em] text-neutral-400">Check result</p>
+      <p className="flex flex-wrap items-center gap-2 px-5 pt-4 text-xs font-medium uppercase tracking-[.14em] text-neutral-400">
+        Check result
+        {note && <span className="rounded-full border border-white/15 bg-white/5 px-2.5 py-0.5 normal-case tracking-normal text-neutral-200">{note}</span>}
+      </p>
       <details className="group">
         <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 px-5 pb-4 pt-2 marker:hidden hover:bg-white/[.025] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-emerald-400">
           <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1">
@@ -86,7 +93,12 @@ function CheckResult({ result }: { result: CheckHistoryEntry }) {
   );
 }
 
-export function CheckHistory({ checkHistory }: CheckHistoryProps) {
+/** Task 4.4 F1: one stored result as its card, without the history caption or landmark. */
+export function CheckResultCard({ result }: Readonly<{ result: CheckHistoryEntry }>) {
+  return <CheckResult result={result} />;
+}
+
+export function CheckHistory({ checkHistory, referencedResultId }: CheckHistoryProps) {
   if (checkHistory.length === 0) {
     return <p className="rounded-2xl border border-white/10 bg-[#202020] px-5 py-6 text-sm text-neutral-400">No acceptance criteria checks have been run yet.</p>;
   }
@@ -94,7 +106,9 @@ export function CheckHistory({ checkHistory }: CheckHistoryProps) {
   return (
     <section aria-label="Acceptance criteria check history" className="space-y-3">
       <p className="text-xs text-neutral-400">Advisory results · newest checks first</p>
-      {checkHistory.map((result) => <CheckResult key={result.id} result={result} />)}
+      {checkHistory.map((result) => (
+        <CheckResult key={result.id} result={result} note={result.id === referencedResultId ? "Referenced by the submission" : undefined} />
+      ))}
     </section>
   );
 }

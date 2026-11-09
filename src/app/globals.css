@@ -58,6 +58,24 @@ body {
 .welcome-copy > p:last-child { margin:0; color:#a1a1a1; font-size:15px; line-height:1.6; }
 .workspace-status,.placeholder-chip { display:inline-flex; align-items:center; gap:9px; border-radius:999px; padding:9px 13px; background:#242424; color:#bdbdbd; font-size:12px; white-space:nowrap; box-shadow:inset 0 1px 0 rgba(255,255,255,.035); }
 .status-dot { width:7px; height:7px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 3px rgba(34,197,94,.12); }
+/* Task 4.4 (design.md B3, B4): "my projects" on the workspace and the project navigation. */
+.workspace-nav.project-nav { max-width:100%; margin:0 0 8px; overflow-x:auto; }
+.workspace-projects { margin-bottom:30px; padding:24px 28px; border-radius:26px; background:#222; box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 12px 34px rgba(0,0,0,.22); }
+.workspace-projects h2 { margin:8px 0 16px; font-size:17px; font-weight:500; }
+.workspace-projects-message { margin:0; color:#b0b0b0; font-size:14px; }
+.workspace-project-list { display:grid; gap:10px; margin:0; padding:0; list-style:none; }
+.workspace-project { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 16px; border-radius:16px; background:#292929; box-shadow:inset 0 1px 0 rgba(255,255,255,.035); }
+.workspace-project-copy { display:flex; min-width:0; flex-direction:column; gap:3px; }
+.workspace-project-name { overflow-wrap:anywhere; color:#f3f3f3; font-size:14px; font-weight:500; }
+.workspace-project-meta { color:#a1a1a1; font-size:12px; }
+.workspace-project-link { flex:none; display:inline-flex; align-items:center; min-height:36px; padding:0 14px; border-radius:999px; background:#333; color:#f3f3f3; text-decoration:none; font-size:13px; font-weight:500; }
+.workspace-project-link:hover { background:#3a3a3a; }
+/* Task 4.4 UI fixes (F3, F4, F6, F8). */
+.project-nav-name { margin:0 0 12px; overflow-wrap:anywhere; color:#d4d4d4; font-size:15px; font-weight:600; letter-spacing:-.01em; }
+.workspace-nav-link.project-nav-link-disabled { color:#6b6b6b; cursor:default; opacity:.7; }
+.task-status-message { position:fixed; z-index:20; right:20px; bottom:20px; max-width:min(420px, calc(100vw - 40px)); margin:0; padding:12px 16px; border:1px solid rgba(255,255,255,.08); border-radius:14px; background:#2a2a2a; color:#f3f3f3; font-size:13px; line-height:1.5; box-shadow:0 14px 32px rgba(0,0,0,.42); }
+.task-state-badge { display:inline-flex; align-items:center; padding:2px 10px; border:1px solid rgba(255,255,255,.1); border-radius:999px; background:rgba(255,255,255,.05); color:#d4d4d4; font-size:12px; font-weight:500; }
+.task-state-badge-done { border-color:rgba(34,197,94,.3); background:rgba(34,197,94,.1); color:#86efac; }
 .workspace-placeholder { padding:26px 28px 22px; border-radius:26px; background:#222; box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 12px 34px rgba(0,0,0,.22); }
 .placeholder-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; }
 .placeholder-heading h2 { margin:8px 0 0; font-size:17px; font-weight:500; }
