@@ -6,6 +6,34 @@ Defines the protections and resource limits that apply to every LLM call made by
 
 ## ADDED Requirements
 
+### Requirement: Product manager project usage read
+The system SHALL provide a current-PM-only, read-only `GET /api/v1/projects/{projectId}/ai-usage` endpoint and a Project Settings AI usage panel. All responses SHALL use `Cache-Control: no-store`.
+
+#### Scenario: Usage request contract
+- **WHEN** the current PM requests usage with no query parameters or exactly startDate and endDate
+- **THEN** use strict real inclusive SGT dates, defaulting to today, and reject partial, reversed, unknown, duplicate or over-seven-day queries
+- **AND** return 200 with range, configured environment and stable daily rows for acceptance_check and progress_report
+
+#### Scenario: Usage projection
+- **WHEN** usage is returned
+- **THEN** each row contains date, feature, chargedTokens, pendingReservedTokens and cacheHits
+- **AND** chargedTokens sums settled noncached charges, pendingReservedTokens sums pending noncached reservations, and cacheHits counts cached records
+- **AND** filter by project, configured environment and request created_at within the resolved SGT interval
+- **AND** return both feature rows for each day, including zero rows
+- **AND** expose no person IDs, raw usage records, prompts, responses or secrets
+
+#### Scenario: Unauthorized usage read
+- **WHEN** a valid request has no session, belongs to a nonmember/missing project, or belongs to a developer
+- **THEN** return safe 401, concealed 404, or 403 respectively before usage reads
+- **AND** the service independently verifies current PM access
+- **AND** no usage, quota, report or task write occurs
+
+#### Scenario: Usage panel states
+- **WHEN** the PM opens Project Settings
+- **THEN** show labelled SGT date controls, environment and daily feature totals
+- **AND** distinguish loading, zero usage and unavailable states with retry
+- **AND** developer-rendered settings contain no usage panel or usage data
+
 ### Requirement: Untrusted content is treated as data
 The system SHALL treat task text, acceptance criteria, progress updates, review feedback, commit messages, and diffs as untrusted data. Untrusted content SHALL be clearly separated from the system's instructions in every prompt, and model output SHALL NOT trigger any action other than displaying or storing a validated result.
 

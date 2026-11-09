@@ -1,5 +1,20 @@
 # Design
 
+## Report Page and Project AI Usage Decisions (8.3)
+
+Human approval (10 November 2026): "I approve the spec delta and recommendations for the decisions."
+Gate: D1-D9 accepted: 9; modified: 0; rejected: 0. Owner: Developer B. These decisions supersede earlier report-navigation deferrals only as the report page becomes ready; D9 remains a prerequisite, not a waiver.
+
+- **D1 (accept) - Page and entry points.** Use `/projects/{projectId}/reports`; enable both existing PM report entry points; place usage within existing Settings. No separate usage page or report history.
+- **D2 (accept) - Initial generation and range behavior.** Explicit generation only, initial dates from server-side SGT date resolution, seven inclusive days maximum, and existing permission to select future dates. Show pending/error/empty/reused/partial-evidence states; prevent duplicate/stale responses.
+- **D3 (accept) - Developer display labels.** Reuse PM-authorized `projectService.listMembers` for labels, with deterministic username/UUID ordering and a neutral UUID fallback if a returned statement cannot be matched. Do not let the model supply usernames.
+- **D4 (accept) - Usage HTTP contract and bounds.** GET accepts no parameters or exactly both dates, today by default, seven inclusive days, strict duplicate/extra-query rejection, 400 invalid requests, existing safe errors, Node runtime and `no-store`. Read-only GET needs no mutation Origin guard.
+- **D5 (accept) - Usage metrics.** Separate settled charged tokens, pending reserved tokens, and cache hits. Include settled failures in charged totals; attribute by request start (`created_at`) SGT date. Do not imply provider-reported input/output totals equal quota charges.
+- **D6 (accept) - Environment/privacy/ordering.** Filter exclusively to configured `APP_ENV`, display that environment, return project aggregates only, and zero-fill two feature rows per day ordered date descending then feature ascending. No person breakdown, cross-environment selector, raw records or cost/latency additions.
+- **D7 (accept) - Authorization and developer direct navigation.** Existing page conventions: session redirect, nonmember safe not-found, developer PM-only unavailable report view. Keep existing Settings developer placeholders; omit the usage panel/data entirely. Repeat PM access within the usage service before querying aggregates.
+- **D8 (accept) - Module boundary and verification.** Dedicated `src/server/project-ai-usage` read module, public service/handler exports, repository-owned aggregate reads and composition wiring; retain existing gateway usage writes. No migration/dependency expected. Require handler/service authorization, PostgreSQL aggregate/boundary/isolation tests, component/page tests and frontend review. Developer A retains adversarial fixture ownership; preserve 8.2 fake-mode deferral.
+- **D9 (accept) - Blocking redaction conflict.** Resolve this as a separately scoped prerequisite for preserving the existing requirement, then resume the dependent disclosure UI. Do not invent a redaction count or silently waive the requirement. Affected work remains stopped pending a human-approved prerequisite contract. `ai-safeguards` requires report redaction occurrence/count, but report input assembly discards summaries and generated/cache DTOs expose/store none. The prerequisite must define assembly metadata, persisted report/DTO fields, cache behavior and legacy-row handling, reassess scope and add a versioned migration if needed. This approval does not select those missing details. Independent usage work may proceed; task 8.3 remains incomplete until its report/disclosure requirements are satisfied.
+
 ## Project Dashboard Decisions (4.7)
 
 Human-approved on 9 November 2026: "I approve the spec delta and accept all your recommendations for the decisions." D1-D8: 8 accepted, 0 modified, 0 rejected. Owner: Developer B; authentication/composition boundaries require Developer A cross-review.

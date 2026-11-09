@@ -6,6 +6,35 @@ Defines the Progress Report: the product manager's AI feature, which summarizes 
 
 ## ADDED Requirements
 
+### Requirement: Product manager report page
+The system SHALL provide `/projects/{projectId}/reports` for the current project product manager, with inclusive SGT start/end date controls defaulting to today and an explicit Generate report action. Opening or refreshing the page SHALL NOT generate a report.
+
+#### Scenario: Authorized report navigation
+- **WHEN** the product manager opens project navigation or dashboard actions
+- **THEN** Reports and Progress Report link to the report page
+- **AND** developers receive neither action nor report data
+
+#### Scenario: Report presentation
+- **WHEN** generation succeeds
+- **THEN** show the returned range, developer groups, category labels, plain-text statements and task-display-key links to project task detail
+- **AND** show generated time, a reuse notice when reused is true, and the server-owned unavailable-GitHub-evidence warning when applicable
+
+#### Scenario: Empty and failed requests
+- **WHEN** the API returns an empty report or a safe error
+- **THEN** show the matching no-activity or actionable error state
+- **AND** never describe a failed request as an empty report
+- **AND** do not display a previous result as belonging to a newly selected range
+
+#### Scenario: Pending and superseded requests
+- **WHEN** generation is pending or a response belongs to a superseded request
+- **THEN** prevent duplicate submission and prevent stale results from replacing the current range/result
+
+#### Scenario: Direct page access
+- **WHEN** a session is absent, the requester is a nonmember, or is a developer
+- **THEN** respectively redirect to sign-in, show safe not-found, or show a PM-only unavailable state without fetching report/member data
+
+Task 8.3 D9 retains the redaction disclosure requirement in `ai-safeguards`. Its separately scoped metadata prerequisite blocks dependent disclosure UI until its contract is approved and implemented; no redaction count may be invented and this page is not complete while that prerequisite remains unresolved.
+
 ### Requirement: Progress report generation API
 The system SHALL provide a PM-only report-generation POST endpoint with strict input, safe responses and the approved task 8.2 transport contract.
 

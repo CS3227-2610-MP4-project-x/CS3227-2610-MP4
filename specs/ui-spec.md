@@ -84,6 +84,10 @@ Recommended spacing:
 | Progress Report | Product manager | Date range picker (default: today, SGT), report grouped by developer, task-ID citations that link to the tasks |
 | Project settings | Product manager | Linked repository and GitHub App connection status (unlinked, linked, or unavailable; never any access token), members, AI usage per feature per day |
 
+Task 8.3 interactions (human-approved 10 November 2026): Reports uses `/projects/{projectId}/reports`; opening/refreshing never generates. Label inclusive SGT date controls (today by default; at most seven days) and provide an explicit Generate report action. Present developer usernames resolved from authorized member data, category labels, plain-text statements, task-display-key links, generation time, reuse notice and unavailable-GitHub-evidence warning. Distinguish pending, no activity and actionable failures; do not show stale results for a new range or accept superseded responses. Report entry points remain subject to the D9 redaction prerequisite recorded in the change design; its count must never be invented.
+
+The PM Settings AI usage panel uses labelled inclusive SGT date controls with the same seven-day bound, displays the configured environment, and presents daily feature rows for charged tokens, pending reserved tokens and cache hits. Show zero rows as zero usage; distinguish loading and unavailable states and offer retry. Developers receive no panel or usage data. No person breakdown or cross-environment selector is provided.
+
 Status colors on the board follow the Color System: monochrome for To Do, In Progress, and In Review, and the green accent only for Done.
 
 ### Acceptance Criteria Check behavior
