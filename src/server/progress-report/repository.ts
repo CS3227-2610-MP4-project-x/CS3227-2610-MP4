@@ -1,5 +1,6 @@
 import "server-only";
 import type { ReportActivity, ReportRange, ReportReadSession, ReportRepository, ReportSnapshot } from "./types";
+import { readReportDatabaseFingerprint } from "./database-fingerprint";
 
 type QueryResult<T extends Record<string, unknown>> = Readonly<{ rows: T[]; rowCount: number | null }>;
 type Query = Readonly<{ query<T extends Record<string, unknown> = Record<string, unknown>>(text: string, values?: readonly unknown[]): Promise<QueryResult<T>> }>;
@@ -111,6 +112,17 @@ export function createProgressReportRepository(pool: ReportQueryPool): ReportRep
                 activity,
                 attachedCommits: attachedRows.rows.map((row) => ({ taskId: String(row.task_id), taskKey: String(row.task_key), sha: String(row.commit_sha), attachedAt: instant(row.created_at) })),
               };
+            },
+            async readDeletionMarkers({ projectId, range }) {
+              const result = await connection.query<{ task_id: string; deleted_at: Date | string }>(
+                `SELECT id::text AS task_id, deleted_at
+                   FROM app.tasks
+                  WHERE project_id = $1::uuid AND deleted_at >= $2::timestamptz AND deleted_at < $3::timestamptz
+                  ORDER BY deleted_at, id`, [projectId, range.startUtc, range.endUtcExclusive]);
+              return result.rows.map((row) => ({ taskId: String(row.task_id), deletedAt: instant(row.deleted_at) }));
+            },
+            async readDatabaseFingerprint({ projectId, range }) {
+              return readReportDatabaseFingerprint(connection, projectId, range);
             },
           };
           const result = await read(session);

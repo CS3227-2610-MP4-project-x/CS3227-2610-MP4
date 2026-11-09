@@ -21,10 +21,12 @@ export type ReportReadSession = Readonly<{
   readAccess(input: { projectId: string; personId: string }): Promise<"product_manager" | "developer" | "not_found">;
   readCurrentSgtDate(): Promise<string>;
   readInputs(input: { projectId: string; range: ReportRange }): Promise<ReportSnapshot>;
+  readDeletionMarkers?(input: { projectId: string; range: ReportRange }): Promise<readonly { taskId: string; deletedAt: string }[]>;
+  readDatabaseFingerprint?(input: { projectId: string; range: ReportRange }): Promise<string>;
 }>;
 export type ReportRepository = Readonly<{ withReadSnapshot<T>(read: (session: ReportReadSession) => Promise<T>): Promise<T> }>;
 export type ReportAssemblyResult =
-  | Readonly<{ kind: "ready"; range: ReportRange; inputText: string; inputLength: number; githubUnavailable: boolean }>
+  | Readonly<{ kind: "ready"; range: ReportRange; inputText: string; inputLength: number; inputFingerprint: string; databaseFingerprint?: string; githubUnavailable: boolean }>
   | Readonly<{ kind: "empty"; range: ReportRange }>
   | Readonly<{ kind: "invalid_range" }>
   | Readonly<{ kind: "range_too_long" }>

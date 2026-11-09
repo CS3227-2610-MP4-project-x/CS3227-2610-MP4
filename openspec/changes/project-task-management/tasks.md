@@ -90,7 +90,7 @@ Depends on: 5 and 6.
 Depends on: 4.1–4.4 and 6. Can run alongside group 7 and tasks 4.5–4.7.
 
 - [x] 8.1 Implement report input assembly from structured activity for a date range in SGT; add tests for range boundaries (including late-evening activity), excluded diffs, empty ranges, ranges longer than 7 days, and activity over the input budget.
-- [ ] 8.2 Implement report generation with citation checks and caching invalidated by new activity; add fake-adapter tests and product-manager-only API authorization tests.
+- [x] 8.2 Implement report generation with citation checks and caching invalidated by new activity; add fake-adapter tests and product-manager-only API authorization tests.
 - [ ] 8.3 Build the report page and the project AI usage view; add product-manager-only project usage API authorization tests.
 
 ## 9. Verification and Evidence
