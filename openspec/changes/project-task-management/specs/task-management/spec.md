@@ -6,6 +6,106 @@ Defines how project members are organized and how product managers and developer
 
 ## ADDED Requirements
 
+<!-- Task 4.6 approved by the human on 9 November 2026; decisions recorded in design.md. -->
+
+### Requirement: Product-manager task control visibility
+The board SHALL show New Task only to the project's product manager. Task detail SHALL show Edit, Reassign and Delete only to that product manager, in every non-deleted task state. These controls SHALL use existing task routes and server authorization. Developers SHALL receive no task-management forms or member-choice data.
+
+#### Scenario: Product manager opens task pages
+- **WHEN** the current product manager opens the board or an accessible task detail
+- **THEN** the board offers New Task and task detail offers Edit, Reassign and Delete
+- **AND** task-management controls offer no lifecycle transition or check execution
+
+#### Scenario: Developer opens task pages
+- **WHEN** a developer opens their board or assigned task detail
+- **THEN** none of New Task, Edit, Reassign or Delete is rendered, including disabled variants
+- **AND** no member-choice data is sent for these forms
+
+### Requirement: Product manager chooses task assignees
+New Task and Reassign SHALL use the existing PM-authorized member read, called from the Server Component, and offer only developer memberships by GitHub username, submitting their person UUIDs. They SHALL preserve member-read ordering and add no route, server contract or authorization rule.
+
+#### Scenario: Eligible developers
+- **WHEN** member loading succeeds
+- **THEN** the selector lists only this project's developers, excluding the product manager
+- **AND** Reassign initially selects the task's current assignee
+
+#### Scenario: No developer or unavailable members
+- **WHEN** the list has no developers or member loading fails
+- **THEN** the affected form cannot submit and explains respectively that a developer must be added in Settings or that member loading must be retried
+- **AND** Edit and Delete do not depend on member-list availability
+
+### Requirement: Product manager creates a task from the board
+New Task SHALL open an inline form with labeled title, description, developer assignee, due date, optional branch and ordered acceptance-criterion inputs. It SHALL POST the existing create payload, with criteria as strings, to the project's tasks route. A blank optional branch SHALL be sent as null. Cancel SHALL close the form without a request.
+
+#### Scenario: Successful task creation
+- **WHEN** the product manager submits valid inputs and the route returns 201
+- **THEN** the UI navigates to the returned task's detail and refreshes server data
+- **AND** the task key is server-allocated and its initial state follows the existing create contract
+
+### Requirement: Product manager edits task fields
+Edit SHALL open an inline form initialized from current task detail, using existing field validation and PATCH with the displayed version. It SHALL edit title, description, due date, optional branch and ordered criteria, preserve retained criterion IDs, omit IDs for new criteria and omit removed criteria. Assignee and state SHALL NOT be sent in this request.
+
+#### Scenario: Save edited criteria and fields
+- **WHEN** the product manager saves valid edits
+- **THEN** PATCH sends version and editable fields, with criteria as the complete ordered list of objects
+- **AND** success closes the form and refreshes detail before another write uses the new version
+
+#### Scenario: Cancel an edit
+- **WHEN** the product manager cancels
+- **THEN** the draft is discarded without a request or task change
+
+### Requirement: Product manager reassigns or deletes a task
+Reassign SHALL submit exactly `{assigneeId, version}` to the existing assignee PUT route. Delete SHALL require explicit confirmation naming the task key and explaining removal from the board, then send exactly `{version}` as JSON to the task DELETE route. These actions SHALL use the displayed task version and retain existing soft-delete and reassignment semantics.
+
+#### Scenario: Reassign succeeds
+- **WHEN** PUT returns 200, including a current-assignee no-op
+- **THEN** the UI closes the form and refreshes detail, showing the returned assignment without locally changing state
+
+#### Scenario: Confirm or cancel deletion
+- **WHEN** the product manager cancels confirmation
+- **THEN** no request is sent
+- **WHEN** the product manager confirms and DELETE returns 204
+- **THEN** the UI navigates to the board and refreshes it, without parsing a response body
+
+### Requirement: Task forms explain validation failures
+Task forms SHALL follow the existing task field limits, trimming, Unicode code-point counts, real calendar dates and branch rules. Criteria SHALL support ordered addition and removal within the existing 1–20 limit. Validation messages SHALL be safe and accessible, preserve draft input and identify required corrections; server validation remains authoritative.
+
+#### Scenario: Invalid form input
+- **WHEN** required text or criteria are blank, a limit is exceeded, the due date is invalid, or the optional branch is invalid
+- **THEN** submission is blocked with an actionable message
+- **AND** past due dates remain allowed and a blank branch means no branch
+
+#### Scenario: Server rejects validation
+- **WHEN** the route returns 400 INVALID_REQUEST or ACCEPTANCE_CRITERIA_REQUIRED
+- **THEN** the form preserves input and shows a safe correction message without claiming success
+
+#### Scenario: Assignee eligibility changed
+- **WHEN** create or reassign returns 409 ASSIGNEE_NOT_DEVELOPER
+- **THEN** the form asks the product manager to reload developer choices and choose an eligible assignee
+- **AND** it does not treat this as a stale-version error or retry automatically
+
+### Requirement: Task controls recover safely from refused writes
+Task controls SHALL prevent repeat submission while pending and SHALL refresh authoritative data after success. They SHALL NOT retry mutations automatically or optimistically change task data. Errors SHALL show safe accessible messages without raw provider or server details. A refreshed version SHALL require a new explicit user action before another mutation.
+
+#### Scenario: Stale task version
+- **WHEN** edit, reassign or delete returns 409 VERSION_CONFLICT
+- **THEN** the UI shows "The task was changed by someone else. Reload and try again", closes the stale form or confirmation and refreshes task data
+- **AND** it does not resubmit the discarded draft with the new version
+
+#### Scenario: Forbidden task mutation
+- **WHEN** any task-management mutation returns 403
+- **THEN** the UI shows a safe reload-and-retry message, disables the current task-management controls and refreshes server access and data
+- **AND** refreshed role visibility controls whether new PM actions are available
+
+#### Scenario: Session or task unavailable
+- **WHEN** a mutation returns 401 or 404
+- **THEN** the UI disables further submission and refreshes server access and data, using the existing sign-in, unavailable or not-found page outcomes
+
+#### Scenario: Network or unexpected failure
+- **WHEN** a request fails operationally or returns an unexpected response
+- **THEN** the UI displays a safe failure message without claiming success or retrying automatically
+- **AND** it asks the person to reload authoritative data before repeating a mutation whose outcome is uncertain
+
 ### Requirement: Return to Project Space
 The shared project-page navigation SHALL expose a "Back to Project Space" link with href `/`, above the project tabs for both developers and product managers. Existing tab order, active states and server access checks SHALL remain unchanged.
 

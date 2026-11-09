@@ -257,6 +257,17 @@ Approved by thegrimbee on 6 November 2026 for task 4.1. The human approved the a
   - *R7 Mocked-test row shapes.* S6 stays as recorded: result-row shapes and statement forms are not fixed. The unit `pg` fake evaluates the statements it receives and fails on any it cannot read; locks are verified only by the PostgreSQL integration tests.
   - *R8 Duplicated constants.* The error table and the UUID pattern stay copied in `src/server/projects/`, `src/server/auth/request-access.ts` and `src/server/auth/project-authorization.ts`. Sharing them would widen the S5 and Q7 exports or add a file outside the 4.1 paths.
 
+## Product-manager task controls decisions (4.6)
+
+Approved by the human on 9 November 2026: the task 4.6 spec delta and recommendations 1–6, unchanged. Implementation uses existing task contracts only; any route, service, schema, migration or authorization change requires a human decision first.
+
+1. **Placement.** New Task is on the board; Edit, Reassign and Delete are on task detail. Forms are inline and follow the existing 4.5 styling and interaction patterns. Developers receive no disabled variants or member-choice data.
+2. **Assignees.** Reuse the existing PM-authorized member read from the Server Component. Offer developer memberships only, preserving its order. Empty or unavailable choices block create/reassign; edit/delete remain usable.
+3. **Editing.** Keep edit and reassign separate. Preserve retained criterion IDs and array order; new criteria have no ID. Blank optional branch is null. Use only the existing payload fields and current displayed version.
+4. **Deletion.** Explicit native confirmation names the task key and explains removal from the board. Cancel sends nothing. Confirm uses the existing versioned JSON DELETE and soft-delete semantics.
+5. **Errors.** Validation preserves drafts. VERSION_CONFLICT discards stale forms/confirmation, refreshes data and requires explicit re-entry. A 403 disables stale controls and refreshes access. ASSIGNEE_NOT_DEVELOPER is a distinct correction message, not a version conflict.
+6. **Success and pending state.** Create opens returned detail; delete returns to the board; edit/reassign refresh detail. Prevent repeated pending submissions and automatic retries. Uncertain outcomes require authoritative reload before repeating a write.
+
 ## Task Management Decisions (4.2)
 
 Approved by thegrimbee on 7 November 2026 for task 4.2. The human approved the main session's draft spec delta and recommendations T1 to T17 as recommended, and asked the agent to choose an alternative for conflict C1 (recorded below). Developer B (thegrimbee) owns the task 4.2 paths; Lim-ZY cross-reviews the change to `src/server/auth/project-authorization.ts`.
