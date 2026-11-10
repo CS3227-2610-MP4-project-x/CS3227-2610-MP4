@@ -88,6 +88,8 @@ Task 8.3 interactions (human-approved 10 November 2026): Reports uses `/projects
 
 The PM Settings AI usage panel uses labelled inclusive SGT date controls with the same seven-day bound, displays the configured environment, and presents daily feature rows for charged tokens, pending reserved tokens and cache hits. Show zero rows as zero usage; distinguish loading and unavailable states and offer retry. Developers receive no panel or usage data. No person breakdown or cross-environment selector is provided.
 
+D9 report disclosure contract (approved 10 November 2026): display a concise note only for a verified positive server replacement count, for example "Sensitive content was redacted: 3 replacements." Show no redaction note for a verified zero count, and never infer zero from missing legacy metadata. The model supplies neither the count nor occurrence flag. Enable Reports navigation and the dashboard report action after the prerequisite implementation and independent review pass.
+
 Status colors on the board follow the Color System: monochrome for To Do, In Progress, and In Review, and the green accent only for Done.
 
 ### Acceptance Criteria Check behavior

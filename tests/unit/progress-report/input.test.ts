@@ -87,7 +87,7 @@ describe("report structured input (8.1 D2-D7)", () => {
     ]));
   });
   it("current context alone does not make the range active", () => {
-    expect(prepare(snapshot({ activity: [] }))).toEqual({ kind: "empty", range });
+    expect(prepare(snapshot({ activity: [] }))).toEqual({ kind: "empty", range, redaction: { occurred: false, replacementCount: 0 } });
   });
   it("orders equal-time activity by type, source ID and task association deterministically", () => {
     const first = update("a");

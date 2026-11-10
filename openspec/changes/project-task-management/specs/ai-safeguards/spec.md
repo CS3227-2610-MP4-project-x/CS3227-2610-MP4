@@ -79,6 +79,12 @@ Redaction SHALL apply to every text segment placed in a prompt, including task t
 - **WHEN** content has been redacted
 - **THEN** the result states that redaction occurred and how many replacements were made, and neither the report nor any log or usage record contains the secret
 
+#### Scenario: Progress report disclosure uses verified server counts
+- **WHEN** a Progress Report is generated or reused
+- **THEN** server-owned occurrence/count metadata follows the approved report contract, counting structured input replacements before prompt escaping and excluding inherited check flags
+- **AND** retries do not multiply the count, reused reports retain it, and unknown legacy counts require regeneration
+- **AND** the model cannot supply the metadata and the UI discloses only positive counts without secret values
+
 #### Scenario: Redaction is repeatable
 - **WHEN** already-redacted content is redacted again
 - **THEN** the output is unchanged

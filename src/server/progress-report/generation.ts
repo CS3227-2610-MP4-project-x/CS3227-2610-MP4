@@ -13,8 +13,9 @@ export type GeneratedReport = Readonly<{
   model: string;
   createdAt: string;
   githubUnavailable: boolean;
+  redaction: Readonly<{ occurred: boolean; replacementCount: number }>;
 }>;
-export type EmptyReport = Readonly<{ kind: "empty"; range: ReportRange; statements: readonly []; githubUnavailable: false }>;
+export type EmptyReport = Readonly<{ kind: "empty"; range: ReportRange; statements: readonly []; githubUnavailable: false; redaction: Readonly<{ occurred: boolean; replacementCount: number }> }>;
 export type ReportDto = GeneratedReport | EmptyReport;
 export type GenerateReportResult = Readonly<{ report: ReportDto; reused: boolean }>;
 
@@ -22,7 +23,7 @@ type GenerationRequest = Readonly<{ projectId: string; personId: string; startDa
 type AssemblyPort = Readonly<{ assemble(request: GenerationRequest): Promise<ReportAssemblyResult> }>;
 type GatewayPort = Pick<LlmGateway, "run" | "recordCacheHit">;
 
-const CONTRACT_VERSION = "progress-report-v1";
+const CONTRACT_VERSION = "progress-report-v2";
 
 export class ProgressReportError extends Error {
   constructor(readonly code: string, readonly resetsAt?: string) {
@@ -58,6 +59,9 @@ function projectTasks(inputText: string): Map<string, TaskProjection> {
 }
 
 function reportDto(stored: StoredProgressReport, range: ReportRange, inputText: string): GeneratedReport {
+  if (stored.redactionReplacementCount === null || !Number.isSafeInteger(stored.redactionReplacementCount) || stored.redactionReplacementCount < 0) {
+    throw new ProgressReportError("INTERNAL_ERROR");
+  }
   const tasks = projectTasks(inputText);
   return {
     kind: "generated",
@@ -71,11 +75,14 @@ function reportDto(stored: StoredProgressReport, range: ReportRange, inputText: 
     model: stored.model,
     createdAt: stored.createdAt,
     githubUnavailable: stored.githubUnavailable,
+    redaction: { occurred: stored.redactionReplacementCount > 0, replacementCount: stored.redactionReplacementCount },
   };
 }
 
 function compatible(stored: StoredProgressReport | null, key: ReportCacheKey): stored is StoredProgressReport {
-  return stored !== null && stored.inputFingerprint === key.inputFingerprint &&
+  return stored !== null && stored.redactionReplacementCount !== null &&
+    stored.redactionReplacementCount === key.redactionReplacementCount &&
+    stored.inputFingerprint === key.inputFingerprint &&
     stored.generationContractVersion === key.generationContractVersion && stored.providerModel === key.providerModel &&
     !stored.githubUnavailable;
 }
@@ -102,7 +109,7 @@ export function createProgressReportGenerationService(deps: {
       try { assembled = await deps.assembly.assemble(request); }
       catch (error) { mapAssemblyError(error); }
       if (assembled.kind === "invalid_range" || assembled.kind === "range_too_long" || assembled.kind === "input_budget_exceeded") throw rangeError(assembled);
-      if (assembled.kind === "empty") return { report: { kind: "empty", range: assembled.range, statements: [], githubUnavailable: false }, reused: false };
+      if (assembled.kind === "empty") return { report: { kind: "empty", range: assembled.range, statements: [], githubUnavailable: false, redaction: assembled.redaction }, reused: false };
 
       const key: ReportCacheKey = {
         projectId: request.projectId,
@@ -111,6 +118,7 @@ export function createProgressReportGenerationService(deps: {
         inputFingerprint: assembled.inputFingerprint,
         generationContractVersion: CONTRACT_VERSION,
         providerModel: deps.providerModel,
+        redactionReplacementCount: assembled.redaction.replacementCount,
       };
       let previous: StoredProgressReport | null;
       try { previous = await deps.repository.read({ projectId: key.projectId, rangeStart: key.rangeStart, rangeEnd: key.rangeEnd }); }
@@ -148,7 +156,10 @@ export function createProgressReportGenerationService(deps: {
       let fresh: ReportAssemblyResult;
       try { fresh = await deps.assembly.assemble(request); }
       catch (error) { mapAssemblyError(error); }
-      if (fresh.kind !== "ready" || fresh.inputFingerprint !== assembled.inputFingerprint) throw new ProgressReportError("REPORT_INPUT_CHANGED");
+      if (fresh.kind !== "ready" || fresh.inputFingerprint !== assembled.inputFingerprint ||
+          fresh.redaction.replacementCount !== assembled.redaction.replacementCount) {
+        throw new ProgressReportError("REPORT_INPUT_CHANGED");
+      }
 
       const published = await deps.repository.publish({
         key,

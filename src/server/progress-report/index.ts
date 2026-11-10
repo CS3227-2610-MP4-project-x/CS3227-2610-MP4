@@ -7,4 +7,4 @@ export { validateReportStatements, type ReportStatement } from "./output";
 export { createReportCacheRepository, type ReportCacheRepository, type StoredProgressReport, type ReportCacheKey } from "./cache-repository";
 export { createProgressReportHandlers, type ProgressReportHandlersOptions } from "./handlers";
 export { readReportDatabaseFingerprint } from "./database-fingerprint";
-export type { ReportRange, ReportTask, ReportActivity, ReportSnapshot, ReportMetadata, ReportMetadataResult, ReportGithubMetadata, ReportReadSession, ReportRepository, ReportAssemblyResult } from "./types";
+export type { ReportRange, ReportRedaction, ReportTask, ReportActivity, ReportSnapshot, ReportMetadata, ReportMetadataResult, ReportGithubMetadata, ReportReadSession, ReportRepository, ReportAssemblyResult } from "./types";

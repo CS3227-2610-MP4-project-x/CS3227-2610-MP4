@@ -18,9 +18,9 @@ export function inputText(githubUnavailable = false) {
 }
 export function ready(fingerprint = "a".repeat(64), githubUnavailable = false) {
   const text = inputText(githubUnavailable);
-  return { kind: "ready" as const, range, inputText: text, inputLength: text.length, inputFingerprint: fingerprint, githubUnavailable };
+  return { kind: "ready" as const, range, inputText: text, inputLength: text.length, inputFingerprint: fingerprint, githubUnavailable, redaction: { occurred: false, replacementCount: 0 } };
 }
-type Stored = { id: string; projectId: string; rangeStart: string; rangeEnd: string; statements: typeof statement[]; model: string; createdAt: string; githubUnavailable: boolean; version: number; inputFingerprint: string | null; generationContractVersion: string | null; providerModel: string | null };
+type Stored = { id: string; projectId: string; rangeStart: string; rangeEnd: string; statements: typeof statement[]; model: string; createdAt: string; githubUnavailable: boolean; version: number; inputFingerprint: string | null; generationContractVersion: string | null; providerModel: string | null; redactionReplacementCount: number | null };
 export function stored(overrides: Partial<Stored> = {}): Stored {
-  return { id: ids.report, projectId: ids.project, rangeStart: range.startDate, rangeEnd: range.endDate, statements: [statement], model: "fake", createdAt: "2026-11-09T02:00:00.000Z", githubUnavailable: false, version: 1, inputFingerprint: "a".repeat(64), generationContractVersion: "progress-report-v1", providerModel: "fake:fake", ...overrides };
+  return { id: ids.report, projectId: ids.project, rangeStart: range.startDate, rangeEnd: range.endDate, statements: [statement], model: "fake", createdAt: "2026-11-09T02:00:00.000Z", githubUnavailable: false, version: 1, inputFingerprint: "a".repeat(64), generationContractVersion: "progress-report-v2", providerModel: "fake:fake", redactionReplacementCount: 0, ...overrides };
 }

@@ -34,7 +34,7 @@ describe("8.2 generation through the real gateway and scripted fake", () => {
     if (result.report.kind !== "generated") throw new Error("Expected generated report");
     expect(result.report.statements[0].tasks).toEqual([{ taskId: ids.task, taskKey: "SYN-1" }]);
     expect(f.repository.publish).toHaveBeenCalledOnce();
-    expect(f.repository.publish).toHaveBeenCalledWith(expect.objectContaining({ personId: ids.pm, expectedVersion: null, statements: [statement], key: expect.objectContaining({ projectId: ids.project, inputFingerprint: "a".repeat(64), generationContractVersion: "progress-report-v1", providerModel: "fake:fake" }) }));
+    expect(f.repository.publish).toHaveBeenCalledWith(expect.objectContaining({ personId: ids.pm, expectedVersion: null, statements: [statement], key: expect.objectContaining({ projectId: ids.project, inputFingerprint: "a".repeat(64), generationContractVersion: "progress-report-v2", providerModel: "fake:fake" }) }));
     expect(f.run).toHaveBeenCalledWith(expect.objectContaining({ feature: "progress_report", projectId: ids.project, personId: ids.pm, maxOutputTokens: 2000 }));
     expect(f.assembly.assemble).toHaveBeenCalledTimes(2);
     expect(f.usage.settle).toHaveBeenCalledWith(expect.objectContaining({ outcome: "succeeded", chargedTokens: 30 }));
@@ -89,6 +89,9 @@ describe("8.2 generation through the real gateway and scripted fake", () => {
     ["legacy fingerprint", { inputFingerprint: null }],
     ["legacy contract", { generationContractVersion: null }],
     ["old contract", { generationContractVersion: "old" }],
+    ["v1 contract", { generationContractVersion: "progress-report-v1" }],
+    ["unknown legacy redaction", { redactionReplacementCount: null }],
+    ["different redaction count", { redactionReplacementCount: 1 }],
     ["different provider/model", { providerModel: "another:model" }],
     ["legacy provider identity", { providerModel: null }],
     ["partial stored evidence", { githubUnavailable: true }],
@@ -122,8 +125,8 @@ describe("8.2 generation through the real gateway and scripted fake", () => {
 
   it("empty input is deterministic and has no cache, usage or provider effects", async () => {
     const f = setup();
-    f.assembly.assemble.mockResolvedValue({ kind: "empty", range });
-    expect(await f.service.generate(request)).toEqual({ report: { kind: "empty", range, statements: [], githubUnavailable: false }, reused: false });
+    f.assembly.assemble.mockResolvedValue({ kind: "empty", range, redaction: { occurred: false, replacementCount: 0 } });
+    expect(await f.service.generate(request)).toEqual({ report: { kind: "empty", range, statements: [], githubUnavailable: false, redaction: { occurred: false, replacementCount: 0 } }, reused: false });
     expect(f.repository.read).not.toHaveBeenCalled();
     expect(f.repository.publish).not.toHaveBeenCalled();
     expect(f.complete).not.toHaveBeenCalled();
@@ -157,6 +160,36 @@ describe("8.2 generation through the real gateway and scripted fake", () => {
     expect(f.repository.read).not.toHaveBeenCalled();
     expect(f.complete).not.toHaveBeenCalled();
     expect(f.usage.reserve).not.toHaveBeenCalled();
+    expect(f.repository.publish).not.toHaveBeenCalled();
+  });
+});
+
+describe('D9 server-owned redaction generation metadata', () => {
+  it('preserves an assembly count through an invalid-output retry without multiplying it', async () => {
+    const f = setup([{ ...success, text: '{}' }, success]);
+    f.assembly.assemble.mockResolvedValue({ ...ready(), redaction: { occurred: true, replacementCount: 3 } });
+    f.repository.publish.mockResolvedValue({ kind: 'stored', report: stored({ redactionReplacementCount: 3 }) });
+    const result = await f.service.generate(request);
+    expect(f.complete).toHaveBeenCalledTimes(2);
+    expect(result.report).toMatchObject({ redaction: { occurred: true, replacementCount: 3 } });
+    expect(f.repository.publish).toHaveBeenCalledWith(expect.objectContaining({ key: expect.objectContaining({ redactionReplacementCount: 3, generationContractVersion: 'progress-report-v2' }) }));
+    const publication = f.repository.publish.mock.calls[0][0] as Record<string, unknown>;
+    expect(publication).not.toHaveProperty('redactionReplacementCount');
+  });
+  it.each([0, 2])('reuses a verified v2 count of %i and derives occurrence', async count => {
+    const f = setup();
+    f.assembly.assemble.mockResolvedValue({ ...ready(), redaction: { occurred: count > 0, replacementCount: count } });
+    f.repository.read.mockResolvedValue(stored({ redactionReplacementCount: count }));
+    const result = await f.service.generate(request);
+    expect(result.reused).toBe(true);
+    expect(result.report).toMatchObject({ redaction: { occurred: count > 0, replacementCount: count } });
+    expect(f.complete).not.toHaveBeenCalled();
+  });
+  it('refuses publication when only replacement count changes during generation', async () => {
+    const f = setup();
+    f.assembly.assemble.mockResolvedValueOnce({ ...ready(), redaction: { occurred: true, replacementCount: 1 } })
+      .mockResolvedValueOnce({ ...ready(), redaction: { occurred: true, replacementCount: 2 } });
+    await expect(f.service.generate(request)).rejects.toMatchObject({ code: 'REPORT_INPUT_CHANGED' });
     expect(f.repository.publish).not.toHaveBeenCalled();
   });
 });

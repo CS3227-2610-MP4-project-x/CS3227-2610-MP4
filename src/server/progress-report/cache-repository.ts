@@ -12,6 +12,7 @@ export type ReportCacheKey = Readonly<{
   inputFingerprint: string;
   generationContractVersion: string;
   providerModel: string;
+  redactionReplacementCount: number;
 }>;
 export type StoredProgressReport = Readonly<{
   id: string;
@@ -26,6 +27,7 @@ export type StoredProgressReport = Readonly<{
   inputFingerprint: string | null;
   generationContractVersion: string | null;
   providerModel: string | null;
+  redactionReplacementCount: number | null;
 }>;
 export type ReportCacheRepository = Readonly<{
   read(input: { projectId: string; rangeStart: string; rangeEnd: string }): Promise<StoredProgressReport | null>;
@@ -46,13 +48,14 @@ type Row = Record<string, unknown> & {
   id: string; project_id: string; range_start: unknown; range_end: unknown; model: string; statements: unknown;
   github_evidence_unavailable: boolean; version: number; created_at: unknown;
   input_fingerprint: string | null; generation_contract_version: string | null; provider_model: string | null;
+  redaction_replacement_count: number | null;
 };
 type Query = Readonly<{ query<T extends Record<string, unknown> = Record<string, unknown>>(text: string, values?: readonly unknown[]): Promise<{ rows: T[]; rowCount: number | null }> }>;
 type Connection = Query & Readonly<{ release(): void }>;
 const SELECT_COLUMNS = `id::text AS id, project_id::text AS project_id,
   to_char(range_start, 'YYYY-MM-DD') AS range_start, to_char(range_end, 'YYYY-MM-DD') AS range_end,
   model, statements, github_evidence_unavailable, version, created_at,
-  input_fingerprint, generation_contract_version, provider_model`;
+  input_fingerprint, generation_contract_version, provider_model, redaction_replacement_count`;
 
 function date(value: unknown): string { return value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10); }
 function instant(value: unknown): string { return value instanceof Date ? value.toISOString() : new Date(String(value)).toISOString(); }
@@ -69,10 +72,13 @@ function fromRow(row: Row): StoredProgressReport {
     inputFingerprint: row.input_fingerprint === null ? null : String(row.input_fingerprint),
     generationContractVersion: row.generation_contract_version === null ? null : String(row.generation_contract_version),
     providerModel: row.provider_model === null ? null : String(row.provider_model),
+    redactionReplacementCount: row.redaction_replacement_count === null ? null : Number(row.redaction_replacement_count),
   };
 }
 function sameKey(report: StoredProgressReport, key: ReportCacheKey): boolean {
-  return report.inputFingerprint === key.inputFingerprint && report.generationContractVersion === key.generationContractVersion && report.providerModel === key.providerModel;
+  return report.redactionReplacementCount !== null &&
+    report.redactionReplacementCount === key.redactionReplacementCount &&
+    report.inputFingerprint === key.inputFingerprint && report.generationContractVersion === key.generationContractVersion && report.providerModel === key.providerModel;
 }
 function reusableWinner(report: StoredProgressReport, key: ReportCacheKey): boolean {
   return sameKey(report, key) && !report.githubUnavailable;
@@ -127,9 +133,10 @@ export function createReportCacheRepository(pool: ReportQueryPool): ReportCacheR
             const updated = await connection.query<Row>(
               `UPDATE app.reports SET model = $2, latest_activity_at = $3::timestamptz, statements = $4::jsonb,
                  github_evidence_unavailable = $5, input_fingerprint = $6, generation_contract_version = $7,
-                 provider_model = $8 WHERE id = $1::uuid AND version = $9 RETURNING ${SELECT_COLUMNS}`,
+                 provider_model = $8, redaction_replacement_count = $9 WHERE id = $1::uuid AND version = $10 RETURNING ${SELECT_COLUMNS}`,
               [current.id, input.model, input.latestActivityAt, JSON.stringify(input.statements), input.githubUnavailable,
-                input.key.inputFingerprint, input.key.generationContractVersion, input.key.providerModel, input.expectedVersion]);
+                input.key.inputFingerprint, input.key.generationContractVersion, input.key.providerModel,
+                input.key.redactionReplacementCount, input.expectedVersion]);
             await connection.query("COMMIT");
             return updated.rows[0] ? { kind: "stored", report: fromRow(updated.rows[0]) } : { kind: "conflict" };
           }
@@ -139,12 +146,12 @@ export function createReportCacheRepository(pool: ReportQueryPool): ReportCacheR
           }
           const inserted = await connection.query<Row>(
             `INSERT INTO app.reports (project_id, range_start, range_end, model, latest_activity_at, statements,
-                github_evidence_unavailable, input_fingerprint, generation_contract_version, provider_model)
-             VALUES ($1::uuid, $2::date, $3::date, $4, $5::timestamptz, $6::jsonb, $7, $8, $9, $10)
+                github_evidence_unavailable, input_fingerprint, generation_contract_version, provider_model, redaction_replacement_count)
+             VALUES ($1::uuid, $2::date, $3::date, $4, $5::timestamptz, $6::jsonb, $7, $8, $9, $10, $11)
              ON CONFLICT (project_id, range_start, range_end) DO NOTHING RETURNING ${SELECT_COLUMNS}`,
             [input.key.projectId, input.key.rangeStart, input.key.rangeEnd, input.model, input.latestActivityAt,
               JSON.stringify(input.statements), input.githubUnavailable, input.key.inputFingerprint,
-              input.key.generationContractVersion, input.key.providerModel]);
+              input.key.generationContractVersion, input.key.providerModel, input.key.redactionReplacementCount]);
           if (inserted.rows[0]) {
             if (input.range && input.expectedDatabaseFingerprint) {
               const currentFingerprint = await readReportDatabaseFingerprint(connection, input.key.projectId, input.range);
