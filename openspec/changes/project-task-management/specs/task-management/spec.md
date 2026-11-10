@@ -604,7 +604,7 @@ The system SHALL provide task detail through `GET /api/v1/projects/{projectId}/t
 
 The `task` object SHALL contain `id` (task UUID), `projectKey`, `taskKey` (the readable key formed from the project key and task number, such as `WEB-12`), `title`, `description`, `status` (the stored task status), `version` (the task's current integer version, which the task write routes require), `assignee` (`{ "id", "githubUsername" }`), `dueDate` (an ISO calendar date), `branchName` (string or null), and `acceptanceCriteria` (objects containing `id`, `position`, and `description`, ordered by `position` ascending then `id` ascending).
 
-`attachedCommits` SHALL contain objects with `id`, `sha`, `attachedBy` (`{ "id", "githubUsername" }`), and `attachedAt`, ordered by `attachedAt` ascending then `id` ascending. `progressUpdates` SHALL contain objects with `id`, `author` (`{ "id", "githubUsername" }`), `body`, and `createdAt`, ordered by `createdAt` ascending then `id` ascending. `reviewFeedback` SHALL contain objects with `id`, `author` (`{ "id", "githubUsername" }`), `feedback`, and `createdAt`, ordered by `createdAt` ascending then `id` ascending. Timestamps SHALL be ISO 8601 UTC strings. The response SHALL contain only fields needed by the client and SHALL NOT expose auth-user IDs, GitHub numeric user IDs, credentials, tokens, or ORM-private fields.
+`attachedCommits` SHALL contain objects with `id`, `sha`, `sourceBranch` (string or null), `attachedBy` (`{ "id", "githubUsername" }`), and `attachedAt`, ordered by `attachedAt` ascending then `id` ascending. A legacy attachment without recorded provenance SHALL return `sourceBranch: null`. `progressUpdates` SHALL contain objects with `id`, `author` (`{ "id", "githubUsername" }`), `body`, and `createdAt`, ordered by `createdAt` ascending then `id` ascending. `reviewFeedback` SHALL contain objects with `id`, `author` (`{ "id", "githubUsername" }`), `feedback`, and `createdAt`, ordered by `createdAt` ascending then `id` ascending. Timestamps SHALL be ISO 8601 UTC strings. The response SHALL contain only fields needed by the client and SHALL NOT expose auth-user IDs, GitHub numeric user IDs, credentials, tokens, or ORM-private fields.
 
 `checkHistory` SHALL contain one entry per distinct stored check result, ordered by `createdAt` descending then `id` descending, with each entry containing `id`, `anchorSha`, `createdAt`, `redacted`, and `payload`. The project manager's access is read-only.
 
@@ -750,6 +750,15 @@ Inside the submission transaction the system SHALL recheck that the task's attac
 - **WHEN** the attached commit set or the criteria hash changes after the tip was resolved and before the submission is stored
 - **THEN** the task moves to In Review with no check-result reference, and no stale reference is stored
 
+#### Scenario: Changed selection cannot reference a stale check
+- **WHEN** the assigned developer changes the saved commit selection after running a check and then submits the task
+- **THEN** the submission references a check only if its anchor SHA matches the unique tip of the current attached commit set and its criteria hash matches the current criteria
+- **AND** prior check results remain in check history even when they no longer match the current selection
+
+#### Scenario: Attached selection is frozen during review and after approval
+- **WHEN** a developer attempts to save attachment changes while a task is In Review or Done
+- **THEN** the save is refused and the commits presented for review or retained after approval remain unchanged
+
 #### Scenario: Check never changes state
 - **WHEN** a check result is stored or read during a submission
 - **THEN** the check itself does not approve, reject, submit, or change the task's state
@@ -860,7 +869,7 @@ The board SHALL let the assigned developer move their own task from To Do to In 
 - **THEN** no To Do to In Progress or In Progress to In Review option is offered
 
 ### Requirement: Task detail page
-The system SHALL show a task-detail page at `/projects/{projectId}/tasks/{taskId}` to the assigned developer and the project's product manager, using the task-detail read. It SHALL show the title, description, acceptance criteria, assignee, due date, branch, progress updates, attached commits, review feedback and distinct check history, and SHALL display the stored status as its state name.
+The system SHALL show a task-detail page at `/projects/{projectId}/tasks/{taskId}` to the assigned developer and the project's product manager, using the task-detail read. It SHALL show the title, description, acceptance criteria, assignee, due date, branch, progress updates, attached commits, review feedback and distinct check history, and SHALL display the stored status as its state name. For both authorized roles, each attached-commit row SHALL show its recorded source branch, or “Branch not recorded” when provenance is null.
 
 #### Scenario: Unassigned developer or nonmember
 - **WHEN** a developer who is not assigned to the task opens it
@@ -877,17 +886,23 @@ An authorized task-detail page SHALL show Project Dashboard / Board / TaskID as 
 - **AND** it does not substitute a Workspace link or expose another project's data
 
 ### Requirement: Developer task detail groups content into main and supporting cards
-Developer task detail SHALL use a main left card for title, readable task ID, description, acceptance criteria and the progress-update composer. A right column SHALL contain details, progress-update timeline and attached-commits cards. On mobile the supporting column SHALL stack below the main card. PM layout SHALL remain unchanged apart from the breadcrumb. Existing role restrictions and unspecified panel/action placements SHALL remain unchanged.
+Developer task detail SHALL use a main left card for title, readable task ID, description, acceptance criteria and the progress-update composer. A right column SHALL contain details, progress-update timeline and attached-commits cards. On mobile the supporting column SHALL stack below the main card. PM layout SHALL remain unchanged apart from the breadcrumb and the shared attached-commit source-branch labels. Existing role restrictions and unspecified panel/action placements SHALL remain unchanged.
 
 #### Scenario: Main task content and supporting details
 - **WHEN** the assigned developer opens task detail in its two-column layout
 - **THEN** the left card shows the title, readable task key, plain-text description and ordered acceptance criteria
-- **AND** the right details card shows assignee, optional branch, status name and due date
+- **AND** the right details card shows assignee, the source branches represented by attached commits with a count for each branch, status name and due date
+- **AND** if no commits are attached, the branch summary shows an explicit empty state
+- **AND** a branch with no recorded provenance is summarized as “Branch not recorded” with its attachment count
 - **AND** the right column separately shows the progress-update timeline and attached commits
 
 #### Scenario: Existing developer features keep their placements
 - **WHEN** the assigned developer opens the rearranged task detail
 - **THEN** the commit picker remains in the Attached commits card in the right column
+- **AND** each attached-commit row shows its source branch, or “Branch not recorded” for a legacy attachment
+- **AND** while the task is In Progress, the developer can stage and save attachment selection changes in that card
+- **AND** in every task state, the developer can review the persisted attached-commits list and its provenance
+- **AND** outside In Progress, the developer cannot change the selection and any selection-editing controls are hidden, disabled, or read-only
 - **AND** Run check remains in the existing Acceptance Criteria Check panel
 - **AND** Submit for review remains available under its existing role and task-state conditions at the top-right of the main card
 - **AND** review feedback and check history retain their existing placements and behavior
@@ -896,6 +911,8 @@ Developer task detail SHALL use a main left card for title, readable task ID, de
 - **WHEN** the product manager opens task detail
 - **THEN** the existing layout, PM task-management controls and read-only check history remain unchanged
 - **AND** only the breadcrumb adopts the project dashboard and board links
+- **AND** the PM Details card continues to show the task's configured branch, without adopting the developer's attached-commit branch summary
+- **AND** the Attached commits card shows each commit's recorded source branch, or “Branch not recorded” for a legacy attachment
 
 #### Scenario: Narrow-screen reading order
 - **WHEN** the assigned developer opens task detail on mobile
@@ -916,7 +933,7 @@ Developer task detail SHALL use a main left card for title, readable task ID, de
 - **AND** the rest of the authorized task content and actions remain available
 
 ### Requirement: Task detail actions follow the role
-The assigned developer SHALL see Run check, the commit picker, a progress-update form and, while the task is In Progress, a Submit for review action that is not blocked when no matching check exists. The product manager SHALL see none of those actions and SHALL read check history only.
+The assigned developer SHALL see Run check, the attached-commits list, a progress-update form and, while the task is In Progress, editable commit-picker controls and a Submit for review action that is not blocked when no matching check exists. Outside In Progress, the developer SHALL retain read-only access to the attached-commits list and provenance; selection-editing controls SHALL be hidden, disabled or read-only. The product manager SHALL see no developer-only actions and SHALL have read-only access to check history and attached-commit provenance.
 
 #### Scenario: Assigned developer opens a task
 - **WHEN** the assigned developer opens an In Progress task

@@ -50,6 +50,11 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ pro
   const { task, attachedCommits, progressUpdates, reviewFeedback, checkHistory } = outcome.detail;
   const isAssignedDeveloper = access.role === "developer";
   const state = taskStateName(task.status);
+  const branchCounts = new Map<string, number>();
+  for (const commit of attachedCommits) {
+    const label = commit.sourceBranch ?? "Branch not recorded";
+    branchCounts.set(label, (branchCounts.get(label) ?? 0) + 1);
+  }
   let members: readonly ProjectMemberView[] | null = null;
   if (access.role === "product_manager") {
     try { members = await composition.projectService.listMembers(projectId, access.personId); }
@@ -92,7 +97,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ pro
               <Panel title="Details">
                 <dl className="grid gap-4 text-sm">
                   <div><dt className="text-neutral-400">Assignee</dt><dd className="mt-1 text-neutral-100">{task.assignee.githubUsername}</dd></div>
-                  <div><dt className="text-neutral-400">Branch</dt><dd className="mt-1 break-all font-mono text-neutral-100">{task.branchName ?? "No branch recorded"}</dd></div>
+                  <div><dt className="text-neutral-400">Source branches</dt><dd className="mt-1 text-neutral-100">{branchCounts.size === 0 ? <span className="text-neutral-400">No attached commits yet.</span> : <ul className="space-y-1">{[...branchCounts].map(([name, count]) => <li key={name} className="break-all"><span className="font-mono">{name}</span><span className="ml-2 text-neutral-400">{count} commit{count === 1 ? "" : "s"}</span></li>)}</ul>}</dd></div>
                   <div><dt className="text-neutral-400">Status</dt><dd className="mt-1"><StateBadge state={state} /></dd></div>
                   <div><dt className="text-neutral-400">Due date</dt><dd className="mt-1 text-neutral-100"><time dateTime={task.dueDate}>{formatDueDate(task.dueDate)}</time></dd></div>
                 </dl>
@@ -104,7 +109,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ pro
 
               <Panel title="Attached commits">
                 <AttachedCommitList commits={attachedCommits} />
-                <div className="mt-5"><TaskCommitPicker projectId={projectId} taskId={task.id} /></div>
+                <div className="mt-5"><TaskCommitPicker projectId={projectId} taskId={task.id} attachedCommits={attachedCommits} editable={task.status === "in_progress"} /></div>
               </Panel>
             </aside>
           </div>

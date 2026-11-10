@@ -92,6 +92,10 @@ export class GitHubEvidenceService {
     if (!uniqueShas.length || uniqueShas.some((sha) => !SHA.test(sha))) evidenceFailure(400);
     const context = await this.assignedContext(projectId, taskId, identity);
     const repository = repositoryOf(context);
+    let inProgress: boolean;
+    try { inProgress = await this.repository.isTaskInProgress(projectId, taskId, identity); }
+    catch { evidenceFailure(500); }
+    if (!inProgress) evidenceFailure(403);
     const authors = await Promise.all(uniqueShas.map((sha) => this.github.getCommitAuthor(repository, sha)));
     for (const author of authors) {
       if (!author.ok) resultError(author.category);
@@ -102,6 +106,64 @@ export class GitHubEvidenceService {
     catch { evidenceFailure(500); }
     if (!saved) evidenceFailure(403);
     return { attachedCommits: uniqueShas.map((sha) => ({ sha })) };
+  }
+
+  async replaceAttachedCommits(projectId: string, taskId: string, identity: VerifiedGitHubIdentity,
+    attachments: readonly Readonly<{ sha: string; sourceBranch: string | null }>[]) {
+    const unique = [...new Set(attachments.map(({ sha }) => sha.toLowerCase()))];
+    if (unique.length !== attachments.length || attachments.some(({ sha, sourceBranch }) =>
+      !SHA.test(sha) || (sourceBranch !== null && (typeof sourceBranch !== "string" || sourceBranch.length === 0)))) evidenceFailure(400);
+    const context = await this.assignedContext(projectId, taskId, identity);
+    const repository = repositoryOf(context);
+    let inProgress: boolean;
+    try { inProgress = await this.repository.isTaskInProgress(projectId, taskId, identity); }
+    catch { evidenceFailure(500); }
+    if (!inProgress) evidenceFailure(403);
+    let current: Awaited<ReturnType<GitHubEvidenceRepository["listAttachedCommitSources"]>>;
+    try { current = await this.repository.listAttachedCommitSources(taskId); }
+    catch { evidenceFailure(500); }
+    const currentBySha = new Map(current.map((attachment) => [attachment.sha.toLowerCase(), attachment]));
+    const additions = attachments.filter(({ sha }) => !currentBySha.has(sha.toLowerCase()));
+    if (additions.some(({ sourceBranch }) => sourceBranch === null)) evidenceFailure(400);
+    const canonicalByPrefix = new Map<string, string>();
+
+    if (additions.length) {
+      let branchResult;
+      try { branchResult = await this.github.listBranches(repository); } catch { evidenceFailure(503); }
+      if (!branchResult.ok) resultError(branchResult.category);
+      for (const attachment of additions) {
+        const branch = branchResult.value.find((item) => item.name === attachment.sourceBranch);
+        if (!branch) evidenceFailure(400);
+        let commit;
+        try { commit = await this.github.getCommitIdentity(repository, attachment.sha); } catch { evidenceFailure(503); }
+        if (!commit.ok) resultError(commit.category);
+        if (commit.value.author.id !== context.githubUserId) evidenceFailure(403);
+        let reachable;
+        try { reachable = await this.github.isAncestor(repository, commit.value.sha, branch.sha); } catch { evidenceFailure(503); }
+        if (!reachable.ok) resultError(reachable.category);
+        if (!reachable.value) evidenceFailure(400);
+        canonicalByPrefix.set(attachment.sha.toLowerCase(), commit.value.sha);
+      }
+    }
+    const replacement = attachments.map((attachment) => {
+      const retained = currentBySha.get(attachment.sha.toLowerCase());
+      return {
+        sha: retained?.sha ?? canonicalByPrefix.get(attachment.sha.toLowerCase()) ?? attachment.sha,
+        sourceBranch: retained ? retained.sourceBranch : attachment.sourceBranch,
+      };
+    });
+    if (new Set(replacement.map(({ sha }) => sha.toLowerCase())).size !== replacement.length) evidenceFailure(400);
+
+    let saved: Awaited<ReturnType<GitHubEvidenceRepository["replaceAttachedCommits"]>>;
+    try { saved = await this.repository.replaceAttachedCommits(projectId, taskId, identity, current, replacement); }
+    catch { evidenceFailure(500); }
+    if (!saved) evidenceFailure(403);
+    const savedBySha = new Map(saved.map((attachment) => [attachment.sha.toLowerCase(), attachment]));
+    return { attachments: replacement.map((attachment) => {
+      const retained = currentBySha.get(attachment.sha.toLowerCase());
+      const persisted = savedBySha.get(attachment.sha.toLowerCase());
+      return { sha: persisted?.sha ?? attachment.sha, sourceBranch: retained ? retained.sourceBranch : persisted?.sourceBranch ?? attachment.sourceBranch };
+    }) };
   }
 
   private static evidenceUnavailable(): never { evidenceFailure(503); }

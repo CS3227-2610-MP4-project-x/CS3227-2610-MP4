@@ -116,3 +116,11 @@ Depends on: all groups above.
 ## 10. Shared Interaction Feedback
 
 - [x] 10.1 Add a shared trailing loading indicator for pending action buttons and internal navigation across currently rendered screens; preserve immediate controls and existing pending/error behavior, then inspect every affected screen and action for consistent placement and reduced-motion support.
+
+## 11. Commit Selection and Branch Provenance
+
+Depends on: 3, 4.4, and 5.1–5.3.
+
+- [x] 11.1 Add tests for complete attached-commit replacement, branch verification and provenance, legacy null provenance, task-detail branch summaries and rows, and staged picker selection/save/cancel/read-only behavior. Include authorization, state, validation, failure atomicity, check-history, and submission evidence cases from the approved specs.
+- [x] 11.2 Add a new versioned migration for nullable `attached_commits.source_branch`; update the task-detail read projection and rendering to expose per-commit source branches and developer branch counts while preserving the product-manager configured task branch.
+- [x] 11.3 Implement the assigned-developer PUT replacement route and atomic service/repository operation; keep POST add-only and enforce the approved In Progress guard on both writes. Update the commit picker to seed persisted selections, stage edits, and save the full selected set with the selected source branch; disable edits outside In Progress. Run relevant tests and checks, complete frontend review, and record rendered/browser verification as unverified when no browser is available.

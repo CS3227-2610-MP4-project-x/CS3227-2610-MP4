@@ -63,7 +63,7 @@ export function StateBadge({ state }: Readonly<{ state: string }>) {
   return <span className={state === "Done" ? "task-state-badge task-state-badge-done" : "task-state-badge"}>{state}</span>;
 }
 
-type AttachedCommit = Readonly<{ id: string; sha: string; attachedBy: Readonly<{ githubUsername: string }>; attachedAt: string }>;
+type AttachedCommit = Readonly<{ id: string; sha: string; sourceBranch?: string | null; attachedBy: Readonly<{ githubUsername: string }>; attachedAt: string }>;
 
 /** Attached commits with their short SHA, who attached them and when (task detail and review queue). */
 export function AttachedCommitList({ commits }: Readonly<{ commits: readonly AttachedCommit[] }>) {
@@ -73,6 +73,7 @@ export function AttachedCommitList({ commits }: Readonly<{ commits: readonly Att
       {commits.map((commit) => (
         <li key={commit.id} className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <code className="font-mono text-neutral-100">{commit.sha.slice(0, 7)}</code>
+          {commit.sourceBranch !== undefined && <span className="rounded-md bg-white/5 px-2 py-0.5 font-mono text-xs text-neutral-300">{commit.sourceBranch ?? "Branch not recorded"}</span>}
           <span className="text-neutral-400">attached by {commit.attachedBy.githubUsername}</span>
           <time dateTime={commit.attachedAt} className="text-xs text-neutral-500">{formatTimestamp(commit.attachedAt)}</time>
         </li>

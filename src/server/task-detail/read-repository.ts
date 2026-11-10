@@ -28,6 +28,7 @@ export type TaskDetailSnapshot = Readonly<{
   attachedCommits: readonly Readonly<{
     id: string;
     sha: string;
+    sourceBranch: string | null;
     attachedBy: Readonly<{ id: string; githubUsername: string }>;
     attachedAt: string;
   }>[];
@@ -106,6 +107,7 @@ export class TaskDetailReadRepository {
               COALESCE((
                 SELECT jsonb_agg(jsonb_build_object(
                   'id', c.id::text, 'sha', c.commit_sha,
+                  'sourceBranch', c.source_branch,
                   'attachedBy', jsonb_build_object('id', author.id::text, 'githubUsername', author.github_username),
                   'attachedAt', c.created_at
                 ) ORDER BY c.created_at ASC, c.id ASC)
