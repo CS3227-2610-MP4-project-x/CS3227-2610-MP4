@@ -154,12 +154,12 @@
 
 - **Changed files and rationale:** Product/spec/test/migration paths listed above implement approved task 11. Workflow records: this plan and `workflow/handoffs/developer-commit-branch-provenance.md`; interaction disclosure: `logs/2026-11-10-developer-commit-branch-provenance.md` (human verification pending).
 - **Tests/checks and results:** Root final focused run: 7 files, 327/327 passed; TypeScript, scoped ESLint, ordinary OpenSpec validation, and diff check passed. Full-suite, lint, build, and PostgreSQL limitations are recorded above. Resource usage metrics were not available.
-- **Generated artifacts:** `/tmp/commit-branch-provenance-visual-diff.html` was generated before commits and refreshed to show 25 changed files; it may not include later workflow-record updates.
+- **Generated artifacts:** `/tmp/commit-branch-provenance-visual-diff.html` was regenerated after all four commits against baseline `ec5eb6829d44f410d90fa8c8ce6feeae18960c29` and shows 25 changed files.
 - **Dependencies added:** None.
 - **Known gaps and unverified items:** Three PostgreSQL tests skipped because `TEST_DATABASE_URL` was unavailable; migration application/real DB behavior remain unverified. Production build blocked by sandbox. Runtime browser/accessibility behavior source-only. Broader OpenSpec task 9.5 remains outstanding. No dependencies added. Generated artifact: `/tmp/commit-branch-provenance-visual-diff.html` (refreshed before the final handoff file).
 - **Reviewer findings:** Both P2 findings resolved; independent re-review found no new defects. Frontend's low-severity wording suggestion was addressed; runtime QA unavailable.
-- **Branch inventory / commits:** The commit/PR agent reports `feat/dev-update-ui` ahead by 3 with a clean worktree: `4349571 feat(tasks): track attached commit source branches`; `f49843a test(github-evidence): cover commit replacement and provenance`; `a2d16e2 docs(workflow): record commit provenance delivery`. The PR draft was updated locally only; no push, PR creation, or remote edit occurred.
-- **Next action and responsible human:** Developer A and B review the three commits and remaining validation limits; a human verifies the interaction summary. Push, PR creation, or remote edits require separate authorization.
+- **Branch inventory / commits:** The commit/PR agent created four scoped commits on `feat/dev-update-ui`: `4349571 feat(tasks): track attached commit source branches`; `f49843a test(github-evidence): cover commit replacement and provenance`; `a2d16e2 docs(workflow): record commit provenance delivery`; and `a0d1301 docs(workflow): reconcile commit status records`. This final documentation correction is the fifth local commit. The PR draft was updated locally only; no push, PR creation, or remote edit occurred. The final worktree is clean and the branch is ahead by five commits.
+- **Next action and responsible human:** Developer A and B review the five-commit series and remaining validation limits; a human verifies the interaction summary. Push, PR creation, or remote edits require separate authorization.
 
 ## Change log
 
@@ -177,4 +177,4 @@
 | 2026-11-10 11:35 | orchestrator / root task coordination | Recorded remediation test additions, picker 5/5 pass, TypeScript/diff pass, and three PostgreSQL skips pending DB setup. |
 | 2026-11-10 11:36 | orchestrator / root task coordination | Recorded tasks 11.1–11.3 complete, re-review clean, final focused validation, and explicit local split-commit authorization (no push/PR). |
 | 2026-11-10 11:44 | orchestrator / root task coordination | Reconciled final handoff evidence, PostgreSQL/browser/build limitations, human-verified log status, and local-only split-commit authorization; no Git actions performed. |
-| 2026-11-10 11:44 | orchestrator / root task coordination | Recorded commit/PR agent's three scoped local commits, clean worktree/ahead-by-3 report, local-only PR draft update, and 25-file pre-commit visual diff; no orchestrator Git actions. |
+| 2026-11-10 11:44 | orchestrator / root task coordination | Recorded commit/PR agent's four scoped local commits, clean worktree/ahead-by-4 report, local-only PR draft update, and 25-file visual diff regenerated after commits; no orchestrator Git actions. |
