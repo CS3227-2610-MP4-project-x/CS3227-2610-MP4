@@ -29,7 +29,7 @@ import { TaskDetailReadRepository, TaskDetailService } from "@/server/task-detai
 import { TaskBoardRepository, TaskBoardService } from "@/server/task-board";
 import { ReviewQueueRepository, ReviewQueueService } from "@/server/review-queue";
 import { ProjectDashboardRepository, ProjectDashboardService } from "@/server/project-dashboard";
-import { createProgressReportRepository, createProgressReportService } from "@/server/progress-report";
+import { createProgressReportGenerationService, createProgressReportRepository, createProgressReportService, createReportCacheRepository } from "@/server/progress-report";
 
 export type ServerComposition = Readonly<{
   authService: AuthService;
@@ -47,6 +47,7 @@ export type ServerComposition = Readonly<{
   reviewQueueService: ReviewQueueService;
   projectDashboardService: ProjectDashboardService;
   progressReportService: ReturnType<typeof createProgressReportService>;
+  progressReportGenerationService: ReturnType<typeof createProgressReportGenerationService>;
   config: ReturnType<typeof getServerConfig>;
   llmGateway: LlmGateway;
 }>;
@@ -116,6 +117,12 @@ export function getServerComposition(): ServerComposition {
   const reviewQueueService = new ReviewQueueService(new ReviewQueueRepository(pool), completionAssessmentService);
   const projectDashboardService = new ProjectDashboardService(new ProjectDashboardRepository(pool), projectAccessRepository);
   const progressReportService = createProgressReportService({ repository: createProgressReportRepository(pool), githubMetadata: createReportGithubMetadata({ adapter: githubEvidenceAdapter }) });
+  const progressReportGenerationService = createProgressReportGenerationService({
+    assembly: progressReportService,
+    repository: createReportCacheRepository(pool),
+    gateway: llmGateway,
+    providerModel: config.ai.provider === "soclaas" ? `${config.ai.provider}:${config.ai.model}` : "fake:fake",
+  });
   composition = Object.freeze({
     authService: new AuthService(config.appOrigin, peopleRepository),
     peopleRepository,
@@ -132,6 +139,7 @@ export function getServerComposition(): ServerComposition {
     reviewQueueService,
     projectDashboardService,
     progressReportService,
+    progressReportGenerationService,
     config,
     llmGateway,
   });

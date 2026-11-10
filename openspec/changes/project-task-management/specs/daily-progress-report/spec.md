@@ -6,6 +6,48 @@ Defines the Progress Report: the product manager's AI feature, which summarizes 
 
 ## ADDED Requirements
 
+### Requirement: Progress report generation API
+The system SHALL provide a PM-only report-generation POST endpoint with strict input, safe responses and the approved task 8.2 transport contract.
+
+#### Scenario: Progress report generation API contract
+- **WHEN** the system generates or reuses a report
+- **THEN** The system SHALL expose only `POST /api/v1/projects/{projectId}/progress-report` for task 8.2, accepting exactly `{}` or `{startDate,endDate}` and returning HTTP 200 `{report,reused}` with a `generated` or `empty` report DTO. It SHALL apply Origin, JSON/body/path validation, session, membership and PM checks in that order, and repeat current PM authorization in the service. It SHALL use existing safe JSON errors, `Cache-Control: no-store`, Node runtime and `maxDuration = 150`. Invalid dates SHALL use 400 `INVALID_REQUEST`; oversized ranges and inputs SHALL use respectively 400 `REPORT_RANGE_TOO_LONG` and `REPORT_INPUT_BUDGET_EXCEEDED`, with fixed messages explaining the limit and shorter-range action. GET/history and UI remain outside this task.
+
+#### Scenario: Authorized generation
+- **WHEN** the current PM posts a valid range
+- **THEN** the server assembles approved input and returns a validated generated report or deterministic empty result
+
+#### Scenario: Unauthorized generation
+- **WHEN** the session is absent, the requester is a developer or the requester is a nonmember
+- **THEN** return respectively 401, 403 or concealed 404 before evidence reads, LLM calls or report/usage writes
+
+#### Scenario: Invalid generation request
+- **WHEN** Origin, JSON type, UUID, extra fields or range validation fails
+- **THEN** return the defined safe refusal without generation
+
+#### Scenario: Generation input refusal
+- **WHEN** the range exceeds seven inclusive days or assembled input exceeds 72,000 UTF-16 code units
+- **THEN** return the specific safe 400 error without calling the LLM
+
+#### Scenario: Invalid output or provider failure
+- **WHEN** output fails schema/citation validation twice or the provider fails
+- **THEN** return the existing safe gateway error, preserve usage settlement and write no new report
+
+#### Scenario: AI containment
+- **WHEN** generation succeeds or fails
+- **THEN** no task, assignment, approval or lifecycle state changes
+
+#### Scenario: Empty generation outcome
+- **WHEN** assembly is empty
+- **THEN** return an `empty` DTO containing the resolved range, empty statements, `githubUnavailable:false` and `reused:false`, without persistence, gateway calls or usage/cache-hit records
+- **AND** unavailable required metadata retains the approved ready behavior rather than becoming empty
+
+#### Scenario: Deterministic generation verification
+- **WHEN** task 8.2 is verified
+- **THEN** scripted existing fake-adapter tests cover valid output, invalid output/retry, provider failure and missing usage; the default fake behavior remains unchanged
+- **AND** handler and direct-service tests cover PM-only access, while PostgreSQL tests cover cache round-trip, project isolation, timestamp ties, deletion, backdated attachments, versions and concurrent publication
+- **AND** application-wide valid canned fake mode and adversarial AI security fixture ownership remain deferred to the responsible journey work and Developer A respectively
+
 ### Requirement: Product manager generates a progress report
 The system SHALL allow the project product manager to generate a per-developer progress report for inclusive SGT calendar dates, defaulting to today. It SHALL summarize completed, submitted and in-progress tasks and flag overdue tasks and repeated requests for changes. Date validation SHALL follow the range contract below.
 
@@ -34,7 +76,11 @@ The system SHALL allow the project product manager to generate a per-developer p
 - **THEN** assembly returns `invalid_range` without an LLM call
 
 ### Requirement: Report statements cite tasks
-Every statement in the report SHALL cite the IDs of the tasks it is based on, and every cited ID SHALL belong to the project.
+The system SHALL validate every report statement against the approved strict schema and authorized task citations, rejecting invalid output through the gateway retry policy.
+
+#### Scenario: Report statements cite tasks contract
+- **WHEN** the system generates or reuses a report
+- **THEN** Every statement SHALL follow the strict task 8.2 schema `{statements:[{developerId,category,text,taskIds}]}`. Categories SHALL be `completed`, `submitted`, `in_progress`, `overdue` or `repeated_changes`. The developer SHALL be a current-assignee UUID supplied in input; text SHALL be nonblank plain text; citations SHALL be nonempty distinct task UUIDs belonging to that assignee's authorized live input group. Extra fields, unknown, foreign-project, deleted or absent-input citations and invalid grouping SHALL invalidate the entire response. The gateway SHALL retry once, then return `INVALID_OUTPUT` without writing a report. Citation membership checks do not prove prose truth. The server SHALL supply range, stored ID, model, timestamps, task display keys and GitHub availability; no uncited overview or model-owned availability message is allowed. Generation SHALL use fixed instructions, named untrusted data, `progress_report` usage attribution and the recorded 2,000-output-token maximum.
 
 #### Scenario: Report cites its sources
 - **WHEN** a report is generated
@@ -112,11 +158,29 @@ The system SHALL refuse ranges longer than seven inclusive calendar days and inp
 - **THEN** no LLM call is made and the product manager is asked to choose a shorter range
 
 ### Requirement: Reports are reused until new activity arrives
-The system SHALL reuse a stored report for the same project and date range, without calling the LLM, until new activity in that range is recorded.
+The system SHALL reuse reports only while complete fresh input and generation identity match, using fingerprint invalidation and guarded publication.
+
+#### Scenario: Reports are reused until new activity arrives contract
+- **WHEN** the system generates or reuses a report
+- **THEN** The system SHALL retain one replaceable report per project/range and reuse it only when freshly assembled complete canonical input, generation contract version and compatible configured provider/model identity match. A new migration SHALL add a lowercase SHA-256 `input_fingerprint` and `generation_contract_version`; legacy rows without these are misses. The fingerprint SHALL include in-range deletion markers for tasks excluded from normal input. Material input changes, including current context, equal-time activity, late attachments and GitHub availability, SHALL invalidate reuse. Partial-evidence reports MAY be persisted with a server-owned warning but SHALL NOT be reused while metadata remains unavailable. Cache hits SHALL record one zero-token gateway cache hit without an LLM call or quota/rate charge.
 
 #### Scenario: Report requested again
 - **WHEN** the product manager requests a report for a project and range with no new activity since the stored report
 - **THEN** the stored report is returned and no LLM call is made
+
+#### Scenario: Material input changes invalidate reuse
+- **WHEN** activity, current task context, an in-range deletion, a newly attached older-authored commit, equal-time activity or evidence availability changes
+- **THEN** fingerprint comparison prevents stale reuse even if the latest activity timestamp does not increase
+
+#### Scenario: Partial evidence is retried
+- **WHEN** required GitHub metadata is unavailable
+- **THEN** available evidence and a server-owned warning are preserved, and subsequent requests retry metadata instead of reusing the partial report
+
+#### Scenario: Publication is fresh and guarded
+- **WHEN** generation finishes
+- **THEN** the service rechecks current PM authorization and input freshness before publishing, without holding a database transaction across GitHub or LLM calls
+- **AND** changed input returns safe 409 `REPORT_INPUT_CHANGED` without storing the new result; an optimistic report-version guard prevents an older generation overwriting a newer row
+- **AND** identical concurrent inputs may incur duplicate charged calls and reuse the winning stored row, but those calls are not recorded as cache hits
 
 ### Requirement: Report access is limited to the product manager
 The system SHALL allow only the project's product manager to generate or view its progress reports.

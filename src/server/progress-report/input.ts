@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { redactSecrets, sanitizePromptData } from "@/server/ai";
 import type { ReportActivity, ReportAssemblyResult, ReportMetadataResult, ReportRange, ReportSnapshot } from "./types";
 
@@ -56,7 +57,7 @@ function safeActivity(row: ReportActivity): Record<string, unknown> {
   return { taskId: row.taskId, taskKey: row.taskKey, type: row.type, sourceId: row.sourceId, occurredAt: row.occurredAt, actor: safeActor(row.actor), payload };
 }
 
-export function prepareReportInput(input: { range: ReportRange; snapshot: ReportSnapshot; metadata: ReportMetadataResult }): ReportAssemblyResult {
+export function prepareReportInput(input: { range: ReportRange; snapshot: ReportSnapshot; metadata: ReportMetadataResult; deletionMarkers?: readonly { taskId: string; deletedAt: string }[]; databaseFingerprint?: string }): ReportAssemblyResult {
   const { range, snapshot, metadata } = input;
   const githubUnavailable = metadata.kind === "unavailable";
   const activities: Record<string, unknown>[] = snapshot.activity.map(safeActivity);
@@ -83,5 +84,10 @@ export function prepareReportInput(input: { range: ReportRange; snapshot: Report
   activities.sort((a, b) => String(a.occurredAt).localeCompare(String(b.occurredAt)) || String(a.type).localeCompare(String(b.type)) || String(a.sourceId).localeCompare(String(b.sourceId)) || String(a.taskId).localeCompare(String(b.taskId)));
   const data = { range: { startDate: range.startDate, endDate: range.endDate }, currentTaskContext, activity: activities, githubUnavailable };
   const inputText = JSON.stringify(data);
-  return inputText.length > LIMIT ? { kind: "input_budget_exceeded", range } : { kind: "ready", range, inputText, inputLength: inputText.length, githubUnavailable };
+  return inputText.length > LIMIT ? { kind: "input_budget_exceeded", range } : {
+    kind: "ready", range, inputText, inputLength: inputText.length,
+    inputFingerprint: createHash("sha256").update(JSON.stringify({ inputText, deletionMarkers: input.deletionMarkers ?? [] }), "utf8").digest("hex"),
+    ...(input.databaseFingerprint ? { databaseFingerprint: input.databaseFingerprint } : {}),
+    githubUnavailable,
+  };
 }
