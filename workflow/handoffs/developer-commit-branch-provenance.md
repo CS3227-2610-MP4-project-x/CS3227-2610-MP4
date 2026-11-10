@@ -6,8 +6,8 @@
 - **Summary:** Implement approved task 11 behavior for persisted commit selection, atomic replacement, source-branch provenance, and role-appropriate task detail display.
 - **Human owner:** Developer A (Lim-ZY) owns the commit picker and attachment API. Developer B (thegrimbee) owns migration, task/review read projections, and task-management data. Both humans cross-review and integrate.
 - **Requirement IDs:** OpenSpec task 11.1, 11.2, and 11.3 in `openspec/changes/project-task-management/tasks.md`.
-- **Status:** Tasks 11.1–11.3 checked. Implementation and independent re-review complete. No commit, push, PR, or deployment was made or authorized.
-- **Next human action:** Review the outstanding evidence limits below and the task branch delta; perform any requested DB verification or runtime UI checks. Separately verify the required human-approved interaction summary in `logs/`.
+- **Status:** Tasks 11.1–11.3 checked; implementation and independent re-review complete. Three authorized scoped local commits were created. No push, PR creation, remote edit, or deployment occurred.
+- **Next human action:** Review the three commits and evidence limits below; perform any requested DB verification or runtime UI checks. Separately verify the required human-approved interaction summary in `logs/`.
 
 ## Source and scope
 
@@ -15,7 +15,7 @@
 - **Source revision:** `ec5eb6829d44f410d90fa8c8ce6feeae18960c29`.
 - **Requirement sources:** `openspec/changes/project-task-management/specs/github-evidence/spec.md`, `openspec/changes/project-task-management/specs/task-management/spec.md`, and task 11 in `openspec/changes/project-task-management/tasks.md`.
 - **Architecture references:** `openspec/changes/project-task-management/design.md`; task-detail guidance in `specs/ui-spec.md`.
-- **Scope boundaries:** Test-writer owned tests only. Implementer owned only `src/**` and one new migration. Frontend and reviewer were read-only. This handoff and the plan are the only workflow records changed by the orchestrator. No shipped migration, dependency, or git history was changed.
+- **Scope boundaries:** Test-writer owned tests only. Implementer owned only `src/**` and one new migration. Frontend and reviewer were read-only. Orchestrator edited only this handoff and the plan. No shipped migration or dependency was changed.
 
 ## Approved behavior implemented
 
@@ -46,7 +46,7 @@
 - **PostgreSQL:** Rollback after second-insert failure and competing-replacement/stale-snapshot cases are authored, but execution is unverified. Docker was inaccessible due to socket permission denial; no `TEST_DATABASE_URL` was configured.
 - **Rendered UI:** Frontend source-inspected developer and PM task views and picker; runtime browser, responsive layout, and rendered accessibility behavior remain unverified because no app/browser was available. The frontend's wording suggestion was addressed with conditional “Edit commits” / “Add commits” button text.
 - **Independent review:** Re-review found no new defects; the mixed-case checkbox issue was resolved. The reviewer confirmed the PostgreSQL execution limitation and did not approve or merge the change.
-- **Visual diff:** [`/tmp/commit-branch-provenance-visual-diff.html`](/tmp/commit-branch-provenance-visual-diff.html), refreshed to show 23 changed files.
+- **Visual diff:** [`/tmp/commit-branch-provenance-visual-diff.html`](/tmp/commit-branch-provenance-visual-diff.html), generated before commits and refreshed to show 25 changed files.
 
 ## Worker session reports
 
@@ -60,7 +60,7 @@
 - **Work completed:** Read canonical workflow contracts, recorded ownership/dependencies, consolidated test, implementation, frontend, and reviewer evidence. No product code or tests changed in this role.
 - **Files changed:** `workflow/plans/developer-commit-branch-provenance.md`; `workflow/handoffs/developer-commit-branch-provenance.md`.
 - **Checks:** Read-only status/source inspection and workflow record validation; no tests run by the orchestrator.
-- **Gaps:** Human-verified session summary in `logs/` remains to be verified. No git actions performed.
+- **Gaps:** Human-verified session summary in `logs/` remains to be verified. No git actions performed by the orchestrator.
 
 ### Test-writer — task 11.1
 
@@ -116,5 +116,5 @@
 - **Dependencies added:** None.
 - **Known gaps:** PostgreSQL tests skipped and migration application unverified; production build sandbox-blocked; browser runtime UI unverified; full suite has 28 unrelated failures; full lint reports generated website errors.
 - **Reviewer findings:** Both P2 findings were addressed; re-review found no new defects. PostgreSQL behavior remains unverified.
-- **Branch inventory / commits / PR:** No commits, push, or PR created. Work remains in the working tree on `feat/dev-update-ui`.
-- **Next action and responsible human:** Developer A and Developer B review the final worktree and decide whether to obtain DB/runtime evidence. Separately, a human must verify the interaction summary required by `AGENTS.md`. No git action is authorized.
+- **Branch inventory / commits / PR:** The task's three scoped commits on `feat/dev-update-ui` are `4349571 feat(tasks): track attached commit source branches`; `f49843a test(github-evidence): cover commit replacement and provenance`; and `a2d16e2 docs(workflow): record commit provenance delivery`. A separate documentation-only follow-up records the final authorization and commit status in this handoff and interaction log. The commit/PR agent prepared the updated PR title and body as a local draft; no push, PR creation, or remote edit occurred. The final worktree was clean, with the branch ahead by four local commits.
+- **Next action and responsible human:** Developer A and Developer B review the four-commit local series and decide whether to obtain DB/runtime evidence. Separately, a human must verify the interaction summary required by `AGENTS.md`. Push, PR creation, and remote edits require separate authorization.

@@ -12,7 +12,7 @@
 - Added route, adapter, picker, task-detail, and PostgreSQL integration coverage.
 - Focused checks passed: 327 tests, TypeScript, scoped lint, ordinary OpenSpec validation, and `git diff --check`.
 - Generated a visual diff at `/tmp/commit-branch-provenance-visual-diff.html`.
-- The commit agent prepared an updated PR title and description. Local split commits were explicitly authorized and are being prepared; no push or remote PR edit is authorized.
+- The commit agent prepared an updated PR title and description as a local draft; the remote PR was not edited. The user explicitly authorized split scoped commits on `feat/dev-update-ui`, created as `4349571`, `f49843a`, and `a2d16e2`, followed by a documentation-only status correction. No push was authorized or performed.
 
 ## Verification limits
 

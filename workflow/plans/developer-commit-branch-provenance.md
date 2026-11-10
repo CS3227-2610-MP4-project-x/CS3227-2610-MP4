@@ -7,7 +7,7 @@
 - **Human owner:** Developer A (Lim-ZY) owns the commit picker and developer experience. Developer B (thegrimbee) owns task management and the data model/database path if persistence changes are needed. This crosses human ownership; Developer A leads picker work and Developer B must own/review any task data/persistence changes. Both humans cross-review and integrate.
 - **Requirement IDs:** None assigned. Active OpenSpec task 11.1–11.3 in `openspec/changes/project-task-management/tasks.md` tracks this work.
 - **Status:** Tasks 11.1–11.3 are checked. Both P2 findings and the frontend wording recommendation were addressed; independent re-review found no new defects. Three PostgreSQL cases and runtime/build checks remain unverified. The user explicitly authorized split scoped local commits on `feat/dev-update-ui`; no push, PR creation, or remote edit is authorized.
-- **Next human action:** Review the final handoff and evidence limits. A commit/PR agent may create only the authorized split local commits on `feat/dev-update-ui`; no push or remote PR action.
+- **Next human action:** Developer A and B review the completed three-commit series and handoff. Push, PR creation, or remote edits require separate authorization.
 
 ## Source and scope
 
@@ -74,9 +74,9 @@
 - **Work completed / findings:** Read canonical orchestrator and handoff contracts; inspected branch/worktree, specs, picker, attachment service/repository, and task-detail read model. Human approved the requirements and directed continuation. Active OpenSpec task 11 divides the work into tests, migration/read projections, and PUT/picker changes. Root confirmed the test-writer and implementer proceeded concurrently on disjoint paths and the test-writer completed; implementer continues only on `src/**` and migration paths. Recorded exact ownership and this sequencing update. No new product decisions made.
 - **Files changed:** `workflow/plans/developer-commit-branch-provenance.md`
 - **Checks run and exact results:** `git status --short --branch` (clean at intake); `git rev-parse HEAD` (`ec5eb6829d44f410d90fa8c8ce6feeae18960c29`); read-only source inspection. No tests run.
-- **Gaps / blockers:** Three PostgreSQL tests were skipped because `TEST_DATABASE_URL` is unset; migration application and DB transaction behavior remain unverified. Production build was sandbox-blocked; browser runtime/responsive/accessibility remains unverified. Broader active-change task 9.5 remains outstanding. Human verification of the session interaction summary remains pending. No push/PR/remote edit is authorized.
+- **Gaps / blockers:** Three PostgreSQL tests were skipped because `TEST_DATABASE_URL` is unset; migration application and DB transaction behavior remain unverified. Production build was sandbox-blocked; browser runtime/responsive/accessibility remains unverified. Broader active-change task 9.5 remains outstanding. Human verification of the session interaction summary remains pending. Push, PR creation, and remote edits are not authorized.
 - **Assignments, dependencies, and handoff decisions:** Tasks 11.1–11.3 checked. Test-writer and implementer ownership stayed disjoint; frontend source QA and independent re-review complete. Split scoped local commits on `feat/dev-update-ui` are explicitly authorized to the commit/PR agent only.
-- **Consolidation notes:** This plan will be updated into the consolidated handoff after implementation, frontend QA, and review are complete.
+- **Consolidation notes:** Final evidence and limitations are consolidated in `workflow/handoffs/developer-commit-branch-provenance.md`. The commit/PR agent created the authorized local commits and updated the PR draft locally; the orchestrator performed no Git actions.
 
 ### Session `test-writer / task 11.1`
 
@@ -152,13 +152,14 @@
 
 ## Consolidated outcome
 
-- **Changed files and rationale:** `workflow/plans/developer-commit-branch-provenance.md` records intake scope and decisions needed.
-- **Tests/checks and results:** No tests; read-only repository context inspection only.
-- **Generated artifacts:** None.
+- **Changed files and rationale:** Product/spec/test/migration paths listed above implement approved task 11. Workflow records: this plan and `workflow/handoffs/developer-commit-branch-provenance.md`; interaction disclosure: `logs/2026-11-10-developer-commit-branch-provenance.md` (human verification pending).
+- **Tests/checks and results:** Root final focused run: 7 files, 327/327 passed; TypeScript, scoped ESLint, ordinary OpenSpec validation, and diff check passed. Full-suite, lint, build, and PostgreSQL limitations are recorded above. Resource usage metrics were not available.
+- **Generated artifacts:** `/tmp/commit-branch-provenance-visual-diff.html` was generated before commits and refreshed to show 25 changed files; it may not include later workflow-record updates.
 - **Dependencies added:** None.
 - **Known gaps and unverified items:** Three PostgreSQL tests skipped because `TEST_DATABASE_URL` was unavailable; migration application/real DB behavior remain unverified. Production build blocked by sandbox. Runtime browser/accessibility behavior source-only. Broader OpenSpec task 9.5 remains outstanding. No dependencies added. Generated artifact: `/tmp/commit-branch-provenance-visual-diff.html` (refreshed before the final handoff file).
 - **Reviewer findings:** Both P2 findings resolved; independent re-review found no new defects. Frontend's low-severity wording suggestion was addressed; runtime QA unavailable.
-- **Next action and responsible human:** Commit/PR agent may create split scoped local commits on `feat/dev-update-ui` under the user's explicit authorization. No push, PR creation, or remote edit is authorized. Human owners review remaining validation limits and verify the interaction summary.
+- **Branch inventory / commits:** The commit/PR agent reports `feat/dev-update-ui` ahead by 3 with a clean worktree: `4349571 feat(tasks): track attached commit source branches`; `f49843a test(github-evidence): cover commit replacement and provenance`; `a2d16e2 docs(workflow): record commit provenance delivery`. The PR draft was updated locally only; no push, PR creation, or remote edit occurred.
+- **Next action and responsible human:** Developer A and B review the three commits and remaining validation limits; a human verifies the interaction summary. Push, PR creation, or remote edits require separate authorization.
 
 ## Change log
 
@@ -175,3 +176,5 @@
 | 2026-11-10 11:34 | orchestrator / root task coordination | Recorded root-approved remediation; mixed-case fix applied, DB regression/integration tests in progress, task 11.1 remains unchecked pending completion. |
 | 2026-11-10 11:35 | orchestrator / root task coordination | Recorded remediation test additions, picker 5/5 pass, TypeScript/diff pass, and three PostgreSQL skips pending DB setup. |
 | 2026-11-10 11:36 | orchestrator / root task coordination | Recorded tasks 11.1–11.3 complete, re-review clean, final focused validation, and explicit local split-commit authorization (no push/PR). |
+| 2026-11-10 11:44 | orchestrator / root task coordination | Reconciled final handoff evidence, PostgreSQL/browser/build limitations, human-verified log status, and local-only split-commit authorization; no Git actions performed. |
+| 2026-11-10 11:44 | orchestrator / root task coordination | Recorded commit/PR agent's three scoped local commits, clean worktree/ahead-by-3 report, local-only PR draft update, and 25-file pre-commit visual diff; no orchestrator Git actions. |
