@@ -6,6 +6,7 @@ import { changeTaskState, staleMessage } from "./task-requests";
 import type { TaskState } from "@/server/tasks";
 import { developerBoardMove } from "./board-moves";
 import { useTaskStatus } from "./task-status";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 export type BoardStatusMenuProps = Readonly<{ projectId: string; taskId: string; taskKey: string; version: number; state: TaskState }>;
 
@@ -42,9 +43,10 @@ export function BoardStatusMenu({ projectId, taskId, taskKey, version, state }: 
           Change status <span aria-hidden="true" className="transition-transform group-open:rotate-180">⌄</span>
         </summary>
         <div className="mt-2 rounded-lg border border-white/10 bg-[#2a2a2a] p-1">
-          <button type="button" onClick={apply} disabled={busy || refreshing}
+          <button type="button" onClick={apply} disabled={busy || refreshing} aria-busy={busy || refreshing}
             className="w-full rounded-md px-3 py-2 text-left text-sm text-neutral-100 hover:bg-white/10 disabled:cursor-wait disabled:opacity-60">
             {move.label}
+            {(busy || refreshing) && <LoadingSpinner />}
           </button>
         </div>
       </details>

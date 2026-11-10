@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PendingLink } from "@/components/ui/pending-link";
 import type { ReactNode } from "react";
 
 // Presentational pieces shared by the board, task-detail and review-queue pages. No data access.
@@ -18,12 +18,28 @@ export function formatDueDate(value: string): string {
     : date.toLocaleDateString("en-SG", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" });
 }
 
-export function TaskPageShell({ crumb, children }: Readonly<{ crumb: string; children: ReactNode }>) {
+export function TaskPageShell({ crumb, children, backLink, projectBreadcrumb, wide = false }: Readonly<{
+  crumb: string;
+  children: ReactNode;
+  backLink?: Readonly<{ href: string; label: string }>;
+  projectBreadcrumb?: Readonly<{ projectId: string; taskKey: string }>;
+  wide?: boolean;
+}>) {
   return (
     <main className="px-5 pb-16 pt-6 sm:px-8">
-      <div className="mx-auto max-w-5xl">
+      <div className={`mx-auto ${wide ? "max-w-7xl" : "max-w-5xl"}`}>
         <nav aria-label="Breadcrumb" className="mb-6 text-sm text-neutral-400">
-          <Link href="/" className="hover:text-white">Workspace</Link><span aria-hidden="true"> / </span><span>{crumb}</span>
+          {backLink
+            ? <PendingLink href={backLink.href} className="hover:text-white">← {backLink.label}</PendingLink>
+            : projectBreadcrumb
+              ? <>
+                  <PendingLink href={`/projects/${projectBreadcrumb.projectId}/dashboard`} className="hover:text-white">Project Dashboard</PendingLink>
+                  <span aria-hidden="true"> / </span>
+                  <PendingLink href={`/projects/${projectBreadcrumb.projectId}/board`} className="hover:text-white">Board</PendingLink>
+                  <span aria-hidden="true"> / </span>
+                  <span aria-current="page">{projectBreadcrumb.taskKey}</span>
+                </>
+              : <><PendingLink href="/" className="hover:text-white">Workspace</PendingLink><span aria-hidden="true"> / </span><span>{crumb}</span></>}
         </nav>
         {children}
       </div>
@@ -47,7 +63,7 @@ export function StateBadge({ state }: Readonly<{ state: string }>) {
   return <span className={state === "Done" ? "task-state-badge task-state-badge-done" : "task-state-badge"}>{state}</span>;
 }
 
-type AttachedCommit = Readonly<{ id: string; sha: string; attachedBy: Readonly<{ githubUsername: string }>; attachedAt: string }>;
+type AttachedCommit = Readonly<{ id: string; sha: string; sourceBranch?: string | null; attachedBy: Readonly<{ githubUsername: string }>; attachedAt: string }>;
 
 /** Attached commits with their short SHA, who attached them and when (task detail and review queue). */
 export function AttachedCommitList({ commits }: Readonly<{ commits: readonly AttachedCommit[] }>) {
@@ -57,6 +73,7 @@ export function AttachedCommitList({ commits }: Readonly<{ commits: readonly Att
       {commits.map((commit) => (
         <li key={commit.id} className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <code className="font-mono text-neutral-100">{commit.sha.slice(0, 7)}</code>
+          {commit.sourceBranch !== undefined && <span className="rounded-md bg-white/5 px-2 py-0.5 font-mono text-xs text-neutral-300">{commit.sourceBranch ?? "Branch not recorded"}</span>}
           <span className="text-neutral-400">attached by {commit.attachedBy.githubUsername}</span>
           <time dateTime={commit.attachedAt} className="text-xs text-neutral-500">{formatTimestamp(commit.attachedAt)}</time>
         </li>

@@ -42,7 +42,7 @@ const criteria = () => [
   { id: id(2), position: 1, description: "Return safe errors" },
   { id: id(3), position: 2, description: "Record evidence" },
 ];
-const commits = () => [1, 2, 3].map((n) => ({ id: id(10 + n), sha: String(n).repeat(40), attachedBy: actor(), attachedAt: n < 3 ? earlier : later }));
+const commits = () => [1, 2, 3].map((n) => ({ id: id(10 + n), sha: String(n).repeat(40), sourceBranch: n === 3 ? null : "feat/selected", attachedBy: actor(), attachedAt: n < 3 ? earlier : later }));
 const updates = () => [1, 2, 3].map((n) => ({ id: id(20 + n), author: actor(), body: `Synthetic update ${n}`, createdAt: n < 3 ? earlier : later }));
 const feedback = () => [1, 2, 3].map((n) => ({ id: id(30 + n), author: { id: f.otherId, githubUsername: "synthetic-pm" }, feedback: `Synthetic feedback ${n}`, createdAt: n < 3 ? earlier : later }));
 const history = () => [3, 2, 1].map((n) => ({

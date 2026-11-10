@@ -27,3 +27,30 @@ export async function POST(request: NextRequest, context: { params: Promise<{ pr
     return Response.json(result, { status: 201, headers: { "Cache-Control": "no-store" } });
   } catch (error) { return githubEvidenceErrorResponse(error); }
 }
+
+export async function PUT(request: NextRequest, context: { params: Promise<{ projectId: string; taskId: string }> }): Promise<Response> {
+  try {
+    const composition = getServerComposition();
+    const { projectId, taskId } = await context.params;
+    if (!isValidProjectId(projectId) || !UUID.test(taskId) || request.headers.get("origin") !== composition.config.appOrigin ||
+      request.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase() !== "application/json") return invalid();
+    let body: unknown;
+    try { body = await request.json(); } catch { return invalid(); }
+    if (typeof body !== "object" || body === null || Array.isArray(body) || Object.keys(body).length !== 1 ||
+      !Array.isArray((body as Record<string, unknown>).attachments) ||
+      (body as { attachments: unknown[] }).attachments.some((attachment) => {
+        if (typeof attachment !== "object" || attachment === null || Array.isArray(attachment)) return true;
+        const row = attachment as Record<string, unknown>;
+        return Object.keys(row).length !== 2 || !Object.hasOwn(row, "sha") || !Object.hasOwn(row, "sourceBranch") ||
+          typeof row.sha !== "string" || !/^[0-9a-f]{7,64}$/i.test(row.sha) ||
+          !(row.sourceBranch === null || (typeof row.sourceBranch === "string" && row.sourceBranch.length > 0));
+      })) return invalid();
+    const attachments = (body as { attachments: { sha: string; sourceBranch: string | null }[] }).attachments;
+    if (new Set(attachments.map(({ sha }) => sha.toLowerCase())).size !== attachments.length) return invalid();
+    const client = await createRequestSupabaseClient(composition.config);
+    const { data, error } = await client.auth.getUser();
+    if (error || !data.user) return Response.json({ error: { code: "UNAUTHENTICATED", message: "Authentication required" } }, { status: 401, headers: { "Cache-Control": "no-store" } });
+    const result = await composition.githubEvidenceService.replaceAttachedCommits(projectId, taskId, verifiedGitHubIdentity(data.user), attachments);
+    return Response.json(result, { status: 200, headers: { "Cache-Control": "no-store" } });
+  } catch (error) { return githubEvidenceErrorResponse(error); }
+}

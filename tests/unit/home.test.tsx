@@ -18,6 +18,7 @@ const boundary = vi.hoisted(() => ({
   completeGitHubSignIn: vi.fn(),
   findPersonIdByAuthUserId: vi.fn(),
   listProjectsForPerson: vi.fn(),
+  cookieGet: vi.fn(),
   redirect: vi.fn((destination: string): never => { throw new Error(`REDIRECT:${destination}`); }),
 }));
 
@@ -41,8 +42,11 @@ vi.mock("react", async (importOriginal) => {
   };
 });
 
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: boundary.cookieGet }) }));
+
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({
+  usePathname: () => "/",
   redirect: boundary.redirect,
   useRouter: () => ({ replace: boundary.replace, push: boundary.replace, refresh: boundary.refresh }),
 }));
@@ -69,6 +73,7 @@ function signedInUser() {
 }
 
 beforeEach(() => {
+  boundary.cookieGet.mockReset();
   boundary.hookHarnessActive = false;
   boundary.hookCursor = 0;
   boundary.hookState = [];
@@ -125,112 +130,39 @@ describe("protected workspace", () => {
   });
 });
 
-// Task 4.4, design.md "Board, Detail and Review Queue Decisions (4.4)" B3: a minimal "my
-// projects" list on `/` shows each project's name, key and the person's role, and links to its
-// board. It is not the project dashboard (B1). Seam chosen by the 4.4 test-writer:
-// composition.projectService.listProjectsForPerson(personId) -> [{ id, key, name, role }], with
-// personId from the session (peopleRepository.findPersonIdByAuthUserId). B3 (amended
-// 2026-11-08): ordered by project name, then id (SQL order covered by the integration test);
-// a failed read shows a safe error in place of the list; no projects shows an empty state.
-describe("my projects entry point (B3)", () => {
+// Approved selected-project routing supersedes the former project list entry point.
+describe("selected-project landing", () => {
   const projects = [
-    { id: "33333333-3333-4333-8333-333333333301", key: "WEB", name: "Synthetic web project", role: "product_manager" },
-    { id: "33333333-3333-4333-8333-333333333302", key: "API", name: "Synthetic api project", role: "developer" },
+    { id: "33333333-3333-4333-8333-333333333301", key: "ALP", name: "Alpha", role: "developer" },
+    { id: "33333333-3333-4333-8333-333333333302", key: "BET", name: "Beta", role: "product_manager" },
   ];
-
-  async function home(): Promise<string> {
-    const { default: Home } = await import("../../src/app/page");
-    return renderToStaticMarkup(await Home());
-  }
-
-  it("reads the signed-in person's projects", async () => {
-    await home();
-
-    expect(boundary.findPersonIdByAuthUserId).toHaveBeenCalledWith(signedInUser().id);
+  async function home() { const { default: Home } = await import("../../src/app/page"); return renderToStaticMarkup(await Home()); }
+  it("reopens an accessible remembered project after reading current memberships", async () => {
+    boundary.listProjectsForPerson.mockResolvedValue(projects);
+    boundary.cookieGet.mockReturnValue({ value: projects[1].id });
+    await expect(home()).rejects.toThrow(`REDIRECT:/projects/${projects[1].id}/dashboard`);
     expect(boundary.listProjectsForPerson).toHaveBeenCalledWith(personId);
   });
-
-  it("lists each project's name and key with a link to its board", async () => {
-    boundary.listProjectsForPerson.mockResolvedValue(projects);
-
-    const markup = await home();
-
-    for (const project of projects) {
-      expect(markup).toContain(project.name);
-      expect(markup).toContain(project.key);
-      expect(markup).toMatch(new RegExp(`<a\\b[^>]*href="/projects/${project.id}/board"`));
-    }
+  it.each([undefined, { value: "malformed" }, { value: "33333333-3333-4333-8333-333333333399" }])("falls back to first currently accessible project for %s", remembered => {
+    boundary.listProjectsForPerson.mockResolvedValue(projects); boundary.cookieGet.mockReturnValue(remembered);
+    return expect(home()).rejects.toThrow(`REDIRECT:/projects/${projects[0].id}/dashboard`);
   });
-
-  it.each([
-    ["product_manager", /product manager/i],
-    ["developer", /developer/i],
-  ] as const)("shows the person's role %s as a readable name", async (role, label) => {
-    boundary.listProjectsForPerson.mockResolvedValue([{ ...projects[0], role }]);
-
-    const markup = (await home()).replaceAll(username, "");
-
-    expect(markup).toMatch(label);
-    expect(markup).not.toContain(role === "product_manager" ? "product_manager" : ">developer<");
+  it("renders all three empty dashboard cards and a create-project action for no memberships", async () => {
+    const html = await home();
+    for (const label of ["Project Progress", "Task Summary", "My tasks"]) expect(html.toLowerCase()).toContain(label.toLowerCase());
+    expect(html).toMatch(/href="\/projects\/new"/); expect(html).toMatch(/Create project/i);
+    expect(html).not.toMatch(/NaN|Infinity/); expect(boundary.redirect).not.toHaveBeenCalled();
   });
-
-  it("shows an empty-state message and no project link when the person has no projects", async () => {
-    const markup = await home();
-
-    expect(markup).not.toMatch(/href="\/projects\/[^/"?]+\/board(?:[?"#])/);
-    expect(markup).toMatch(/<a\b[^>]*href="\/projects\/new"[^>]*>[\s\S]*?Create project/i);
-    expect(markup.replaceAll(username, "")).toMatch(/no projects|any projects|not a member/i);
-  });
-
-  it("shows the empty state, not an error, when the session has no registered person (reviewer round 1)", async () => {
+  it("treats an unregistered person as a successful empty state", async () => {
     boundary.findPersonIdByAuthUserId.mockResolvedValue(null);
-
-    const markup = (await home()).replaceAll(username, "");
-
-    expect(boundary.listProjectsForPerson).not.toHaveBeenCalled();
-    expect(boundary.redirect).not.toHaveBeenCalled();
-    expect(markup).toMatch(/no projects|any projects|not a member/i);
-    expect(markup).not.toMatch(/could not|couldn.t|unable|unavailable|try again/i);
-    expect(markup).not.toMatch(/href="\/projects\/[^/"?]+\/board(?:[?"#])/);
-    expect(markup).toMatch(/<a\b[^>]*href="\/projects\/new"[^>]*>[\s\S]*?Create project/i);
+    const html = await home(); expect(boundary.listProjectsForPerson).not.toHaveBeenCalled();
+    expect(html).toMatch(/Create project/); expect(html).not.toMatch(/could not|unavailable/i);
   });
-
-  it("keeps the order the read returns (project name, then id)", async () => {
-    const ordered = [
-      { id: "33333333-3333-4333-8333-333333333311", key: "ALP", name: "Alpha synthetic project", role: "developer" },
-      { id: "33333333-3333-4333-8333-333333333312", key: "BET", name: "Beta synthetic project", role: "developer" },
-      { id: "33333333-3333-4333-8333-333333333313", key: "GAM", name: "Gamma synthetic project", role: "product_manager" },
-    ];
-    boundary.listProjectsForPerson.mockResolvedValue(ordered);
-
-    const markup = await home();
-
-    const positions = ordered.map((project) => markup.indexOf(`/projects/${project.id}/board`));
-    for (const position of positions) expect(position).toBeGreaterThanOrEqual(0);
-    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
-  });
-
-  it("shows a safe error in place of the list when the read fails, and still renders the page", async () => {
+  it("does not redirect or fabricate empty success when memberships fail", async () => {
     boundary.listProjectsForPerson.mockRejectedValue(new Error("synthetic-private-db-detail"));
-
-    const markup = await home();
-
-    expect(boundary.redirect).not.toHaveBeenCalled();
-    expect(markup).toContain(username);
-    expect(markup).toMatch(/<button\b[^>]*>[\s\S]*?Sign out[\s\S]*?<\/button>/i);
-    expect(markup).toMatch(/could not|couldn.t|unable|unavailable|try again/i);
-    expect(markup).not.toContain("synthetic-private-db-detail");
-    expect(markup).not.toMatch(/href="\/projects\/[^/"?]+\/board(?:[?"#])/);
-    expect(markup).toMatch(/<a\b[^>]*href="\/projects\/new"[^>]*>[\s\S]*?Create project/i);
-  });
-
-  it("renders project names as plain text", async () => {
-    boundary.listProjectsForPerson.mockResolvedValue([{ ...projects[0], name: "Synthetic <b>bold</b> name" }]);
-
-    const markup = await home();
-
-    expect(markup).not.toContain("<b>bold</b>");
-    expect(markup).toContain("&lt;b&gt;bold&lt;/b&gt;");
+    const html = await home(); expect(boundary.redirect).not.toHaveBeenCalled();
+    expect(html).toMatch(/could not|unavailable|try again/i); expect(html).not.toContain("synthetic-private-db-detail");
+    expect(html).toMatch(/role="(?:alert|status)"/);
   });
 });
 

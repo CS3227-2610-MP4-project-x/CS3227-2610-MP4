@@ -414,3 +414,26 @@ describe("deterministic GitHub fake", () => {
     }
   });
 });
+
+
+// Task 11.1: resolve approved short input refs before full-SHA ancestry checks.
+describe("canonical commit identity", () => {
+  it("resolves a short input to the provider's full SHA and stable author identity", async () => {
+    const fullSha = "abcdef1" + "2".repeat(33);
+    const { adapter, fetchStub } = harness(() => json({ sha: fullSha, author: { id: 789, login: "developer" } }));
+    expect(await adapter.getCommitIdentity(repository, "ABCDEF1")).toEqual({ ok: true, value: { sha: fullSha, author: { id: 789, login: "developer" } } });
+    expect(new URL(String(fetchStub.mock.calls[1][0])).pathname).toBe("/repos/sample/project/commits/ABCDEF1");
+  });
+  it.each([
+    { sha: TIP_SHA, author: { id: 789, login: "developer" } },
+    { sha: "abcdef1", author: { id: 789, login: "developer" } },
+    { sha: "abcdef1" + "2".repeat(33), author: null },
+  ])("refuses mismatched, abbreviated, or unauthored provider identity %j", async (body) => {
+    const { adapter } = harness(() => json(body));
+    expect(await adapter.getCommitIdentity(repository, "abcdef1")).toEqual({ ok: false, category: "malformed_response", status: 200 });
+  });
+  it("contains unavailable provider evidence without exposing raw response text", async () => {
+    const { adapter } = harness(() => json({ message: PROVIDER_ERROR }, 503));
+    expect(await adapter.getCommitIdentity(repository, "abcdef1")).toEqual({ ok: false, category: "unavailable", status: 503 });
+  });
+});

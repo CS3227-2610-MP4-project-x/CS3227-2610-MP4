@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { addProjectMember, transferProjectManager } from "./project-actions";
 import type { ProjectMemberView } from "@/server/projects";
 
@@ -129,8 +130,9 @@ export function MembersSettings({ projectId, members }: Props) {
           <input id="new-member-username" name="username" value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="off" required
             placeholder="GitHub username" disabled={pendingAction !== "idle" || controlsDisabled}
             className="min-h-11 min-w-0 flex-1 rounded-lg border border-white/15 bg-[#1a1a1a] px-3 text-sm text-neutral-100 outline-none focus:border-emerald-400 disabled:opacity-60" />
-          <button type="submit" disabled={pendingAction !== "idle" || controlsDisabled} className="min-h-11 rounded-lg bg-emerald-500 px-5 text-sm font-semibold text-black hover:bg-emerald-400 disabled:cursor-wait disabled:opacity-60">
+          <button type="submit" disabled={pendingAction !== "idle" || controlsDisabled} aria-busy={pendingAction === "adding"} className="min-h-11 rounded-lg bg-emerald-500 px-5 text-sm font-semibold text-black hover:bg-emerald-400 disabled:cursor-wait disabled:opacity-60">
             {pendingAction === "adding" ? "Adding member…" : "Add member"}
+            {pendingAction === "adding" && <LoadingSpinner />}
           </button>
         </div>
       </form>
@@ -145,8 +147,9 @@ export function MembersSettings({ projectId, members }: Props) {
             <option value="">Choose a developer</option>
             {developers.map((member) => <option key={member.personId} value={member.personId}>{member.githubUsername}</option>)}
           </select>
-          <button type="button" onClick={transfer} disabled={pendingAction !== "idle" || controlsDisabled || !selected} className="min-h-11 rounded-lg border border-white/15 px-5 text-sm font-semibold text-neutral-100 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50">
+          <button type="button" onClick={transfer} disabled={pendingAction !== "idle" || controlsDisabled || !selected} aria-busy={pendingAction === "transferring"} className="min-h-11 rounded-lg border border-white/15 px-5 text-sm font-semibold text-neutral-100 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50">
             {pendingAction === "transferring" ? "Transferring product manager…" : "Transfer product manager"}
+            {pendingAction === "transferring" && <LoadingSpinner />}
           </button>
         </div>}
       </div>

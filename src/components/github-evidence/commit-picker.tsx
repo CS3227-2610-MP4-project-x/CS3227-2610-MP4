@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 type Branches = Readonly<{ defaultBranch: string; branches: readonly { name: string }[] }>;
 type Commit = Readonly<{ sha: string; shortSha: string; message: string; authoredAt: string; mentionsTaskId: boolean }>;
@@ -16,7 +17,10 @@ function sgtNext(date: string): string {
   return start.toISOString();
 }
 
-export function CommitPicker({ projectId, taskId, onAttached }: { projectId: string; taskId: string; onAttached?: (shas: readonly string[]) => void }) {
+type AttachedCommit = Readonly<{ sha: string; sourceBranch: string | null }>;
+type CommitPickerProps = Readonly<{ projectId: string; taskId: string; attachedCommits?: readonly AttachedCommit[]; editable?: boolean; onSaved?: () => void }>;
+
+export function CommitPicker({ projectId, taskId, attachedCommits = [], editable = true, onSaved }: CommitPickerProps) {
   const [open, setOpen] = useState(false);
   const [branchData, setBranchData] = useState<Branches | null>(null);
   const [branch, setBranch] = useState("");
@@ -25,7 +29,9 @@ export function CommitPicker({ projectId, taskId, onAttached }: { projectId: str
   const [page, setPage] = useState(1);
   const [data, setData] = useState<CommitPage | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selectedBranches, setSelectedBranches] = useState<Map<string, string>>(new Map());
   const [busy, setBusy] = useState(false);
+  const [loadingPage, setLoadingPage] = useState<"previous" | "next" | null>(null);
   const [message, setMessage] = useState("");
   const seenCommits = useRef<Set<string>>(new Set());
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -39,6 +45,7 @@ export function CommitPicker({ projectId, taskId, onAttached }: { projectId: str
 
   function closeDialog() {
     setOpen(false);
+    setLoadingPage(null);
     triggerRef.current?.focus();
   }
 
@@ -83,36 +90,47 @@ export function CommitPicker({ projectId, taskId, onAttached }: { projectId: str
         setBranch(nextBranch);
         setData(null);
       } else setData(commitResult);
-      setSelected((current) => {
-        const next = new Set(current);
-        for (const commit of commitResult.commits) {
-          if (!seenCommits.current.has(commit.sha) && commit.mentionsTaskId) next.add(commit.sha);
-          seenCommits.current.add(commit.sha);
-        }
-        return next;
-      });
-    }).catch((error: unknown) => { if (!cancelled) setMessage(error instanceof Error ? error.message : "Repository evidence is unavailable."); })
-      .finally(() => { if (!cancelled) setBusy(false); });
+      const mentioned = commitResult.commits.filter((commit) => !seenCommits.current.has(commit.sha) && commit.mentionsTaskId &&
+        !attachedCommits.some((item) => item.sha.toLowerCase() === commit.sha.toLowerCase()));
+      for (const commit of commitResult.commits) seenCommits.current.add(commit.sha);
+      if (mentioned.length) {
+        setSelected((current) => new Set([...current, ...mentioned.map(({ sha }) => sha)]));
+        setSelectedBranches((current) => new Map([...current, ...mentioned.map(({ sha }) => [sha, commitResult.branch] as const)]));
+      }
+    }).catch((error: unknown) => { if (!cancelled) { setData(null); setMessage(error instanceof Error ? error.message : "Repository evidence is unavailable."); } })
+      .finally(() => { if (!cancelled) { setBusy(false); setLoadingPage(null); } });
     return () => { cancelled = true; };
-  }, [open, api, query, branch, branchData, dateRangeValid]);
+  }, [open, api, query, branch, branchData, dateRangeValid, attachedCommits]);
 
-  function changeFilter(update: () => void) { update(); setPage(1); setData(null); setMessage(""); }
-  function changePage(nextPage: number) { setPage(nextPage); setData(null); setMessage(""); }
-  const loading = busy || (open && dateRangeValid && data === null && message === "");
-  async function attach() {
+  function changeFilter(update: () => void) { update(); setLoadingPage(null); setPage(1); setData(null); setMessage(""); }
+  function changePage(nextPage: number) { setLoadingPage(nextPage < page ? "previous" : "next"); setPage(nextPage); setMessage(""); }
+  const loading = busy || loadingPage !== null || (open && dateRangeValid && data === null && message === "");
+  function toggle(sha: string, checked: boolean, sourceBranch = branch) {
+    const normalized = sha.toLowerCase();
+    setSelected((current) => { const next = new Set([...current].filter((item) => item.toLowerCase() !== normalized)); if (checked) next.add(sha); return next; });
+    setSelectedBranches((current) => { const next = new Map([...current].filter(([item]) => item.toLowerCase() !== normalized)); if (checked) next.set(sha, sourceBranch); return next; });
+  }
+  function isSelected(sha: string): boolean { return [...selected].some((item) => item.toLowerCase() === sha.toLowerCase()); }
+
+  async function save() {
     setBusy(true); setMessage("");
     try {
-      const shas = [...selected];
-      const response = await fetch(`${api}/attached-commits`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ commitShas: shas }) });
+      const currentBySha = new Map(attachedCommits.map((commit) => [commit.sha.toLowerCase(), commit]));
+      const attachments = [...selected].map((sha) => {
+        const existing = currentBySha.get(sha.toLowerCase());
+        return { sha: existing?.sha ?? sha, sourceBranch: existing ? existing.sourceBranch : selectedBranches.get(sha) ?? branch };
+      });
+      const response = await fetch(`${api}/attached-commits`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ attachments }) });
       const body = await response.json();
-      if (!response.ok) throw new Error("Selected commits could not be attached. Verify each commit is yours and retry.");
-      onAttached?.(shas); setMessage(`${body.attachedCommits.length} commit${body.attachedCommits.length === 1 ? "" : "s"} attached.`); closeDialog();
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not attach commits."); }
+      if (!response.ok) throw new Error("Selected commits could not be saved. Verify each commit is yours and reachable from its source branch, then retry.");
+      onSaved?.();
+      setMessage(`${body.attachments.length} commit${body.attachments.length === 1 ? "" : "s"} saved.`); closeDialog();
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not save commits."); }
     finally { setBusy(false); }
   }
 
   return <>
-    <button ref={triggerRef} type="button" onClick={() => { seenCommits.current.clear(); setSelected(new Set()); setData(null); setMessage(""); setOpen(true); }} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 text-sm font-medium text-neutral-100 hover:bg-white/10">＋ Add commits</button>
+    {!editable ? null : <button ref={triggerRef} type="button" onClick={() => { seenCommits.current.clear(); setSelected(new Set(attachedCommits.map(({ sha }) => sha))); setSelectedBranches(new Map()); setData(null); setMessage(""); setOpen(true); }} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 text-sm font-medium text-neutral-100 hover:bg-white/10">＋ {attachedCommits.length > 0 ? "Edit commits" : "Add commits"}</button>}
     {open && <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDialog(); }}>
       <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="commit-picker-title" tabIndex={-1} onKeyDown={trapDialogKeys} className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-white/10 bg-[#222] p-5 shadow-2xl sm:p-7">
         <div className="flex items-start justify-between gap-5"><div><h2 id="commit-picker-title" className="text-xl font-semibold">Select your commits</h2><p className="mt-1 text-sm text-neutral-400">Only commits authored by your verified GitHub account are shown.</p></div>
@@ -123,13 +141,14 @@ export function CommitPicker({ projectId, taskId, onAttached }: { projectId: str
         {!dateRangeValid && <p role="alert" className="mt-4 text-sm text-amber-300">Choose an end date on or after the start date.</p>}
         {loading && <p role="status" className="mt-5 text-sm text-neutral-400">Loading repository evidence…</p>}
         {!loading && data?.commits.length === 0 && <p className="mt-5 rounded-lg bg-white/5 p-4 text-sm text-neutral-300">No commits found for this date and branch.</p>}
-        {data && data.commits.length > 0 && <div className="mt-5 divide-y divide-white/10 rounded-lg border border-white/10">{data.commits.map((commit) => <label key={commit.sha} className="flex cursor-pointer items-start gap-3 p-4 hover:bg-white/[.03]">
-          <input type="checkbox" checked={selected.has(commit.sha)} onChange={(event) => setSelected((current) => { const next = new Set(current); if (event.target.checked) next.add(commit.sha); else next.delete(commit.sha); return next; })} className="mt-1 accent-emerald-400" />
+        {open && attachedCommits.length > 0 && <section className="mt-5"><h3 className="mb-2 text-sm font-medium text-neutral-200">Already attached</h3><div className="divide-y divide-white/10 rounded-lg border border-white/10">{attachedCommits.map((commit) => <label key={commit.sha} className="flex cursor-pointer items-center gap-3 p-3 hover:bg-white/[.03]"><input type="checkbox" checked={isSelected(commit.sha)} onChange={(event) => toggle(commit.sha, event.target.checked)} className="accent-emerald-400" /><code className="font-mono text-sm text-neutral-100">{commit.sha.slice(0, 7)}</code><span className="text-xs text-neutral-400">{commit.sourceBranch ?? "Branch not recorded"}</span></label>)}</div></section>}
+        {data && !loading && data.commits.length > 0 && <div className="mt-5 divide-y divide-white/10 rounded-lg border border-white/10">{data.commits.map((commit) => <label key={commit.sha} className="flex cursor-pointer items-start gap-3 p-4 hover:bg-white/[.03]">
+          <input type="checkbox" checked={isSelected(commit.sha)} onChange={(event) => toggle(commit.sha, event.target.checked, data.branch)} className="mt-1 accent-emerald-400" />
           <span className="min-w-0 flex-1"><span className="block text-sm leading-5 text-neutral-100">{commit.message}</span><span className="mt-2 flex flex-wrap gap-x-3 text-xs text-neutral-400"><span className="font-mono">{commit.shortSha}</span><time dateTime={commit.authoredAt}>{new Date(commit.authoredAt).toLocaleString("en-SG", { timeZone: "Asia/Singapore" })}</time>{commit.mentionsTaskId && <span className="text-emerald-300">Matches this task</span>}</span></span>
         </label>)}</div>}
-        {data && <div className="mt-4 flex items-center justify-between"><button type="button" disabled={page <= 1 || loading} onClick={() => changePage(page - 1)} className="rounded-md border border-white/10 px-3 py-2 text-sm disabled:opacity-40">Previous</button><span className="text-xs text-neutral-400">Page {page} · {selected.size} selected</span><button type="button" disabled={!data.nextPage || loading} onClick={() => changePage(data.nextPage!)} className="rounded-md border border-white/10 px-3 py-2 text-sm disabled:opacity-40">Next</button></div>}
+        {data && <div className="mt-4 flex items-center justify-between"><button type="button" disabled={page <= 1 || loading} aria-busy={loadingPage === "previous"} onClick={() => changePage(page - 1)} className="rounded-md border border-white/10 px-3 py-2 text-sm disabled:opacity-40">Previous{loadingPage === "previous" && <LoadingSpinner />}</button><span className="text-xs text-neutral-400">Page {page} · {selected.size} selected</span><button type="button" disabled={!data.nextPage || loading} aria-busy={loadingPage === "next"} onClick={() => changePage(data.nextPage!)} className="rounded-md border border-white/10 px-3 py-2 text-sm disabled:opacity-40">Next{loadingPage === "next" && <LoadingSpinner />}</button></div>}
         {message && <p role="status" aria-live="polite" className="mt-4 rounded-md bg-white/5 p-3 text-sm text-neutral-300">{message}</p>}
-        <div className="mt-6 flex justify-end gap-3 border-t border-white/10 pt-5"><button type="button" onClick={closeDialog} className="rounded-lg border border-white/10 px-4 py-2 text-sm">Cancel</button><button type="button" disabled={busy || selected.size === 0} onClick={attach} className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-50">Attach commits</button></div>
+        <div className="mt-6 flex justify-end gap-3 border-t border-white/10 pt-5"><button type="button" onClick={closeDialog} className="rounded-lg border border-white/10 px-4 py-2 text-sm">Cancel</button><button type="button" disabled={busy} aria-busy={busy} onClick={save} className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-50">Save commits{busy && <LoadingSpinner />}</button></div>
       </section>
     </div>}
   </>;

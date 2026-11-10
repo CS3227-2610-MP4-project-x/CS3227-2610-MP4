@@ -38,11 +38,21 @@ Depends on: 3.
 
 ### Tracking note for tasks 4.5 to 4.7
 
+- [x] Extend the approved dashboard with the developer mockup cards, own-task filters/metadata/detail links, membership-validated browser-local project selection, role-aware section preservation, and empty landing cards/Create project emphasis. Preserve the PM overview; verify with behavioral tests, browser UI inspection and independent review. Human approved this extension on 9 November 2026; see the design's developer dashboard and project switching extension. Implemented and locally checked; the new PostgreSQL test is added but skipped without TEST_DATABASE_URL. Full-suite baseline failures and release-validation gaps remain disclosed in workflow/handoffs/developer-dashboard-project-switching.md.
+
 Added on 9 November 2026 at the request of thegrimbee (Developer B). Task 4.4's decision B1 in `design.md` deferred the members screen, the product-manager task controls, and the dashboard to "a later approved change or task", but no task tracked them, and no task covered a UI for project creation. Without 4.5 and 4.6 the complete Developer and Product Manager journeys required by 9.2 cannot be performed through the UI. Member removal and role change remain out of scope (D7). Tasks 4.5 to 4.7 depend on 4.4 for the shared project navigation and page-access helper.
 
 ### Completion evidence for task 4.4
 
 Marked complete on 9 November 2026 at the human's explicit instruction. The existing 4.4 handoff records implementation, final review without blockers or majors, and a human-reported PostgreSQL integration pass after the second fix round. The current branch's final lint, type-check, unit, PostgreSQL and production-build checks also pass as recorded for task 4.5 below. See `workflow/handoffs/tasks-board-detail-review-queue-4-4.md` for its original scope, review results and remaining follow-ups. This tracking update does not claim a new independent review of 4.4 or waive the recorded Developer A cross-review and later verification tasks.
+
+### Approved task-detail UI follow-up (10 November 2026)
+
+- [x] Add the project-scoped `Project Dashboard / Board / <taskKey>` task breadcrumb and the developer-only two-column task-detail composition, with Submit for review in the main card's top-right corner; preserve the product-manager layout and other existing feature placements. Add behavioral tests, rendered UI inspection and independent review. See "Approved follow-up: Project-scoped task breadcrumb and developer task-detail layout" in `design.md`.
+
+Completion evidence for the approved task-detail UI follow-up
+
+Implemented on 10 November 2026. Focused task-detail and Board tests passed (52/52); type-check, scoped ESLint, whitespace validation, OpenSpec validation, and independent source review passed. The connected developer update timeline and shared entry rendering were reviewed with no new findings. Browser QA was authorized but remained unverified because the available browser provider had no browser/IAB session; responsive rendered geometry and interactions are not claimed. Production build also remains unverified because of the recorded sandbox/Turbopack worker-port restriction and webpack fallback parsing error. See `workflow/handoffs/developer-dashboard-project-switching.md` and `logs/2026-11-09-developer-dashboard-project-switching.md`. This records implementation completion only; it does not claim rendered/browser or release validation.
 
 ### Completion evidence for task 4.5
 
@@ -67,7 +77,7 @@ Depends on: 3. Can run alongside group 4.
 - Approved task-scoped branch and commit listing routes and commit attachment route are specified in `specs/github-evidence/spec.md`.
 - The approved security flow, setup callback, snapshot-read, final-link routes and payloads, 10-minute attempt and snapshot TTLs, normalized persistence, current App-access recheck, task-scoped pagination (`page` default 1, `perPage` default 50/max 100, `nextPage`), and in-request first-seen SHA deduplication are recorded in that spec. PostgreSQL migration/integrity tests were completed in the remote development environment, as confirmed by the user on 2026-11-06.
 - Keep task 5.3 unchecked until implementation and applicable tests are complete.
-- At completion of Section 5.3, task 4.4 remained unchecked: its broader board, task-detail and review-queue work was outside the minimal-host allowance. That allowance alone did not complete task 4.4. Its own implementation is now tracked by the task 4.4 checkbox and completion evidence above.
+- At completion of Section 5.3, task 4.4 was still unchecked: its broader board, task-detail and review-queue work was outside the minimal-host allowance. That allowance alone did not complete task 4.4. Later verification marked 4.4 complete; the human-approved task-detail UI follow-up is tracked separately above and does not reopen it.
 
 ## 6. LLM Gateway and Safeguards
 
@@ -102,3 +112,15 @@ Depends on: all groups above.
 - [ ] 9.3 **[P]** Run accessibility checks on the main pages and record results.
 - [ ] 9.4 Deploy to production, run the release checks (including one real SoC LLM call from each environment, after confirming with `GET /v1/models` that each key can use the pinned model, and a GitHub sign-in on each environment that returns to that environment's own URL), and record commands, revision, environment, results, and evidence paths.
 - [ ] 9.5 Run OpenSpec validation and all lint, type-check, test, and build checks; resolve findings and record the final results.
+
+## 10. Shared Interaction Feedback
+
+- [x] 10.1 Add a shared trailing loading indicator for pending action buttons and internal navigation across currently rendered screens; preserve immediate controls and existing pending/error behavior, then inspect every affected screen and action for consistent placement and reduced-motion support.
+
+## 11. Commit Selection and Branch Provenance
+
+Depends on: 3, 4.4, and 5.1–5.3.
+
+- [x] 11.1 Add tests for complete attached-commit replacement, branch verification and provenance, legacy null provenance, task-detail branch summaries and rows, and staged picker selection/save/cancel/read-only behavior. Include authorization, state, validation, failure atomicity, check-history, and submission evidence cases from the approved specs.
+- [x] 11.2 Add a new versioned migration for nullable `attached_commits.source_branch`; update the task-detail read projection and rendering to expose per-commit source branches and developer branch counts while preserving the product-manager configured task branch.
+- [x] 11.3 Implement the assigned-developer PUT replacement route and atomic service/repository operation; keep POST add-only and enforce the approved In Progress guard on both writes. Update the commit picker to seed persisted selections, stage edits, and save the full selected set with the selected source branch; disable edits outside In Progress. Run relevant tests and checks, complete frontend review, and record rendered/browser verification as unverified when no browser is available.
