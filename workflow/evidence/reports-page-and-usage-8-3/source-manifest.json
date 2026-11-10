@@ -1,0 +1,199 @@
+{
+    "dateSgt":  "2026-11-10",
+    "sourceRevision":  "7057644f41c7a0effc8784a7ec68e44bfc68886b",
+    "state":  "Task8.3 product committed; validated source pinned; workflow evidence prepared for authorized documentation commit; human verification and controlled release pending",
+    "environment":  "synthetic local PostgreSQL18 and intercepted Chromium component harness",
+    "checks":  {
+                   "lint":  "pass",
+                   "typecheck":  "pass",
+                   "unit":  "69 files / 2398 tests pass",
+                   "integration":  "25 files / 375 tests pass",
+                   "build":  "pass",
+                   "browser":  "8 pass / 0 failure / 0 page error",
+                   "strictOpenSpec":  "exit1 / 6 pre-existing unrelated warnings"
+               },
+    "files":  [
+                  {
+                      "path":  "openspec/changes/project-task-management/design.md",
+                      "sha256":  "34c61442ea1b3a7237690672d50dbbccab5a53b65b703eba7cbe4055a0555656"
+                  },
+                  {
+                      "path":  "openspec/changes/project-task-management/specs/ai-safeguards/spec.md",
+                      "sha256":  "cfa5f4a2459f04402165858593e7b1990a2b82bf4643c8b0b4636e2a2db22368"
+                  },
+                  {
+                      "path":  "openspec/changes/project-task-management/specs/daily-progress-report/spec.md",
+                      "sha256":  "a1f4ba750b9cf5639a1e66f5ddd7d71dcad3b4a782db27cbed65fb4508c9c1c0"
+                  },
+                  {
+                      "path":  "openspec/changes/project-task-management/specs/data-persistence/spec.md",
+                      "sha256":  "d11d29f4f3e373034dfbd59985412283cf47ba19c97e9eba1a1823c12d50f346"
+                  },
+                  {
+                      "path":  "openspec/changes/project-task-management/tasks.md",
+                      "sha256":  "dec7205bbc68752ae118b33da1d97f7da7b10dd91101d0e06f060f45dd758738"
+                  },
+                  {
+                      "path":  "specs/ui-spec.md",
+                      "sha256":  "3748f7947fd82c8f486cf8d5974acc00a2e0cb25d549970b83da74363d5af230"
+                  },
+                  {
+                      "path":  "src/app/api/v1/projects/[projectId]/ai-usage/route.ts",
+                      "sha256":  "b6c95dfbad7e7a831b399a19840a362051bc63389da13ae27ce4bd089795ba08"
+                  },
+                  {
+                      "path":  "src/app/projects/[projectId]/reports/page.tsx",
+                      "sha256":  "22ad5a1a5117c1ab976c0db0ea68e4f09640a9645e5d44e8ff9da6dadad0d8d5"
+                  },
+                  {
+                      "path":  "src/app/projects/[projectId]/settings/page.tsx",
+                      "sha256":  "91c960f97215408d317d70fb039d713046ae5ba6d867a89f736588eb2867632f"
+                  },
+                  {
+                      "path":  "src/components/progress-report/index.ts",
+                      "sha256":  "d9a1c26e3ed13e8f693478bc5cfcffc8d43a35ee96935d04969106e9a92b123c"
+                  },
+                  {
+                      "path":  "src/components/progress-report/progress-report.tsx",
+                      "sha256":  "3651cb3cca8ae4f08a79c5d08ccf64b0a0550908f3cb9be546ea05e2234c3be2"
+                  },
+                  {
+                      "path":  "src/components/project-ai-usage/index.ts",
+                      "sha256":  "9d7c44c801e731548b536c6d195f32db6b4d6569580f960650f35327714f245f"
+                  },
+                  {
+                      "path":  "src/components/project-ai-usage/project-ai-usage.tsx",
+                      "sha256":  "8136845b8aff9d43ab8270f5778f5b5a771b1ddcd8325593212ef5cbe97b6a6e"
+                  },
+                  {
+                      "path":  "src/components/project-dashboard/project-dashboard.tsx",
+                      "sha256":  "e4fb5d406f7c933bf67eba421f129deed62843e60aeb9b9828ebd7aabfb019d3"
+                  },
+                  {
+                      "path":  "src/components/project-navigation/project-navigation.tsx",
+                      "sha256":  "7654b5a8a45dc0544480057d8efbaafb7b60527a368c3b3e6af3e556e936459f"
+                  },
+                  {
+                      "path":  "src/server/composition.ts",
+                      "sha256":  "daee4a5368021565f63674eb9f527790e930f48da5ba5ca1be92b84319aa9f82"
+                  },
+                  {
+                      "path":  "src/server/progress-report/cache-repository.ts",
+                      "sha256":  "5b66fb2801cf3e993a1722f5bc41375a959a70b054937c59673a5ca58a7dddc6"
+                  },
+                  {
+                      "path":  "src/server/progress-report/generation.ts",
+                      "sha256":  "5488a5b2c8ae594ba4e5efcfd23d9747669153757d4c1db16ba5a66769edf659"
+                  },
+                  {
+                      "path":  "src/server/progress-report/index.ts",
+                      "sha256":  "0836879038ce3fe13a47ad146fd3aae6e897d948322c47c3fd09934b05d83fcc"
+                  },
+                  {
+                      "path":  "src/server/progress-report/input.ts",
+                      "sha256":  "76583380c75df15d947dd61c0b2a5246a4ca5a302e5424b287a1dd69e6680d70"
+                  },
+                  {
+                      "path":  "src/server/progress-report/types.ts",
+                      "sha256":  "a45d2dd398fa72ac97b8b9415cf44af97170f588fb5a1edef22fe8f559eb367c"
+                  },
+                  {
+                      "path":  "src/server/project-ai-usage/errors.ts",
+                      "sha256":  "453087fbe50a58a26038974ebeedac3c3cd2cca214f5a347b80f323b409a00ee"
+                  },
+                  {
+                      "path":  "src/server/project-ai-usage/handlers.ts",
+                      "sha256":  "b8139576043589dc27c8d07604c7ac8d26f4b9ec492ee9ecf75e5f51265a5a36"
+                  },
+                  {
+                      "path":  "src/server/project-ai-usage/index.ts",
+                      "sha256":  "358765e9c779eb3d8835307026f96024e89746a19542517ef1d566d0b96277e4"
+                  },
+                  {
+                      "path":  "src/server/project-ai-usage/repository.ts",
+                      "sha256":  "65652d73bbb71751b920ca23f12855b3265aeb83f995ccac83b8cbffb4b40d0a"
+                  },
+                  {
+                      "path":  "src/server/project-ai-usage/service.ts",
+                      "sha256":  "a9aa44ade12554e71877f2cc167611bd4fd9d7d5fc7e66055d9008b9c759541f"
+                  },
+                  {
+                      "path":  "src/server/project-ai-usage/types.ts",
+                      "sha256":  "c1ed885e308d0e3edc3b3cb579294efe752decc27f2573a613a4f7af084ddd52"
+                  },
+                  {
+                      "path":  "supabase/migrations/20261110090000_report_redaction_count.sql",
+                      "sha256":  "dac0ddbafa4b7e576c96ca7b99ff85476434be6bf9845ed366e2c3ca7262bc67"
+                  },
+                  {
+                      "path":  "tests/integration/db/progress-report-generation.test.ts",
+                      "sha256":  "9077bb986206dbe13f06a694c8be6f430071f704731aa17644f54a9e0256790d"
+                  },
+                  {
+                      "path":  "tests/integration/db/project-ai-usage.test.ts",
+                      "sha256":  "715fa7965940a72cae412738a61b1bd7c0092f559396bb21c92cd10ec99735c5"
+                  },
+                  {
+                      "path":  "tests/integration/db/report-redaction-count.test.ts",
+                      "sha256":  "6380e6b625a8b08a7710b9069505e3a557edc2d3f61a45069fc918edc02ecee4"
+                  },
+                  {
+                      "path":  "tests/unit/ai/source-boundaries.test.ts",
+                      "sha256":  "7414918ad07e1085aaa97fd20dd0423351ebf20b8853c8cc723aeeeceb0d1d9f"
+                  },
+                  {
+                      "path":  "tests/unit/progress-report/generation.test.ts",
+                      "sha256":  "0f7b11296cc63ccbb07198c0782c8cd0c95081709f9c2831359bdbf468966cad"
+                  },
+                  {
+                      "path":  "tests/unit/progress-report/generation-fixtures.ts",
+                      "sha256":  "29c8c40d586950edb1f9da5588021440fb821f85db168bdbdd2c42e23a50c91a"
+                  },
+                  {
+                      "path":  "tests/unit/progress-report/handlers-generation.test.ts",
+                      "sha256":  "fd6c7bdbbf38b00030c3398617aaea16d5dc83011dce938d0d227f1ed5d02487"
+                  },
+                  {
+                      "path":  "tests/unit/progress-report/input.test.ts",
+                      "sha256":  "0f0f0eb740f7f99be2204d311d7728295e37cbf29b20a1b31cdb18aa297483eb"
+                  },
+                  {
+                      "path":  "tests/unit/progress-report/redaction-metadata.test.ts",
+                      "sha256":  "8c1c22854fe034f4808f59deccb5f6fbb1ed699adcaff97ae379b5559a5ffc83"
+                  },
+                  {
+                      "path":  "tests/unit/progress-report/report-component.test.tsx",
+                      "sha256":  "f559c3067a638756addbbd93aa6ac2bf33774c7d07725b50e64202d87bbac89c"
+                  },
+                  {
+                      "path":  "tests/unit/progress-report/report-page.test.tsx",
+                      "sha256":  "3509dbc15ef4aea1cf51b5f031e3fc7da859fcc35378b536ed28fd84441487cf"
+                  },
+                  {
+                      "path":  "tests/unit/project-ai-usage/component.test.tsx",
+                      "sha256":  "c4d3b0fa4c2520c66bdc50cffb60f9e2e11527857096f9c33d3fd57152379a7d"
+                  },
+                  {
+                      "path":  "tests/unit/project-ai-usage/handlers.test.ts",
+                      "sha256":  "3321494c3f821122ccac206752f1f20631f4a6b9ed3aae2b4dcc1425f0aca566"
+                  },
+                  {
+                      "path":  "tests/unit/project-ai-usage/service.test.ts",
+                      "sha256":  "61e77793fe55932111e5585e168d58de12aa68ae177e707f669c17a392a2bd05"
+                  },
+                  {
+                      "path":  "tests/unit/project-ai-usage/settings-page.test.tsx",
+                      "sha256":  "c1bb6904f2dba2287ce636861322fc8a3ee2cb3e7ef28cf17799b6425fd6979d"
+                  },
+                  {
+                      "path":  "tests/unit/project-dashboard/project-dashboard-view.test.tsx",
+                      "sha256":  "31d30be5a45b51da214d06e81d3621d5dc886a4e62329574fa364239c72c6821"
+                  },
+                  {
+                      "path":  "tests/unit/task-pages/project-navigation.test.tsx",
+                      "sha256":  "54dda4f99a6daa966cc92e71aa4c91ec3132fe55efe53204a4ac77bb512ef526"
+                  }
+              ],
+    "testedSourceRevision":  "daaad85e97dcc441e7c09ec0dce7e0588581fbc2",
+    "validationContext":  "Checks ran before the product commit against the recorded 45 file hashes; every hash matched before staging, and the commit pins that validated content. No code changes justified rerunning checks."
+}
