@@ -88,8 +88,8 @@ function detail({ status = "in_progress", empty = false }: Options = {}) {
       ],
     },
     attachedCommits: empty ? [] : [
-      { id: uuid(11), sha: "1".repeat(40), attachedBy: developer, attachedAt: "2026-11-05T01:00:00.000Z" },
-      { id: uuid(12), sha: "2".repeat(40), attachedBy: developer, attachedAt: "2026-11-05T02:00:00.000Z" },
+      { id: uuid(11), sha: "1".repeat(40), sourceBranch: "feat/selected", attachedBy: developer, attachedAt: "2026-11-05T01:00:00.000Z" },
+      { id: uuid(12), sha: "2".repeat(40), sourceBranch: "feat/selected", attachedBy: developer, attachedAt: "2026-11-05T02:00:00.000Z" },
     ],
     progressUpdates: [
       { id: uuid(21), author: developer, body: "Synthetic update earlier", createdAt: "2026-11-04T01:00:00.000Z" },
@@ -135,7 +135,7 @@ function expectDetailFields(html: string) {
   for (const criterion of value.task.acceptanceCriteria) expect(text).toContain(criterion.description);
   expect(text).toContain(developer.githubUsername);
   expect(html).toContain("2026-11-30");
-  expect(text).toContain("feature/synthetic-branch");
+  expect(text).toContain("feat/selected");
   for (const commit of value.attachedCommits) expect(html).toContain(commit.sha.slice(0, 7));
   expect(text).toContain("Synthetic review feedback");
   for (const entry of value.checkHistory) expect(html).toContain(entry.anchorSha.slice(0, 7));
@@ -255,7 +255,7 @@ describe("Task detail actions follow the role", () => {
     const html = await render();
 
     expect(visibleText(html)).toContain("Run check");
-    expect(visibleText(html)).toContain("Add commits");
+    expect(visibleText(html)).toContain("Edit commits");
     expect(stubs(html, "progress-update-form")).toEqual([
       expect.objectContaining({ "data-project-id": projectId, "data-task-id": taskId }),
     ]);
@@ -386,14 +386,14 @@ describe("Approved task-detail UI follow-up", () => {
     expect(main).not.toContain("Synthetic update later");
     expect(main).not.toContain("1".repeat(7));
     expect(main).not.toContain(details);
-    for (const marker of ["Assignee", usernames.developer, "Branch", "feature/synthetic-branch", "Status", "In Progress", "Due date", "2026-11-30"]) {
+    for (const marker of ["Assignee", usernames.developer, "Source branches", "feat/selected", "Status", "In Progress", "Due date", "2026-11-30"]) {
       expect(details).toContain(marker);
     }
     expect(timeline).toContain("Synthetic update later");
     expect(timeline).toContain(usernames.developer);
     expect(timeline).not.toContain('data-stub="progress-update-form"');
     expect(commits).toContain("1".repeat(7));
-    expect(commits).toContain("Add commits");
+    expect(commits).toContain("Edit commits");
     expect(commits).not.toContain("Run check");
     expectReadingOrder(html, [main, details, timeline, commits]);
   });
@@ -479,7 +479,7 @@ describe("Approved task-detail UI follow-up", () => {
     f.getTaskDetail.mockResolvedValue({ ...value, task: { ...value.task, branchName: null } });
     const html = await render();
 
-    expect(namedCard(html, "Details")).toContain("No branch recorded");
+    expect(namedCard(html, "Details")).toContain("No attached commits yet.");
     expect(namedCard(html, "Progress updates")).toContain("No progress updates yet.");
     const commits = namedCard(html, "Attached commits");
     expect(commits).toContain("No commits are attached yet.");
@@ -487,5 +487,38 @@ describe("Approved task-detail UI follow-up", () => {
     expect(namedCard(html, "Acceptance Criteria Check")).toContain("Run check");
     expect(stubs(html, "progress-update-form")).toHaveLength(1);
     expect(stubs(html, "submit-for-review")).toHaveLength(1);
+  });
+});
+
+
+describe("attached commit source branches", () => {
+  it("summarizes source branches and counts in developer Details without using the configured branch", async () => {
+    const value = detail();
+    value.attachedCommits.push({ ...value.attachedCommits[0], id: uuid(13), sha: "3".repeat(40), sourceBranch: "feat/another" });
+    f.getTaskDetail.mockResolvedValue(value);
+    const html = await render();
+    const details = visibleText(namedCard(html, "Details"));
+    expect(details).toMatch(/feat\/selected\s*(?:[·:—(]\s*)?2/);
+    expect(details).toMatch(/feat\/another\s*(?:[·:—(]\s*)?1/);
+    expect(details).not.toContain("feature/synthetic-branch");
+  });
+  it.each(["developer", "product_manager"])("shows each commit's branch and legacy fallback for %s", async (role) => {
+    if (role === "product_manager") asProductManager();
+    const value = detail();
+    const commits = value.attachedCommits as { sourceBranch: string | null }[];
+    commits[1].sourceBranch = null;
+    f.getTaskDetail.mockResolvedValue(value);
+    const html = await render();
+    const card = namedCard(html, "Attached commits");
+    expect(card).toContain("feat/selected"); expect(card).toContain("Branch not recorded");
+    if (role === "developer") expect(namedCard(html, "Details")).toContain("Branch not recorded");
+    else expect(smallestContainer(html, "Synthetic detail title", "header")).toContain("feature/synthetic-branch");
+  });
+  it.each(["to_do", "in_review", "done"])("keeps attachments and check history visible but offers no commit edit while %s", async (status) => {
+    f.getTaskDetail.mockResolvedValue(detail({ status }));
+    const html = await render();
+    expect(namedCard(html, "Attached commits")).toContain("feat/selected");
+    expect(visibleText(html)).not.toMatch(/Add commits|Save commits|Edit commits/);
+    for (const entry of detail().checkHistory) expect(html).toContain(entry.anchorSha.slice(0, 7));
   });
 });
