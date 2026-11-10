@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState, useTransition, type FormEvent } from "react";
+import { useId, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { changeTaskState, staleMessage, type StateChange } from "./task-requests";
 import { useTaskStatus } from "./task-status";
@@ -22,10 +22,6 @@ export function ReviewActions({ projectId, taskId, taskKey, version }: ReviewAct
   const [refreshing, startTransition] = useTransition();
   const fieldId = useId();
 
-  useEffect(() => {
-    if (!busy && !refreshing) setActiveAction(null);
-  }, [busy, refreshing]);
-
   async function apply(change: StateChange, success: string, action: "approve" | "request_changes") {
     setBusy(true);
     setActiveAction(action);
@@ -40,7 +36,10 @@ export function ReviewActions({ projectId, taskId, taskKey, version }: ReviewAct
     // F4: the entry leaves the queue after the refresh, so the outcome goes to the page-level region.
     if (outcome === "ok") setFeedback("");
     announce(outcome === "ok" ? success : staleMessage(taskKey));
-    startTransition(() => router.refresh());
+    startTransition(() => {
+      setActiveAction(null);
+      router.refresh();
+    });
   }
 
   async function approve() {
