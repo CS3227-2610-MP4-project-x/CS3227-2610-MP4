@@ -4,7 +4,7 @@ import { createProgressReportHandlers } from "@/server/progress-report";
 import { ids, range } from "./generation-fixtures";
 
 const origin = "https://synthetic.example";
-const empty = { report: { kind: "empty" as const, range, statements: [] as [], githubUnavailable: false as const }, reused: false };
+const empty = { report: { kind: "empty" as const, range, statements: [] as [], githubUnavailable: false as const, redaction: { occurred: false, replacementCount: 0 } }, reused: false };
 function setup() {
   const resolveAccess = vi.fn(async (..._args: unknown[]): Promise<{ personId: string; role: "product_manager" | "developer" } | Response> => ({ personId: ids.pm, role: "product_manager" }));
   const generate = vi.fn(async (..._args: unknown[]) => empty);

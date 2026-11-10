@@ -30,6 +30,7 @@ import { TaskBoardRepository, TaskBoardService } from "@/server/task-board";
 import { ReviewQueueRepository, ReviewQueueService } from "@/server/review-queue";
 import { ProjectDashboardRepository, ProjectDashboardService } from "@/server/project-dashboard";
 import { createProgressReportGenerationService, createProgressReportRepository, createProgressReportService, createReportCacheRepository } from "@/server/progress-report";
+import { createProjectAiUsageRepository, createProjectAiUsageService, ProjectAiUsageError } from "@/server/project-ai-usage";
 
 export type ServerComposition = Readonly<{
   authService: AuthService;
@@ -48,6 +49,7 @@ export type ServerComposition = Readonly<{
   projectDashboardService: ProjectDashboardService;
   progressReportService: ReturnType<typeof createProgressReportService>;
   progressReportGenerationService: ReturnType<typeof createProgressReportGenerationService>;
+  projectAiUsageService: ReturnType<typeof createProjectAiUsageService>;
   config: ReturnType<typeof getServerConfig>;
   llmGateway: LlmGateway;
 }>;
@@ -123,6 +125,27 @@ export function getServerComposition(): ServerComposition {
     gateway: llmGateway,
     providerModel: config.ai.provider === "soclaas" ? `${config.ai.provider}:${config.ai.model}` : "fake:fake",
   });
+  const projectAiUsageRepository = createProjectAiUsageRepository({
+    query: async <Row,>(text: string, values?: readonly unknown[]) => {
+      const result = await pool.query(text, values ? [...values] : []);
+      return { rows: result.rows as Row[] };
+    },
+  });
+  const projectAiUsageService = createProjectAiUsageService({
+    repository: projectAiUsageRepository,
+    authorizeProductManager: async ({ projectId, actorId }) => {
+      const role = await projectAccessRepository.findProjectRole(projectId, actorId);
+      if (!role) throw new ProjectAiUsageError("NOT_FOUND");
+      if (role !== "product_manager") throw new ProjectAiUsageError("FORBIDDEN");
+    },
+    readCurrentSgtDate: async () => {
+      const result = await pool.query<{ date: string }>("SELECT (now() AT TIME ZONE 'Asia/Singapore')::date::text AS date");
+      const date = result.rows[0]?.date;
+      if (!date) throw new Error("Could not read the current SGT date.");
+      return date;
+    },
+    environment: config.appEnvironment,
+  });
   composition = Object.freeze({
     authService: new AuthService(config.appOrigin, peopleRepository),
     peopleRepository,
@@ -140,6 +163,7 @@ export function getServerComposition(): ServerComposition {
     projectDashboardService,
     progressReportService,
     progressReportGenerationService,
+    projectAiUsageService,
     config,
     llmGateway,
   });

@@ -18,7 +18,7 @@ dbDescribe("8.2 real PostgreSQL report generation/cache publication", () => {
     const task = await createTask(database().admin, { projectId: team.projectId, assigneeId: team.developerId, status: "in_progress" });
     await insertTaskChild(database().admin, ENTITY_TABLES.progressUpdates, { projectId: team.projectId, taskId: task.id, actorId: team.developerId }, { created_at: "2026-11-09T01:00:00Z" });
     const statements = [{ developerId: team.developerId, category: "in_progress" as const, text: "Made progress.", taskIds: [task.id] }];
-    const key = { projectId: team.projectId, rangeStart: range.startDate, rangeEnd: range.endDate, inputFingerprint: "a".repeat(64), generationContractVersion: "progress-report-v1", providerModel: "fake:fake" };
+    const key = { projectId: team.projectId, rangeStart: range.startDate, rangeEnd: range.endDate, inputFingerprint: "a".repeat(64), generationContractVersion: "progress-report-v2", providerModel: "fake:fake", redactionReplacementCount: 0 };
     const publication = { key, statements, model: "fake", githubUnavailable: false, latestActivityAt: "2026-11-09T01:00:00.000Z", expectedVersion: null, personId: team.productManagerId };
     return { team, task, statements, key, publication };
   }
@@ -36,7 +36,7 @@ dbDescribe("8.2 real PostgreSQL report generation/cache publication", () => {
     const created = await repository.publish(f.publication);
     expect(created.kind).toBe("stored");
     const stored = await repository.read(f.key);
-    expect(stored).toMatchObject({ projectId: f.team.projectId, statements: f.statements, inputFingerprint: f.key.inputFingerprint, generationContractVersion: "progress-report-v1", providerModel: "fake:fake", githubUnavailable: false, version: expect.any(Number) });
+    expect(stored).toMatchObject({ projectId: f.team.projectId, statements: f.statements, inputFingerprint: f.key.inputFingerprint, generationContractVersion: "progress-report-v2", providerModel: "fake:fake", githubUnavailable: false, version: expect.any(Number) });
     expect(new Date(stored!.createdAt).toISOString()).toBe(stored!.createdAt);
     const other = await createProjectWithTeam(database().admin);
     expect(await repository.read({ ...f.key, projectId: other.projectId })).toBeNull();
@@ -265,7 +265,7 @@ dbDescribe("8.2 real PostgreSQL report generation/cache publication", () => {
     await blocker.query("BEGIN");
     await insertReport(blocker, f.team.projectId, { start: range.startDate, end: range.endDate }, {
       model: "fake", statements: JSON.stringify(f.statements), github_evidence_unavailable: true,
-      input_fingerprint: f.key.inputFingerprint, generation_contract_version: f.key.generationContractVersion, provider_model: f.key.providerModel,
+      input_fingerprint: f.key.inputFingerprint, generation_contract_version: f.key.generationContractVersion, provider_model: f.key.providerModel, redaction_replacement_count: 0,
     });
     const publication = createReportCacheRepository(pool()).publish({ ...f.publication, githubUnavailable: true }).then(
       (result) => ({ ok: true as const, result }),
@@ -299,7 +299,7 @@ dbDescribe("8.2 real PostgreSQL report generation/cache publication", () => {
     await blocker.query("BEGIN");
     const winner = await insertReport(blocker, f.team.projectId, { start: range.startDate, end: range.endDate }, {
       model: "fake", statements: JSON.stringify(f.statements), github_evidence_unavailable: false,
-      input_fingerprint: initial.inputFingerprint, generation_contract_version: "progress-report-v1", provider_model: "fake:fake",
+      input_fingerprint: initial.inputFingerprint, generation_contract_version: "progress-report-v2", provider_model: "fake:fake", redaction_replacement_count: 0,
     });
     const adapter = new FakeAdapter([{ ok: true, text: JSON.stringify({ statements: [{ ...f.statements[0], text: "Losing generation" }] }), usage: { inputTokens: 12, outputTokens: 8 } }]);
     const complete = vi.spyOn(adapter, "complete");

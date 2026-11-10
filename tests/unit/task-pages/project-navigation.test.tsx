@@ -98,14 +98,6 @@ function hrefOf(anchor: string): string | undefined {
   return /\bhref="([^"]*)"/.exec(anchor)?.[1];
 }
 
-function expectDisabledTab(html: string, label: string) {
-  expect(visibleText(html)).toContain(label);
-  expect(links(html, label), `${label} is not a link`).toEqual([]);
-  const disabled = [...html.matchAll(/<(\w+)\b[^>]*aria-disabled="true"[^>]*>([\s\S]*?)<\/\1>/g)]
-    .some((match) => visibleText(match[2]).includes(label));
-  expect(disabled, `${label} is marked aria-disabled`).toBe(true);
-}
-
 function expectLinkedTab(html: string, label: string, href: string) {
   const found = links(html, label);
   expect(found, `${label} tab`).toHaveLength(1);
@@ -125,13 +117,13 @@ describe("project navigation tabs (B4, O1-a)", () => {
     expect(html.indexOf(accountMenus[0][0])).toBeGreaterThan(html.indexOf("</nav>"));
   });
 
-  it("shows the product manager Dashboard, Board, Review Queue, Reports (disabled) and Settings", async () => {
+  it("shows product manager report navigation after the D9 readiness gate", async () => {
     const html = await navigation("product_manager");
 
     expectLinkedTab(html, "Dashboard", `/projects/${projectId}/dashboard`);
     expectLinkedTab(html, "Board", `/projects/${projectId}/board`);
     expectLinkedTab(html, "Review Queue", `/projects/${projectId}/review-queue`);
-    expectDisabledTab(html, "Reports");
+    expectLinkedTab(html, "Reports", `/projects/${projectId}/reports`);
     expectLinkedTab(html, "Settings", `/projects/${projectId}/settings`);
   });
 
@@ -159,7 +151,7 @@ describe("project navigation tabs (B4, O1-a)", () => {
   });
 
   it.each([
-    ["dashboard", "Dashboard"], ["board", "Board"], ["tasks", "Board"], ["review-queue", "Review Queue"], ["settings", "Settings"],
+    ["dashboard", "Dashboard"], ["board", "Board"], ["tasks", "Board"], ["review-queue", "Review Queue"], ["settings", "Settings"], ["reports", "Reports"],
   ] as const)("marks the right tab current on segment %s (F5)", async (segment, label) => {
     f.segment = segment;
 
@@ -169,15 +161,11 @@ describe("project navigation tabs (B4, O1-a)", () => {
     expect(current).toEqual([label]);
   });
 
-  it.each(["Reports"])("gives the disabled %s tab a distinct class and a Coming soon hint (F6)", async (label) => {
+  it("keeps the ready Reports link free of disabled and coming-soon presentation", async () => {
     const html = await navigation("product_manager");
-
-    const element = [...html.matchAll(/<(\w+)\b([^>]*aria-disabled="true"[^>]*)>([\s\S]*?)<\/\1>/g)]
-      .find((match) => visibleText(match[3]).includes(label));
-    expect(element, `${label} disabled tab`).toBeDefined();
-    expect(/\bclass="([^"]*)"/.exec(element![2])?.[1] ?? "").toMatch(/(?:^|\s)project-nav-link-disabled(?:\s|$)/);
-    expect(element![0]).toMatch(/coming soon/i);
-    for (const anchor of html.match(/<a\b[^>]*>/g) ?? []) expect(anchor).not.toContain("project-nav-link-disabled");
+    const reportLinks = links(html, 'Reports');
+    expect(reportLinks).toHaveLength(1);
+    expect(reportLinks[0]).not.toMatch(/aria-disabled="true"|project-nav-link-disabled|coming soon/i);
   });
 });
 

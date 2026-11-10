@@ -29,7 +29,7 @@ export function ProjectDashboard({ projectId, role, dashboard, members }: Props)
       <TaskManager projectId={projectId} members={members ?? null} className="dashboard-action dashboard-create-action"
         expandedClassName="dashboard-create-action-expanded" />
       <Link className="dashboard-action" href={`/projects/${encodeURIComponent(projectId)}/review-queue`}><span aria-hidden="true">◷</span><span>Review Queue</span></Link>
-      <div className="dashboard-action dashboard-action-disabled" aria-disabled="true" title="Coming soon in task 8.3"><span aria-hidden="true">▤</span><span>Progress Report</span><span className="sr-only"> (coming soon)</span></div>
+      <Link className="dashboard-action" href={`/projects/${encodeURIComponent(projectId)}/reports`}><span aria-hidden="true">▤</span><span>Progress Report</span></Link>
     </div></div>}
     <section aria-labelledby="project-progress-heading" className="dashboard-card mt-8">
       <h2 id="project-progress-heading" className="workspace-kicker">Project Progress</h2>

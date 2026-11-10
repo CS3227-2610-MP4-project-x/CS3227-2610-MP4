@@ -1,6 +1,7 @@
 import "server-only";
 
 export type ReportRange = Readonly<{ startDate: string; endDate: string; startUtc: string; endUtcExclusive: string }>;
+export type ReportRedaction = Readonly<{ occurred: boolean; replacementCount: number }>;
 export type ReportTask = Readonly<{ taskId: string; taskKey: string; title: string; currentAssignee: Readonly<{ personId: string; githubUsername: string }>; status: "to_do" | "in_progress" | "in_review" | "done"; dueDate: string; requestChangesCount: number }>;
 type ReportActivityBase = Readonly<{ taskId: string; taskKey: string; sourceId: string; occurredAt: string; actor: Readonly<{ personId: string; githubUsername: string }> | null }>;
 type StatusTransition = Readonly<{ fromStatus: string | null; toStatus: string | null }>;
@@ -26,8 +27,8 @@ export type ReportReadSession = Readonly<{
 }>;
 export type ReportRepository = Readonly<{ withReadSnapshot<T>(read: (session: ReportReadSession) => Promise<T>): Promise<T> }>;
 export type ReportAssemblyResult =
-  | Readonly<{ kind: "ready"; range: ReportRange; inputText: string; inputLength: number; inputFingerprint: string; databaseFingerprint?: string; githubUnavailable: boolean }>
-  | Readonly<{ kind: "empty"; range: ReportRange }>
+  | Readonly<{ kind: "ready"; range: ReportRange; inputText: string; inputLength: number; inputFingerprint: string; databaseFingerprint?: string; githubUnavailable: boolean; redaction: ReportRedaction }>
+  | Readonly<{ kind: "empty"; range: ReportRange; redaction: ReportRedaction }>
   | Readonly<{ kind: "invalid_range" }>
   | Readonly<{ kind: "range_too_long" }>
   | Readonly<{ kind: "input_budget_exceeded"; range: ReportRange }>;

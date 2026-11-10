@@ -101,7 +101,11 @@ Depends on: 4.1–4.4 and 6. Can run alongside group 7 and tasks 4.5–4.7.
 
 - [x] 8.1 Implement report input assembly from structured activity for a date range in SGT; add tests for range boundaries (including late-evening activity), excluded diffs, empty ranges, ranges longer than 7 days, and activity over the input budget.
 - [x] 8.2 Implement report generation with citation checks and caching invalidated by new activity; add fake-adapter tests and product-manager-only API authorization tests.
-- [ ] 8.3 Build the report page and the project AI usage view; add product-manager-only project usage API authorization tests.
+- [x] 8.3 Build the report page and the project AI usage view; add product-manager-only project usage API authorization tests.
+
+### Task 8.3 D9 prerequisite (contract approved 10 November 2026)
+
+Implemented on 10 November 2026: structured-input replacement counts before escaping (once per occurrence, excluding inherited check flags and retry multiplication), server-owned occurrence/count DTO metadata, a new report-count migration, count-sensitive cache identity and generation contract v2, legacy unknown-count regeneration, and positive-count-only disclosure. Fresh general/security reviews and frontend checks reported no findings before PM report entry points were enabled; a fresh final review also reported no findings. Final checks passed: 69 unit files / 2,398 tests, 25 synthetic PostgreSQL 18 files / 375 tests, 8 synthetic browser checks, lint, TypeScript and production build. See `workflow/handoffs/reports-page-and-usage-8-3.md` and its evidence directory. Strict OpenSpec validation retains six pre-existing unrelated length warnings. Human cross-review, interaction-summary verification, actual authenticated journeys/accessibility/live-provider evaluation and controlled real-environment migration remain pending. This checkbox records implementation completion, not human approval or release readiness; no commit or real-environment migration execution is authorized by this tracking update.
 
 ## 9. Verification and Evidence
 

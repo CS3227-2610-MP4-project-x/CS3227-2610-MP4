@@ -6,6 +6,18 @@ Defines the integrity guarantees of the PostgreSQL schema that stores people, pr
 
 ## ADDED Requirements
 
+### Requirement: Reports persist verified redaction counts
+The system SHALL add report replacement-count storage through a new versioned migration. New reports SHALL retain a nonnegative integer count without secret values, and `occurred` SHALL be derived from whether the count exceeds zero. Legacy rows without a verified count SHALL remain cache misses until regenerated.
+
+#### Scenario: Report metadata round trip
+- **WHEN** a generated report with a verified replacement count is stored and read
+- **THEN** the same count is retained and reused without secret values
+
+#### Scenario: Legacy counts are unknown
+- **WHEN** an existing report has no verified replacement count
+- **THEN** the migration does not invent zero for that report
+- **AND** report generation treats it as a cache miss and regenerates it
+
 ### Requirement: Schema is created by versioned migrations
 The system SHALL create and change the database schema only through ordered, versioned migrations kept in the repository. A migration that has shipped SHALL NOT be edited; a change SHALL be a new migration. Migrations SHALL be applied as a controlled release step, not by the running application.
 

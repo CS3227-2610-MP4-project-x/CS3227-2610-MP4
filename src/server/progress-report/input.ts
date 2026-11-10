@@ -34,13 +34,15 @@ export function resolveReportRange(input: { startDate?: unknown; endDate?: unkno
   return { kind: "valid", range: { startDate: start, endDate: end, startUtc, endUtcExclusive } };
 }
 
-function safeText(text: string): string {
-  return sanitizePromptData(redactSecrets(text).text);
+function safeTextWithCount(text: string, countReplacement: (count: number) => void): string {
+  const redacted = redactSecrets(text);
+  countReplacement(redacted.redactionCount);
+  return sanitizePromptData(redacted.text);
 }
-function safeActor(actor: ReportActivity["actor"]): ReportActivity["actor"] {
+function safeActor(actor: ReportActivity["actor"], safeText: (text: string) => string): ReportActivity["actor"] {
   return actor ? { personId: actor.personId, githubUsername: safeText(actor.githubUsername) } : null;
 }
-function safeActivity(row: ReportActivity): Record<string, unknown> {
+function safeActivity(row: ReportActivity, safeText: (text: string) => string): Record<string, unknown> {
   let payload: Record<string, unknown>;
   switch (row.type) {
     case "progress_update": payload = { body: safeText(String(row.payload.body ?? "")) }; break;
@@ -54,28 +56,33 @@ function safeActivity(row: ReportActivity): Record<string, unknown> {
       break;
     }
   }
-  return { taskId: row.taskId, taskKey: row.taskKey, type: row.type, sourceId: row.sourceId, occurredAt: row.occurredAt, actor: safeActor(row.actor), payload };
+  return { taskId: row.taskId, taskKey: row.taskKey, type: row.type, sourceId: row.sourceId, occurredAt: row.occurredAt, actor: safeActor(row.actor, safeText), payload };
 }
 
 export function prepareReportInput(input: { range: ReportRange; snapshot: ReportSnapshot; metadata: ReportMetadataResult; deletionMarkers?: readonly { taskId: string; deletedAt: string }[]; databaseFingerprint?: string }): ReportAssemblyResult {
   const { range, snapshot, metadata } = input;
   const githubUnavailable = metadata.kind === "unavailable";
-  const activities: Record<string, unknown>[] = snapshot.activity.map(safeActivity);
+  let replacementCount = 0;
+  const safe = (text: string): string => safeTextWithCount(text, (count) => { replacementCount += count; });
+  const activities: Record<string, unknown>[] = snapshot.activity.map((activity) => safeActivity(activity, safe));
   if (metadata.commits?.length) {
     const commits = new Map(metadata.commits.map((commit) => [commit.sha.toLowerCase(), commit]));
     for (const attached of snapshot.attachedCommits) {
       const commit = commits.get(attached.sha.toLowerCase());
       if (!commit || commit.authoredAt < range.startUtc || commit.authoredAt >= range.endUtcExclusive) continue;
-      activities.push({ taskId: attached.taskId, taskKey: attached.taskKey, type: "attached_commit", sourceId: attached.sha, occurredAt: commit.authoredAt, actor: commit.author.githubUsername ? { githubUsername: safeText(commit.author.githubUsername) } : null,
-        payload: { sha: commit.sha, authoredAt: commit.authoredAt, message: safeText(commit.message), attachedAt: attached.attachedAt } });
+      activities.push({ taskId: attached.taskId, taskKey: attached.taskKey, type: "attached_commit", sourceId: attached.sha, occurredAt: commit.authoredAt, actor: commit.author.githubUsername ? { githubUsername: safe(commit.author.githubUsername) } : null,
+        payload: { sha: commit.sha, authoredAt: commit.authoredAt, message: safe(commit.message), attachedAt: attached.attachedAt } });
     }
   }
-  if (!activities.length && !githubUnavailable) return { kind: "empty", range };
+  if (!activities.length && !githubUnavailable) return { kind: "empty", range, redaction: { occurred: false, replacementCount: 0 } };
   const taskGroups = new Map<string, { currentAssignee: ReportSnapshot["tasks"][number]["currentAssignee"]; tasks: Record<string, unknown>[] }>();
   for (const task of snapshot.tasks) {
-    const assignee = { personId: task.currentAssignee.personId, githubUsername: safeText(task.currentAssignee.githubUsername) };
+    const assignee = { personId: task.currentAssignee.personId, githubUsername: safe(task.currentAssignee.githubUsername) };
     const group = taskGroups.get(assignee.personId) ?? { currentAssignee: assignee, tasks: [] };
-    group.tasks.push({ taskId: task.taskId, taskKey: task.taskKey, title: safeText(task.title), currentAssignee: assignee, status: task.status, dueDate: task.dueDate,
+    // The group and each task both serialize the current assignee. Count each appearance,
+    // even though the first task's sanitized assignee object is shared in memory.
+    if (group.tasks.length === 0) replacementCount += redactSecrets(task.currentAssignee.githubUsername).redactionCount;
+    group.tasks.push({ taskId: task.taskId, taskKey: task.taskKey, title: safe(task.title), currentAssignee: assignee, status: task.status, dueDate: task.dueDate,
       requestChangesCount: task.requestChangesCount, overdue: task.status !== "done" && task.dueDate < range.endDate, repeatedChanges: task.requestChangesCount > 1 });
     taskGroups.set(assignee.personId, group);
   }
@@ -86,8 +93,9 @@ export function prepareReportInput(input: { range: ReportRange; snapshot: Report
   const inputText = JSON.stringify(data);
   return inputText.length > LIMIT ? { kind: "input_budget_exceeded", range } : {
     kind: "ready", range, inputText, inputLength: inputText.length,
-    inputFingerprint: createHash("sha256").update(JSON.stringify({ inputText, deletionMarkers: input.deletionMarkers ?? [] }), "utf8").digest("hex"),
+    inputFingerprint: createHash("sha256").update(JSON.stringify({ inputText, deletionMarkers: input.deletionMarkers ?? [], redactionReplacementCount: replacementCount }), "utf8").digest("hex"),
     ...(input.databaseFingerprint ? { databaseFingerprint: input.databaseFingerprint } : {}),
     githubUnavailable,
+    redaction: { occurred: replacementCount > 0, replacementCount },
   };
 }

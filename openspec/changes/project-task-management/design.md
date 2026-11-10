@@ -1,5 +1,47 @@
 # Design
 
+## Report Page and Project AI Usage Decisions (8.3)
+
+Human approval (10 November 2026): "I approve the spec delta and recommendations for the decisions."
+Gate: D1-D9 accepted: 9; modified: 0; rejected: 0. Owner: Developer B. These decisions supersede earlier report-navigation deferrals only as the report page becomes ready; D9 remains a prerequisite, not a waiver.
+
+- **D1 (accept) - Page and entry points.** Use `/projects/{projectId}/reports`; enable both existing PM report entry points; place usage within existing Settings. No separate usage page or report history.
+- **D2 (accept) - Initial generation and range behavior.** Explicit generation only, initial dates from server-side SGT date resolution, seven inclusive days maximum, and existing permission to select future dates. Show pending/error/empty/reused/partial-evidence states; prevent duplicate/stale responses.
+- **D3 (accept) - Developer display labels.** Reuse PM-authorized `projectService.listMembers` for labels, with deterministic username/UUID ordering and a neutral UUID fallback if a returned statement cannot be matched. Do not let the model supply usernames.
+- **D4 (accept) - Usage HTTP contract and bounds.** GET accepts no parameters or exactly both dates, today by default, seven inclusive days, strict duplicate/extra-query rejection, 400 invalid requests, existing safe errors, Node runtime and `no-store`. Read-only GET needs no mutation Origin guard.
+- **D5 (accept) - Usage metrics.** Separate settled charged tokens, pending reserved tokens, and cache hits. Include settled failures in charged totals; attribute by request start (`created_at`) SGT date. Do not imply provider-reported input/output totals equal quota charges.
+- **D6 (accept) - Environment/privacy/ordering.** Filter exclusively to configured `APP_ENV`, display that environment, return project aggregates only, and zero-fill two feature rows per day ordered date descending then feature ascending. No person breakdown, cross-environment selector, raw records or cost/latency additions.
+- **D7 (accept) - Authorization and developer direct navigation.** Existing page conventions: session redirect, nonmember safe not-found, developer PM-only unavailable report view. Keep existing Settings developer placeholders; omit the usage panel/data entirely. Repeat PM access within the usage service before querying aggregates.
+- **D8 (accept) - Module boundary and verification.** Dedicated `src/server/project-ai-usage` read module, public service/handler exports, repository-owned aggregate reads and composition wiring; retain existing gateway usage writes. No migration/dependency expected. Require handler/service authorization, PostgreSQL aggregate/boundary/isolation tests, component/page tests and frontend review. Developer A retains adversarial fixture ownership; preserve 8.2 fake-mode deferral.
+- **D9 (accept) - Blocking redaction conflict.** Resolve this as a separately scoped prerequisite for preserving the existing requirement, then resume the dependent disclosure UI. Do not invent a redaction count or silently waive the requirement. Affected work remains stopped pending a human-approved prerequisite contract. `ai-safeguards` requires report redaction occurrence/count, but report input assembly discards summaries and generated/cache DTOs expose/store none. The prerequisite must define assembly metadata, persisted report/DTO fields, cache behavior and legacy-row handling, reassess scope and add a versioned migration if needed. This approval does not select those missing details. Independent usage work may proceed; task 8.3 remains incomplete until its report/disclosure requirements are satisfied.
+
+### Task 8.3 D9 redaction-work approval
+
+Human approval (10 November 2026): "I approve the redactopm pf D9, please update the relevant documents for me. What else do I need to do before committing?"
+
+Recorded as approval to proceed with D9 redaction-disclosure work, preserving the existing requirement. This is not evidence of implementation or verification and does not waive disclosure. The separate prerequisite contract still needs recorded decisions for assembly replacement-count semantics, persisted report/DTO fields, cached and legacy reports, and migration scope. No concrete contract for these details has yet been presented and approved. D9 remains open until that contract is recorded, the dependent implementation/tests and independent review are complete, and report entry points can be enabled. Task 8.3 remains unchecked. This documentation update authorizes no commit.
+
+### Task 8.3 D9 approved redaction contract
+
+Human approval (10 November 2026): "I approve these proposed decisions". All six proposed decisions accepted; none modified or rejected. This contract supersedes the earlier statements that D9's counting, persistence, DTO, cache and legacy decisions were unrecorded. It resolves the planning blocker, not implementation or verification. Owner: Developer B; Developer A cross-review remains required for AI/public service boundaries.
+
+- **Count.** Count secret replacements in the structured report input before prompt escaping. Count each input occurrence once; retries do not increase the count. Exclude redaction flags inherited from earlier acceptance checks.
+- **DTO.** Expose server-owned `redaction: { occurred: boolean, replacementCount: number }`. The model cannot supply these fields.
+- **Persistence.** Add a new migration storing the replacement count on reports. Derive `occurred` from whether the count exceeds zero. Store no secret values. Do not modify a shipped migration.
+- **Cache.** Include the count in report identity and bump the generation contract version. Reused reports retain their verified count. Treat legacy reports without a count as cache misses and regenerate.
+- **UI.** Show a concise disclosure only when the count is positive, such as "Sensitive content was redacted: 3 replacements." Enable report entry points after implementation and review pass.
+- **Verification.** Add focused tests for counting, retries, persistence, cache invalidation, legacy rows and disclosure; rerun applicable checks and obtain independent review before completing task 8.3.
+
+This explicitly supersedes Secret Redaction Decisions (6.2) D3's "Progress Reports store nothing new" for report replacement counts only. It does not add secret text, redaction kinds or prompt/response content to usage records or logs. The contract authorizes the new migration scope under Developer B; actual migration execution remains a controlled release step with backup/restore planning. Task 8.3 stays unchecked until implementation and verification pass. No additional commit is authorized by this approval.
+
+Implementation evidence (10 November 2026): D9 is implemented and independently reviewed, including the new `20261110090000_report_redaction_count.sql` migration and post-review PM report entry-point enablement. Final checks: 2,398 unit tests, 375 synthetic PostgreSQL 18 tests, 8 synthetic browser checks, lint, type-check and production build pass. D9's former implementation blocker is closed; historical pending statements above describe earlier stages. Task 8.3 now records implementation completion only. Human cross-review and summary verification, real authenticated journeys/accessibility/live-provider evaluation, and controlled real-environment migration remain pending. No code commit or deployment approval is implied.
+
+### Task 8.3 source-boundary test conflict resolution
+
+Human decision (10 November 2026): "Keep D8; authorize the test-writer to update that boundary test to allow the dedicated read-only repository while preserving write restrictions."
+
+The existing `tests/unit/ai/source-boundaries.test.ts` restriction that only the gateway usage writer repository may reference usage tables is superseded for the dedicated `src/server/project-ai-usage/repository.ts` aggregate reader. Gateway usage writes remain exclusively owned by `src/server/repositories/usage-repository.ts`; the new reader must remain read-only. This is a narrow authorization for the same test-writer to update that boundary test, not permission to change Developer A's adversarial AI fixtures. D8 architecture and D9 prerequisite are retained. This addendum is after the single authorized specification commit and remains uncommitted.
+
 ## Developer dashboard and project switching extension
 
 Approved by the human in this chat on 9 November 2026 after reviewing the requirements draft and proposed browser preference design; browser UI checks are explicitly authorized. This extension supersedes D1's old entry-link preservation, D4 for developer summaries, the developer allocation presentation, and B3's project-list landing. The existing product-manager dashboard at `/projects/{projectId}/dashboard` remains in place.

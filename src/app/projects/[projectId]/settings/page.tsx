@@ -7,6 +7,7 @@ import { verifiedGitHubIdentity } from "@/server/github-repository-link";
 import { ProjectRepositorySettings } from "@/components/github-repository/project-repository-settings";
 import { MembersSettings } from "@/components/projects";
 import { ProjectError, type ProjectMemberView } from "@/server/projects";
+import { ProjectAiUsage } from "@/components/project-ai-usage";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,11 @@ export default async function ProjectSettingsPage({ params, searchParams }: {
   const { githubSnapshot } = await searchParams;
   const composition = getServerComposition();
   const access = await requireProjectPageAccess(composition, projectId);
+  let usageToday: string | null = null;
+  if (access.role === "product_manager") {
+    try { usageToday = await composition.projectAiUsageService.readCurrentSgtDate(); }
+    catch { /* Keep the usage panel unavailable when the server SGT clock cannot be read. */ }
+  }
   let bindingState: { kind: "linked"; binding: { owner: string; name: string } } | { kind: "unlinked" } | { kind: "unavailable" } = { kind: "unavailable" };
   try {
     const client = await createRequestSupabaseClient(composition.config);
@@ -55,5 +61,11 @@ export default async function ProjectSettingsPage({ params, searchParams }: {
           <p role="status" className="mt-3 text-sm text-neutral-400">Members settings are available to the project manager.</p>
         </section>}
     <ProjectRepositorySettings projectId={projectId} snapshotId={githubSnapshot} initialBindingState={bindingState} />
+    {access.role === "product_manager" && (usageToday
+      ? <div className="mt-6"><ProjectAiUsage projectId={projectId} initialStartDate={usageToday} initialEndDate={usageToday} environment={composition.config.appEnvironment} /></div>
+      : <section aria-labelledby="project-ai-usage-heading" className="mt-6 rounded-2xl border border-white/10 bg-[#222] p-6 sm:p-9">
+          <h2 id="project-ai-usage-heading" className="text-2xl font-semibold tracking-tight">AI usage</h2>
+          <p role="alert" className="mt-3 text-sm text-amber-200">Usage is unavailable because the current SGT date could not be loaded. Reload Project Settings to try again.</p>
+        </section>)}
   </div></main>;
 }
