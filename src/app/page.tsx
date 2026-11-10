@@ -1,71 +1,36 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { AccountControl } from "@/components/auth/account-control";
-import { createRequestSupabaseClient } from "@/server/auth/supabase-auth";
-import { getVerifiedGitHubProfile } from "@/server/auth/session-identity";
+import { EmptyDashboard } from "@/components/project-dashboard";
+import { projectSelectionCookieName, projectSwitchHref, selectRememberedProject } from "@/lib/project-selection";
+import { requireWorkspaceSession } from "@/server/auth";
 import { getServerComposition } from "@/server/composition";
+import { readMyProjects } from "@/server/projects";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  let profile = null;
-  try {
-    const { config } = getServerComposition();
-    const client = await createRequestSupabaseClient(config);
-    profile = await getVerifiedGitHubProfile(client);
-  } catch {
-    redirect("/sign-in");
+  const composition = getServerComposition();
+  const { authUserId, profile } = await requireWorkspaceSession(composition.config);
+  const projects = await readMyProjects(composition.peopleRepository, composition.projectService, authUserId);
+
+  if (projects === null) {
+    return <main className="workspace-page">
+      <div className="workspace-shell">
+        <p className="workspace-projects-message" role="alert">Your projects could not be loaded. Reload the page to try again.</p>
+      </div>
+    </main>;
   }
 
-  if (!profile) redirect("/sign-in");
+  if (projects.length > 0) {
+    let rememberedId: string | undefined;
+    try {
+      rememberedId = (await cookies()).get(projectSelectionCookieName(authUserId))?.value;
+    } catch {
+      // A browser preference is optional; membership order supplies a safe fallback.
+    }
+    const selected = selectRememberedProject(projects, rememberedId);
+    if (selected) redirect(projectSwitchHref(selected.id, selected.role, "dashboard"));
+  }
 
-  return (
-    <main className="workspace-page">
-      <div className="workspace-shell">
-        <header className="workspace-header">
-          <div className="workspace-brand">
-            <span className="brand-mark" aria-hidden="true">C</span>
-            <div>
-              <p className="workspace-kicker">CS3227 · PROJECT SPACE</p>
-              <h1>Workspace</h1>
-            </div>
-          </div>
-          <AccountControl githubUsername={profile.githubUsername} avatarUrl={profile.avatarUrl} />
-        </header>
-
-        <nav className="workspace-nav" aria-label="Main navigation">
-          <Link className="workspace-nav-link workspace-nav-link-active" href="/" aria-current="page">Dashboard</Link>
-          <span className="workspace-nav-link workspace-nav-link-disabled" aria-disabled="true">Board</span>
-        </nav>
-
-        <section className="workspace-welcome" aria-labelledby="welcome-title">
-          <div className="welcome-copy">
-            <p className="workspace-kicker">YOUR PROJECT, IN ONE PLACE</p>
-            <h2 id="welcome-title">Good to have you here, {profile.githubUsername}.</h2>
-            <p>Your signed-in workspace is ready. Project tasks and progress will appear here.</p>
-          </div>
-          <div className="workspace-status" aria-label="Session active">
-            <span className="status-dot" />
-            Session active
-          </div>
-        </section>
-
-        <section className="workspace-placeholder" aria-label="Project overview">
-          <div className="placeholder-heading">
-            <div>
-              <p className="workspace-kicker">PROJECT OVERVIEW</p>
-              <h2>Project Progress</h2>
-            </div>
-            <span className="placeholder-chip">Getting started</span>
-          </div>
-          <p className="placeholder-description">Your project summary will show here once a project is available.</p>
-          <div className="placeholder-track" aria-hidden="true"><span /></div>
-          <div className="placeholder-footnote">
-            <span>Tasks completed</span>
-            <span>Progress will appear here</span>
-          </div>
-        </section>
-      </div>
-    </main>
-  );
+  return <EmptyDashboard identity={profile} />;
 }

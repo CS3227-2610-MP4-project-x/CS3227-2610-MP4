@@ -1,0 +1,33 @@
+{
+  "baseUrl": "/CS3227-2610-MP4/",
+  "titlePrefix": "",
+  "titleSuffix": " · CS3227-2610-MP4",
+  "ignore": [
+    "_markbind/layouts/*",
+    "_markbind/logs/*",
+    "_markbind/generated-pages/*",
+    "_temp/*",
+    "_site/*",
+    "package.json",
+    "package-lock.json",
+    "scripts/*",
+    "site.json",
+    "*.md",
+    "*.njk",
+    ".git/*",
+    ".gitignore",
+    "node_modules/*"
+  ],
+  "pagesExclude": ["node_modules/*"],
+  "pages": [
+    {
+      "src": "index.md"
+    },
+    {
+      "glob": ["**/index.md", "**/*.md"]
+    }
+  ],
+  "deploy": {
+    "message": "Site Update."
+  }
+}

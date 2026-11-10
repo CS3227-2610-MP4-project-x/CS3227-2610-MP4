@@ -16,6 +16,9 @@ const boundary = vi.hoisted(() => ({
   fetch: vi.fn(),
   getServerComposition: vi.fn(),
   completeGitHubSignIn: vi.fn(),
+  findPersonIdByAuthUserId: vi.fn(),
+  listProjectsForPerson: vi.fn(),
+  cookieGet: vi.fn(),
   redirect: vi.fn((destination: string): never => { throw new Error(`REDIRECT:${destination}`); }),
 }));
 
@@ -39,8 +42,11 @@ vi.mock("react", async (importOriginal) => {
   };
 });
 
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: boundary.cookieGet }) }));
+
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({
+  usePathname: () => "/",
   redirect: boundary.redirect,
   useRouter: () => ({ replace: boundary.replace, push: boundary.replace, refresh: boundary.refresh }),
 }));
@@ -52,6 +58,7 @@ vi.mock("@/server/auth/supabase-auth", () => ({
 const origin = "http://localhost:3000";
 const username = "synthetic-developer";
 const avatar = "https://avatars.githubusercontent.com/u/424242?v=4";
+const personId = "22222222-2222-4222-8222-222222222222";
 
 function signedInUser() {
   return {
@@ -66,13 +73,19 @@ function signedInUser() {
 }
 
 beforeEach(() => {
+  boundary.cookieGet.mockReset();
   boundary.hookHarnessActive = false;
   boundary.hookCursor = 0;
   boundary.hookState = [];
   boundary.getUser.mockResolvedValue({ data: { user: signedInUser() }, error: null });
+  boundary.findPersonIdByAuthUserId.mockResolvedValue(personId);
+  boundary.listProjectsForPerson.mockResolvedValue([]);
   boundary.getServerComposition.mockReturnValue({
     config: { appOrigin: origin },
     authService: { completeGitHubSignIn: boundary.completeGitHubSignIn },
+    // Task 4.4 B3: the "my projects" read (seam chosen by the 4.4 test-writer).
+    peopleRepository: { findPersonIdByAuthUserId: boundary.findPersonIdByAuthUserId },
+    projectService: { listProjectsForPerson: boundary.listProjectsForPerson },
   });
   boundary.completeGitHubSignIn.mockResolvedValue(undefined);
 });
@@ -114,6 +127,42 @@ describe("protected workspace", () => {
     const { default: Home } = await import("../../src/app/page");
 
     await expect(Home()).rejects.toThrow("REDIRECT:/sign-in");
+  });
+});
+
+// Approved selected-project routing supersedes the former project list entry point.
+describe("selected-project landing", () => {
+  const projects = [
+    { id: "33333333-3333-4333-8333-333333333301", key: "ALP", name: "Alpha", role: "developer" },
+    { id: "33333333-3333-4333-8333-333333333302", key: "BET", name: "Beta", role: "product_manager" },
+  ];
+  async function home() { const { default: Home } = await import("../../src/app/page"); return renderToStaticMarkup(await Home()); }
+  it("reopens an accessible remembered project after reading current memberships", async () => {
+    boundary.listProjectsForPerson.mockResolvedValue(projects);
+    boundary.cookieGet.mockReturnValue({ value: projects[1].id });
+    await expect(home()).rejects.toThrow(`REDIRECT:/projects/${projects[1].id}/dashboard`);
+    expect(boundary.listProjectsForPerson).toHaveBeenCalledWith(personId);
+  });
+  it.each([undefined, { value: "malformed" }, { value: "33333333-3333-4333-8333-333333333399" }])("falls back to first currently accessible project for %s", remembered => {
+    boundary.listProjectsForPerson.mockResolvedValue(projects); boundary.cookieGet.mockReturnValue(remembered);
+    return expect(home()).rejects.toThrow(`REDIRECT:/projects/${projects[0].id}/dashboard`);
+  });
+  it("renders all three empty dashboard cards and a create-project action for no memberships", async () => {
+    const html = await home();
+    for (const label of ["Project Progress", "Task Summary", "My tasks"]) expect(html.toLowerCase()).toContain(label.toLowerCase());
+    expect(html).toMatch(/href="\/projects\/new"/); expect(html).toMatch(/Create project/i);
+    expect(html).not.toMatch(/NaN|Infinity/); expect(boundary.redirect).not.toHaveBeenCalled();
+  });
+  it("treats an unregistered person as a successful empty state", async () => {
+    boundary.findPersonIdByAuthUserId.mockResolvedValue(null);
+    const html = await home(); expect(boundary.listProjectsForPerson).not.toHaveBeenCalled();
+    expect(html).toMatch(/Create project/); expect(html).not.toMatch(/could not|unavailable/i);
+  });
+  it("does not redirect or fabricate empty success when memberships fail", async () => {
+    boundary.listProjectsForPerson.mockRejectedValue(new Error("synthetic-private-db-detail"));
+    const html = await home(); expect(boundary.redirect).not.toHaveBeenCalled();
+    expect(html).toMatch(/could not|unavailable|try again/i); expect(html).not.toContain("synthetic-private-db-detail");
+    expect(html).toMatch(/role="(?:alert|status)"/);
   });
 });
 

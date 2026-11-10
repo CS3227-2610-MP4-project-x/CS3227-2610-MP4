@@ -1,0 +1,59 @@
+"use client";
+
+import { PendingLink } from "@/components/ui/pending-link";
+import { useSelectedLayoutSegment } from "next/navigation";
+import { AccountControl } from "@/components/auth/account-control";
+import { ProjectSwitcher } from "./project-switcher";
+import type { ProjectView } from "@/server/projects";
+
+export type ProjectNavigationProps = Readonly<{
+  projectId: string;
+  role: "product_manager" | "developer";
+  identity: Readonly<{ githubUsername: string; avatarUrl: string | null }>;
+  projects?: readonly ProjectView[];
+  accountId?: string;
+}>;
+
+type Tab = Readonly<{ label: string; segment: string | null; managerOnly: boolean }>;
+
+// Task 4.7 D1, ui-spec "Top Navigation": Dashboard and Board are available to every member;
+// Review Queue, Reports (disabled until task 8.3) and Settings are PM-only.
+// Hiding a tab is never the protection: each page checks access on the server (B2).
+const TABS: readonly Tab[] = [
+  { label: "Dashboard", segment: "dashboard", managerOnly: false },
+  { label: "Board", segment: "board", managerOnly: false },
+  { label: "Review Queue", segment: "review-queue", managerOnly: true },
+  { label: "Reports", segment: null, managerOnly: true },
+  { label: "Settings", segment: "settings", managerOnly: true },
+];
+
+// F5: a task-detail page belongs to the Board tab.
+function tabSegmentOf(segment: string | null): string | null {
+  return segment === "tasks" ? "board" : segment;
+}
+
+export function ProjectNavigation({ projectId, role, identity, projects, accountId }: ProjectNavigationProps) {
+  const active = tabSegmentOf(useSelectedLayoutSegment());
+  const tabs = TABS.filter((tab) => role === "product_manager" || !tab.managerOnly);
+  return (
+    <>
+      <div className="project-navigation-row">
+        {projects && accountId && <ProjectSwitcher projectId={projectId} projects={projects} accountId={accountId} />}
+        <nav className="workspace-nav project-nav" aria-label="Project navigation">
+          {tabs.map((tab) => tab.segment === null
+            // F6: a disabled tab looks distinct from an inactive one and says why it cannot be used.
+            ? <span key={tab.label} className="workspace-nav-link project-nav-link-disabled" aria-disabled="true" title="Coming soon">
+                {tab.label}<span className="sr-only"> (coming soon)</span>
+              </span>
+            : <PendingLink key={tab.label}
+                className={tab.segment === active ? "workspace-nav-link workspace-nav-link-active" : "workspace-nav-link"}
+                href={`/projects/${encodeURIComponent(projectId)}/${tab.segment}`}
+                aria-current={tab.segment === active ? "page" : undefined}>
+                {tab.label}
+              </PendingLink>)}
+        </nav>
+        <AccountControl githubUsername={identity.githubUsername} avatarUrl={identity.avatarUrl} />
+      </div>
+    </>
+  );
+}

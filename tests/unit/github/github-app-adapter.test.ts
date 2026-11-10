@@ -24,6 +24,9 @@ const query: CommitQuery = {
 };
 const TOKEN = "synthetic-installation-token-do-not-leak";
 const PROVIDER_ERROR = "synthetic-provider-detail-do-not-leak";
+const ANCESTOR_SHA = "a".repeat(40);
+const MIDDLE_SHA = "b".repeat(40);
+const TIP_SHA = "c".repeat(40);
 const { privateKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,
   privateKeyEncoding: { type: "pkcs8", format: "pem" },
@@ -199,11 +202,127 @@ describe("repository evidence", () => {
   });
 });
 
+// Group 7: completion-assessment requirements "Check input is limited to what
+// the assessment needs" and "Developer runs an acceptance criteria check".
+// These adapter tests establish immutable config reads and pairwise ancestry;
+// selected-set tip resolution belongs to the check-service tests.
+describe("immutable repository file evidence", () => {
+  it("reads the root configuration as raw text at the supplied immutable SHA", async () => {
+    const content = '{"version":1,"domainLogic":["core/"]}';
+    const { adapter, fetchStub } = harness(() => new Response(content));
+    expect(await adapter.fetchFileAtCommit(repository, ".acceptance-check.json", TIP_SHA))
+      .toEqual({ ok: true, value: content });
+    const [input, init] = fetchStub.mock.calls[1];
+    const url = new URL(String(input));
+    expect(url.pathname).toBe("/repos/sample/project/contents/.acceptance-check.json");
+    expect([...url.searchParams.entries()]).toEqual([["ref", TIP_SHA]]);
+    expect(new Headers(init?.headers).get("accept")).toBe("application/vnd.github.raw+json");
+    expect(new Headers(init?.headers).get("X-GitHub-Api-Version")).toBe("2026-03-10");
+  });
+
+  it("encodes path segments without treating path characters as query parameters", async () => {
+    const { adapter, fetchStub } = harness(() => new Response("synthetic file"));
+    await adapter.fetchFileAtCommit(repository, "policy files/rules?#.json", TIP_SHA);
+    const url = new URL(String(fetchStub.mock.calls[1][0]));
+    expect(url.pathname).toBe("/repos/sample/project/contents/policy%20files/rules%3F%23.json");
+    expect([...url.searchParams.entries()]).toEqual([["ref", TIP_SHA]]);
+    expect(url.hash).toBe("");
+  });
+
+  it.each(["main", "abcdef1", "", "x".repeat(40)])("refuses non-immutable ref %j before network access", async (ref) => {
+    const { adapter, fetchStub } = harness();
+    expect(await adapter.fetchFileAtCommit(repository, ".acceptance-check.json", ref))
+      .toEqual({ ok: false, category: "invalid_request" });
+    expect(fetchStub).not.toHaveBeenCalled();
+  });
+
+  it.each(["", "/absolute.json", "../outside.json", "config/../rules.json", "config\\rules.json"])
+    ("refuses non-repository file path %j before network access", async (path) => {
+      const { adapter, fetchStub } = harness();
+      expect(await adapter.fetchFileAtCommit(repository, path, TIP_SHA))
+        .toEqual({ ok: false, category: "invalid_request" });
+      expect(fetchStub).not.toHaveBeenCalled();
+    });
+
+  it("keeps a successfully read empty file distinct from unavailable evidence", async () => {
+    const { adapter } = harness(() => new Response(""));
+    expect(await adapter.fetchFileAtCommit(repository, ".acceptance-check.json", TIP_SHA))
+      .toEqual({ ok: true, value: "" });
+  });
+});
+
+describe("commit ancestry evidence", () => {
+  it.each([
+    ["ahead", true], ["identical", true], ["behind", false], ["diverged", false],
+  ] as const)("maps compare status %s to ancestor=%s", async (status, isAncestor) => {
+    const { adapter, fetchStub } = harness(() => json({ status }));
+    expect(await adapter.isAncestor(repository, ANCESTOR_SHA, TIP_SHA)).toEqual({ ok: true, value: isAncestor });
+    const [input, init] = fetchStub.mock.calls[1];
+    expect(new URL(String(input)).pathname)
+      .toBe(`/repos/sample/project/compare/${ANCESTOR_SHA}...${TIP_SHA}`);
+    expect(new Headers(init?.headers).get("accept")).toBe("application/vnd.github+json");
+    expect(new Headers(init?.headers).get("X-GitHub-Api-Version")).toBe("2026-03-10");
+  });
+
+  it("provides the directed relations needed for a selected chain's descendant tip", async () => {
+    const fetchStub = vi.fn<typeof fetch>(async (input) => {
+      if (String(input).endsWith("/access_tokens")) return json({ token: TOKEN }, 201);
+      const range = new URL(String(input)).pathname.split("/").at(-1);
+      const relations: Record<string, string> = {
+        [`${ANCESTOR_SHA}...${MIDDLE_SHA}`]: "ahead",
+        [`${MIDDLE_SHA}...${TIP_SHA}`]: "ahead",
+        [`${ANCESTOR_SHA}...${TIP_SHA}`]: "ahead",
+        [`${TIP_SHA}...${MIDDLE_SHA}`]: "behind",
+      };
+      return json({ status: relations[range ?? ""] });
+    });
+    const adapter = new GitHubAppAdapter({ appId: "1234", privateKey, fetch: fetchStub });
+    for (const ancestor of [ANCESTOR_SHA, MIDDLE_SHA]) {
+      expect(await adapter.isAncestor(repository, ancestor, TIP_SHA)).toEqual({ ok: true, value: true });
+    }
+    expect(await adapter.isAncestor(repository, ANCESTOR_SHA, MIDDLE_SHA)).toEqual({ ok: true, value: true });
+    expect(await adapter.isAncestor(repository, TIP_SHA, MIDDLE_SHA)).toEqual({ ok: true, value: false });
+  });
+
+  it("reports both directions false for incomparable selected tips", async () => {
+    const { adapter } = harness(() => json({ status: "diverged" }));
+    expect(await adapter.isAncestor(repository, MIDDLE_SHA, TIP_SHA)).toEqual({ ok: true, value: false });
+    expect(await adapter.isAncestor(repository, TIP_SHA, MIDDLE_SHA)).toEqual({ ok: true, value: false });
+  });
+
+  it("recognizes identical SHAs without requiring GitHub availability", async () => {
+    const { adapter, fetchStub } = harness();
+    expect(await adapter.isAncestor(repository, ANCESTOR_SHA, ANCESTOR_SHA.toUpperCase()))
+      .toEqual({ ok: true, value: true });
+    expect(fetchStub).not.toHaveBeenCalled();
+  });
+
+  it.each([{}, null, [], { status: "unknown" }, { status: 123 }])
+    ("rejects malformed compare evidence %j", async (body) => {
+      const { adapter } = harness(() => json(body));
+      expect(await adapter.isAncestor(repository, ANCESTOR_SHA, TIP_SHA))
+        .toEqual({ ok: false, category: "malformed_response", status: 200 });
+    });
+
+  it("rejects a non-JSON compare response", async () => {
+    const { adapter } = harness(() => new Response("not JSON"));
+    expect(await adapter.isAncestor(repository, ANCESTOR_SHA, TIP_SHA))
+      .toEqual({ ok: false, category: "malformed_response", status: 200 });
+  });
+
+  it.each([["main", TIP_SHA], [ANCESTOR_SHA, "abcdef1"]])
+    ("refuses invalid comparison refs %s and %s before network access", async (ancestor, descendant) => {
+      const { adapter, fetchStub } = harness();
+      expect(await adapter.isAncestor(repository, ancestor, descendant)).toEqual({ ok: false, category: "invalid_request" });
+      expect(fetchStub).not.toHaveBeenCalled();
+    });
+});
+
 describe("safe provider failures", () => {
   const statuses = [
     [401, "unauthorized"], [403, "forbidden"], [404, "not_found"], [429, "rate_limited"], [503, "unavailable"],
   ] as const;
-  const operations = ["listBranches", "listCommits", "fetchDiff"] as const;
+  const operations = ["listBranches", "listCommits", "fetchDiff", "fetchFileAtCommit", "isAncestor"] as const;
 
   for (const operation of operations) {
     for (const phase of ["mint", "read"] as const) {
@@ -218,7 +337,9 @@ describe("safe provider failures", () => {
         const log = vi.spyOn(console, "log").mockImplementation(() => {});
         const result = operation === "listBranches" ? await adapter.listBranches(repository)
           : operation === "listCommits" ? await adapter.listCommits(repository, query)
-          : await adapter.fetchDiff(repository, "abcdef1234567");
+          : operation === "fetchDiff" ? await adapter.fetchDiff(repository, "abcdef1234567")
+          : operation === "fetchFileAtCommit" ? await adapter.fetchFileAtCommit(repository, ".acceptance-check.json", TIP_SHA)
+          : await adapter.isAncestor(repository, ANCESTOR_SHA, TIP_SHA);
         expect(result).toEqual({ ok: false, category, status });
         expect(JSON.stringify(result)).not.toContain(PROVIDER_ERROR);
         expect(JSON.stringify(result)).not.toContain(TOKEN);
@@ -239,6 +360,21 @@ describe("safe provider failures", () => {
     const adapter = new GitHubAppAdapter({ appId: "1234", privateKey, fetch: fetchStub });
     expect(await adapter.listBranches(repository)).toEqual({ ok: false, category: "unavailable" });
   });
+
+  for (const operation of ["fetchFileAtCommit", "isAncestor"] as const) {
+    it.each(["mint", "read"])(`${operation}: handles %s network failure without returning provider details`, async (phase) => {
+      const fetchStub = vi.fn<typeof fetch>(async (input) => {
+        if (phase === "read" && String(input).endsWith("/access_tokens")) return json({ token: TOKEN }, 201);
+        throw new Error(`${PROVIDER_ERROR} ${TOKEN}`);
+      });
+      const adapter = new GitHubAppAdapter({ appId: "1234", privateKey, fetch: fetchStub });
+      const result = operation === "fetchFileAtCommit"
+        ? await adapter.fetchFileAtCommit(repository, ".acceptance-check.json", TIP_SHA)
+        : await adapter.isAncestor(repository, ANCESTOR_SHA, TIP_SHA);
+      expect(result).toEqual({ ok: false, category: "unavailable" });
+      expect(fetchStub).toHaveBeenCalledTimes(phase === "mint" ? 1 : 2);
+    });
+  }
 
   it("reports malformed branch data as unavailable evidence rather than an empty list", async () => {
     const { adapter } = harness(() => json({ message: PROVIDER_ERROR }));
@@ -276,5 +412,28 @@ describe("deterministic GitHub fake", () => {
       expect(await adapter.listCommits(repository, query)).toEqual(commits);
       expect(await adapter.fetchDiff(repository, "abcdef1234567")).toEqual(diff);
     }
+  });
+});
+
+
+// Task 11.1: resolve approved short input refs before full-SHA ancestry checks.
+describe("canonical commit identity", () => {
+  it("resolves a short input to the provider's full SHA and stable author identity", async () => {
+    const fullSha = "abcdef1" + "2".repeat(33);
+    const { adapter, fetchStub } = harness(() => json({ sha: fullSha, author: { id: 789, login: "developer" } }));
+    expect(await adapter.getCommitIdentity(repository, "ABCDEF1")).toEqual({ ok: true, value: { sha: fullSha, author: { id: 789, login: "developer" } } });
+    expect(new URL(String(fetchStub.mock.calls[1][0])).pathname).toBe("/repos/sample/project/commits/ABCDEF1");
+  });
+  it.each([
+    { sha: TIP_SHA, author: { id: 789, login: "developer" } },
+    { sha: "abcdef1", author: { id: 789, login: "developer" } },
+    { sha: "abcdef1" + "2".repeat(33), author: null },
+  ])("refuses mismatched, abbreviated, or unauthored provider identity %j", async (body) => {
+    const { adapter } = harness(() => json(body));
+    expect(await adapter.getCommitIdentity(repository, "abcdef1")).toEqual({ ok: false, category: "malformed_response", status: 200 });
+  });
+  it("contains unavailable provider evidence without exposing raw response text", async () => {
+    const { adapter } = harness(() => json({ message: PROVIDER_ERROR }, 503));
+    expect(await adapter.getCommitIdentity(repository, "abcdef1")).toEqual({ ok: false, category: "unavailable", status: 503 });
   });
 });

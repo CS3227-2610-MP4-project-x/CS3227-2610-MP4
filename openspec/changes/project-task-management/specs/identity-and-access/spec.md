@@ -80,32 +80,33 @@ The system SHALL provide temporary project and task route stubs to verify server
 
 #### Scenario: Project details require membership
 - **WHEN** a person requests `GET /api/v1/projects/{projectId}`
-- **THEN** an authenticated project member reaches the stub, while an authenticated non-member receives HTTP 404
+- **THEN** an authenticated project member receives HTTP 200 with the project's `id`, `key`, `name`, and the requester's `role`, while an authenticated non-member receives HTTP 404
 
-#### Scenario: Project creation stub requires authentication
+#### Scenario: Project creation is functional
 - **WHEN** a person requests `POST /api/v1/projects`
-- **THEN** an unauthenticated person receives HTTP 401 and an authenticated person reaches the stub
-- **AND** the stub does not create a project or determine its initial product manager
-- **AND** project creation policy remains a task 4.1 design decision, and payload and successful-response schemas are unspecified
+- **THEN** the endpoint is no longer a stub, and the task-management requirement "Signed-in people create projects" defines its policy, payload, and responses
 
-#### Scenario: Task creation stub requires the product-manager role
+#### Scenario: Task creation is functional
 - **WHEN** a person requests `POST /api/v1/projects/{projectId}/tasks`
-- **THEN** a project product manager reaches the stub, a project developer receives HTTP 403, and a non-member receives HTTP 404
+- **THEN** the endpoint is no longer a stub: a project product manager may create a task, a project developer receives HTTP 403, and a non-member receives HTTP 404
+- **AND** the task-management requirement "Product manager manages tasks" defines its payload and responses
 
-#### Scenario: Task read stub requires membership
+#### Scenario: Task detail read enforces task access
 - **WHEN** a person requests `GET /api/v1/projects/{projectId}/tasks/{taskId}`
-- **THEN** an authenticated project member reaches the stub, while an authenticated non-member receives HTTP 404
+- **THEN** the assigned developer and the project's product manager receive task detail as defined by task-management's "Authorized members read task detail" requirement
+- **AND** another project developer receives HTTP 403, while a non-member or task outside the project receives HTTP 404
 
-#### Scenario: Task field edit stub requires the product-manager role
+#### Scenario: Task field edit is functional
 - **WHEN** a person requests a field edit using `PATCH /api/v1/projects/{projectId}/tasks/{taskId}`
-- **THEN** a project product manager reaches the stub, a project developer receives HTTP 403, and a non-member receives HTTP 404
+- **THEN** the endpoint is no longer a stub: a project product manager may edit the task, a project developer receives HTTP 403, and a non-member receives HTTP 404
+- **AND** the task-management requirement "Product manager manages tasks" defines its payload and responses
 
-#### Scenario: Task state transition stub enforces lifecycle permissions
+#### Scenario: Task state transition is functional and enforces lifecycle permissions
 - **WHEN** a person sends PATCH to `/api/v1/projects/{projectId}/tasks/{taskId}/state` with a JSON body whose `state` is `To Do`, `In Progress`, `In Review`, or `Done`
 - **THEN** only the assigned developer is authorized to request `In Progress` from `To Do` or `In Review` from `In Progress`
 - **AND** only the project's product manager is authorized to request `Done` or `In Progress` from `In Review`
-- **AND** an authenticated project member without the required assignment or role receives HTTP 403, while a non-member receives HTTP 404
-- **AND** an authorized request reaches a stub that returns HTTP 501 without changing the task state
+- **AND** an authenticated project member without the required assignment or role, or who requests any other combination of role, assignment, and current state, receives HTTP 403, while a non-member receives HTTP 404
+- **AND** an authorized request is no longer a stub: it changes the task as the task-management requirements "Task lifecycle" and "Task state route" define
 
 #### Scenario: Authorized request reaches a protected route stub
 - **WHEN** an authenticated person with the required project access requests one of the initial protected route stubs before its feature is implemented
@@ -136,10 +137,16 @@ The system SHALL provide temporary project and task route stubs to verify server
 - **THEN** the system returns HTTP 500 with code `INTERNAL_ERROR` and message `Internal server error`
 - **AND** the response does not expose the underlying failure details
 
-#### Scenario: State transition validation remains with task lifecycle implementation
-- **WHEN** a requested state transition is invalid for the task's current state
-- **THEN** task 3.2's authorization stubs do not implement transition validation or mutation
-- **AND** task 4.3 defines the functional invalid-transition response and behavior
+#### Scenario: Invalid state transition uses the permission response
+- **WHEN** a requested state transition is not allowed for the requester from the task's current state
+- **THEN** the system returns HTTP 403 with code `FORBIDDEN` and message `Insufficient permissions`, and the task state is unchanged
+- **AND** task 4.3 adds no separate invalid-transition error code
+- **AND** HTTP 409 on this route comes only from the task-management `version` guard, with code `VERSION_CONFLICT`
+
+#### Scenario: Progress update route is a protected mutating route
+- **WHEN** a person requests `POST /api/v1/projects/{projectId}/tasks/{taskId}/progress-updates`
+- **THEN** only the assigned developer is authorized, any other project member receives HTTP 403, and a non-member or task outside the project receives HTTP 404
+- **AND** the task-management requirement "Developer submits task progress" defines its payload and responses
 
 ### Requirement: Protected API errors use stable safe responses
 Protected API errors SHALL use the JSON envelope `{ "error": { "code": "...", "message": "..." } }`. Codes and generic messages SHALL be stable and SHALL NOT expose provider, database, or other internal details.
@@ -166,3 +173,26 @@ Protected API errors SHALL use the JSON envelope `{ "error": { "code": "...", "m
 #### Scenario: Authenticated person opens the sign-in page
 - **WHEN** a person with a valid session requests `/sign-in`
 - **THEN** the browser is redirected to the signed-in workspace at `/`
+
+### Requirement: Mutating project routes check the request origin
+Every state-changing project route SHALL require an `Origin` header equal to the environment's `APP_ORIGIN` and a `Content-Type` of `application/json`, and SHALL reject other requests before changing any state.
+
+#### Scenario: Bad origin is refused
+- **WHEN** a mutating request to `POST /api/v1/projects`, `POST /api/v1/projects/{projectId}/members`, `POST /api/v1/projects/{projectId}/product-manager-transfer`, `POST /api/v1/projects/{projectId}/tasks`, `PATCH /api/v1/projects/{projectId}/tasks/{taskId}`, `PUT /api/v1/projects/{projectId}/tasks/{taskId}/assignee`, `DELETE /api/v1/projects/{projectId}/tasks/{taskId}`, `PATCH /api/v1/projects/{projectId}/tasks/{taskId}/state`, or `POST /api/v1/projects/{projectId}/tasks/{taskId}/progress-updates` has a missing `Origin` header or one that differs from `APP_ORIGIN`
+- **THEN** the system returns HTTP 403 with code `FORBIDDEN` and a safe message, and nothing changes
+
+#### Scenario: Wrong content type is refused
+- **WHEN** such a request does not have `Content-Type: application/json`
+- **THEN** the system returns HTTP 400 with code `INVALID_REQUEST` and nothing changes
+
+#### Scenario: Bad origin and wrong content type
+- **WHEN** such a request has both a bad `Origin` and a wrong content type
+- **THEN** the system returns HTTP 403 with code `FORBIDDEN`
+
+#### Scenario: Origin is checked before the session
+- **WHEN** such a request has a bad `Origin` and no valid session
+- **THEN** the system returns HTTP 403 with code `FORBIDDEN`, not HTTP 401
+
+#### Scenario: Matching origin proceeds to authorization
+- **WHEN** such a request has an `Origin` equal to `APP_ORIGIN` and a JSON content type
+- **THEN** the normal authentication, membership, and role checks apply

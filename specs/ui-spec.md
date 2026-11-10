@@ -73,18 +73,39 @@ Recommended spacing:
 
 ## Screens
 
+### Approved developer dashboard extension (9 November 2026)
+
+At `/projects/{projectId}/dashboard`, developers see the supplied `frontend_mockup_1.png` composition: Project progress and Task summary side by side on desktop, with My tasks spanning the available width below. Stack these cards on narrow screens. Omit Recent activity, search, notifications, task checkboxes and Check ready. Project progress is project-wide; summary and My tasks contain only the developer's live assignments. My tasks has working All/status filters and task-detail links, descriptions, optional branches, due dates and update/attached-commit counts. Developers see My tasks instead of Task Allocation. Keep the existing product-manager overview and actions.
+
+Place a project selector at the top left beside the project navigation. The selected project is shared by Dashboard and Board. Keep Create project discoverable. With no memberships, `/` shows empty Project progress, Task summary and My tasks cards and emphasizes Create project. Errors remain distinct from successful empty reads.
+
+This extension supersedes the monochrome-only status guidance below: use grey for To Do, blue for In Progress, yellow for In Review and green for Done. Always retain text labels and accessible contrast.
+
 | Screen | Who | Contents |
 |---|---|---|
 | Project dashboard | Both | Header, Project Progress, Action Buttons (product manager only), Task Summary Card, Task Allocation |
 | Task board | Both | Four columns: To Do, In Progress, In Review, Done. Product managers see all tasks; developers see their own tasks. Moving a card uses a status menu; drag-and-drop is optional. |
-| Task detail | Both | Title, description, acceptance criteria, assignee, due date, branch, progress updates, attached commits, latest Acceptance Criteria Check, review feedback |
+| Task detail | Both | Project Dashboard / Board / readable task key breadcrumb. Both roles retain the current task information and role-specific actions. The developer layout uses a main task card and a supporting right column; the PM layout remains unchanged apart from the breadcrumb. |
 | Commit picker | Developer | Dialog opened from task detail: date range and branch filters, checklist of the developer's commits (message, short SHA, time), with commits mentioning the task ID pre-selected |
-| Acceptance Criteria Check | Developer (product manager read-only) | One row per criterion with status (addressed / not addressed / unclear) and expandable diff evidence, then a list of possible gaps. No numeric score. |
-| Review queue | Product manager | Tasks in In Review, each with commits and the latest check; Approve and Request changes (with required feedback) actions |
+| Acceptance Criteria Check | Developer (product manager read-only) | One row per criterion with status (addressed / not addressed / unclear) and expandable diff evidence, then a list of possible gaps. No numeric score. Provide access to distinct check history; exact-set reuse displays the existing result with a brief notice. Show a brief redaction note only when secrets were redacted before assessment. |
+| Review queue | Product manager | Tasks in In Review, each with commits, the result referenced by the submission, and distinct check history; Approve and Request changes (with required feedback) actions. Check access is read-only. |
 | Progress Report | Product manager | Date range picker (default: today, SGT), report grouped by developer, task-ID citations that link to the tasks |
-| Project settings | Product manager | Linked repository, token status (never the token itself), members, AI usage per feature per day |
+| Project settings | Product manager | Linked repository and GitHub App connection status (unlinked, linked, or unavailable; never any access token), members, AI usage per feature per day |
 
 Status colors on the board follow the Color System: monochrome for To Do, In Progress, and In Review, and the green accent only for Done.
+
+### Acceptance Criteria Check behavior
+- Keep the developer's **Run check** action in the task-detail Acceptance Criteria Check panel. Keep the commit picker with Attached commits. The product manager can open results and history but has no run or edit action.
+- Show one entry per distinct stored result in newest-first order. Each entry shows its anchor SHA and timestamp; opening it shows its result content and whether redaction occurred. Reuse a result only when the commit set, acceptance criteria, and repository path rules are identical; show a concise notice that the existing result is being shown and do not add a duplicate history entry. A developer can run a new check after repository path rules change.
+- A submission in the review queue opens the check result it references, while keeping the task's distinct check history available.
+- Show a concise note that secrets were redacted before assessment only when redaction occurred. Never show the redacted value or secret text.
+- Keep the check advisory. Approval and Request changes remain explicit product-manager actions in the review workflow.
+
+### Approved developer task-detail layout (10 November 2026)
+Show the task breadcrumb as `Project Dashboard / Board / <taskKey>` for both roles, linking the first two items to the current project's dashboard and board. Other uses of the shared task-page shell retain their current presentation. For developers, use a main left card for title, readable task key, description, acceptance criteria and the progress-update composer. Place Details, Progress updates and Attached commits in separate cards in a right column. Details shows assignee, branch, status and due date. Place the developer's Submit for review button at the main card's top-right, preserving its existing role and task-state conditions. Render updates newest-first in the UI along a connected vertical guide with an event marker for each update, while leaving the existing ascending server/API response unchanged. Keep the commit picker in Attached commits and Run check in its existing Acceptance Criteria Check panel. Preserve other actions and panels in their current placement and behavior. The product manager layout remains unchanged apart from the breadcrumb. On narrow screens, stack Details, Progress updates and Attached commits below the main card in that order.
+
+### Visual references and human review
+The developer Acceptance Criteria Check and task-detail screens use the human-supplied `frontend_mockup_3.png` and `frontend_mockup_2.png` as accepted visual direction. The product manager review screen uses `frontend_mockup_pm_review.png` as accepted visual direction. The images guide visual styling and composition only; written requirements in OpenSpec govern behavior. The developer mockup that presents **Submit for review** directly on the check result screen depicts Task 4.3 lifecycle integration; Group 7 must not implement submission or change lifecycle behavior.
 
 ## Components
 
@@ -122,14 +143,18 @@ Status colors on the board follow the Color System: monochrome for To Do, In Pro
 - Keep rows airy and minimal, with no visible dividers unless extremely subtle.
 
 ### Top Navigation
-- Use a compact full-width bar with rounded capsule styling.
+- Use a compact full-width bar with a subtle bottom border and a slightly lighter background than the page.
+- Place the project selector at the left and make its button the same height as the account control button.
+- Align the selector's outer left edge with the page content below it at desktop and mobile widths.
+- Place the developer-style AccountControl at the far right of this row for both project roles; do not duplicate account controls in dashboard bodies.
+- Show the selected project name inside the selector, without a duplicate project heading above it.
+- Place Dashboard and Board beside the selector without a shared capsule background. Keep the active tab softly filled; lightly highlight inactive tabs on hover.
 - Tabs: Dashboard, Board, and, for product managers, Review Queue, Reports, and Settings.
-- Active tab gets a brighter icon/text treatment and a soft filled indicator.
-- Inactive tabs should remain visible but subdued.
+- Inactive tabs should remain visible but subdued, with a light hover highlight.
 
 ## Shape Language
 - Prefer border radii between `18px` and `28px`.
-- Use full pill radii for chips, segmented controls, and nav containers.
+- Use full pill radii for chips and segmented controls; navigation containers can remain unboxed.
 - Icons should be simple line icons with slight softness, not sharp enterprise-style icons.
 - Avoid sharp corners anywhere in the interface.
 

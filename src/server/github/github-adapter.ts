@@ -23,6 +23,12 @@ export type GitHubCommit = Readonly<{
   date: string;
 }>;
 
+export type GitHubCommitAncestry = Readonly<{
+  ancestorSha: string;
+  descendantSha: string;
+  isAncestor: boolean;
+}>;
+
 export type GitHubFailureCategory =
   | "unauthorized"
   | "forbidden"
@@ -50,9 +56,12 @@ export type CommitQuery = Readonly<{
 export interface GitHubEvidenceAdapter {
   getRepositoryDefaultBranch(repository: GitHubRepository): Promise<GitHubResult<string>>;
   getCommitAuthor(repository: GitHubRepository, sha: string): Promise<GitHubResult<GitHubUser>>;
+  getCommitIdentity(repository: GitHubRepository, sha: string): Promise<GitHubResult<Readonly<{ sha: string; author: GitHubUser }>>>;
   listBranches(repository: GitHubRepository): Promise<GitHubResult<readonly GitHubBranch[]>>;
   listCommits(repository: GitHubRepository, query: CommitQuery): Promise<GitHubResult<readonly GitHubCommit[]>>;
   fetchDiff(repository: GitHubRepository, sha: string): Promise<GitHubResult<string>>;
+  fetchFileAtCommit(repository: GitHubRepository, path: string, commitSha: string): Promise<GitHubResult<string>>;
+  isAncestor(repository: GitHubRepository, ancestorSha: string, descendantSha: string): Promise<GitHubResult<boolean>>;
 }
 
 export type GitHubAppAdapterOptions = Readonly<{
@@ -117,6 +126,16 @@ function validRepo(repository: GitHubRepository): boolean {
 
 function isIsoDate(value: string): boolean {
   return Number.isFinite(Date.parse(value)) && /^\d{4}-\d\d-\d\dT/.test(value);
+}
+
+function isFullCommitSha(value: string): boolean {
+  return /^[0-9a-f]{40,64}$/i.test(value);
+}
+
+function isRepositoryFilePath(value: string): boolean {
+  if (!value || value.startsWith("/") || value.endsWith("/") || value.includes("\\")) return false;
+  const segments = value.split("/");
+  return segments.every((segment) => segment.length > 0 && segment !== "." && segment !== ".." && !segment.includes("\0"));
 }
 
 function nextPageUrl(linkHeader: string | null): URL | null | "invalid" {
@@ -290,6 +309,18 @@ export class GitHubAppAdapter implements GitHubEvidenceAdapter {
       });
   }
 
+  async getCommitIdentity(repository: GitHubRepository, sha: string): Promise<GitHubResult<Readonly<{ sha: string; author: GitHubUser }>>> {
+    if (!/^[0-9a-f]{7,64}$/i.test(sha)) return failed("invalid_request");
+    return this.#singleRead(repository, `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.name)}/commits/${encodeURIComponent(sha)}`,
+      "application/vnd.github+json", async (response) => {
+        const body: unknown = await response.json();
+        if (!isObject(body) || typeof body.sha !== "string" || !/^[0-9a-f]{40,64}$/i.test(body.sha) ||
+            !body.sha.toLowerCase().startsWith(sha.toLowerCase()) || !isObject(body.author) ||
+            !Number.isSafeInteger(body.author.id) || typeof body.author.login !== "string") throw new Error("invalid response");
+        return { sha: body.sha, author: { id: body.author.id as number, login: body.author.login } };
+      });
+  }
+
   async listCommits(repository: GitHubRepository, query: CommitQuery): Promise<GitHubResult<readonly GitHubCommit[]>> {
     if (!query.author.login || !Number.isSafeInteger(query.author.id) || !isIsoDate(query.since) || !isIsoDate(query.until) || query.since > query.until || !query.branch) {
       return failed("invalid_request");
@@ -316,16 +347,42 @@ export class GitHubAppAdapter implements GitHubEvidenceAdapter {
     const path = `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.name)}/commits/${encodeURIComponent(sha)}`;
     return this.#singleRead(repository, path, "application/vnd.github.diff", async (response) => response.text());
   }
+
+  async fetchFileAtCommit(repository: GitHubRepository, path: string, commitSha: string): Promise<GitHubResult<string>> {
+    if (!isRepositoryFilePath(path) || !isFullCommitSha(commitSha)) return failed("invalid_request");
+    const encodedPath = path.split("/").map(encodeURIComponent).join("/");
+    const query = new URLSearchParams({ ref: commitSha });
+    const endpoint = `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.name)}/contents/${encodedPath}?${query}`;
+    return this.#singleRead(repository, endpoint, "application/vnd.github.raw+json", async (response) => response.text());
+  }
+
+  async isAncestor(repository: GitHubRepository, ancestorSha: string, descendantSha: string): Promise<GitHubResult<boolean>> {
+    if (!isFullCommitSha(ancestorSha) || !isFullCommitSha(descendantSha)) return failed("invalid_request");
+    if (ancestorSha.toLowerCase() === descendantSha.toLowerCase()) return { ok: true, value: true };
+    const range = `${encodeURIComponent(ancestorSha)}...${encodeURIComponent(descendantSha)}`;
+    const endpoint = `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.name)}/compare/${range}`;
+    return this.#singleRead(repository, endpoint, "application/vnd.github+json", async (response) => {
+      const body: unknown = await response.json();
+      if (!isObject(body) || !["ahead", "behind", "identical", "diverged"].includes(String(body.status))) {
+        throw new Error("invalid response");
+      }
+      return body.status === "ahead" || body.status === "identical";
+    });
+  }
 }
 
 export type FakeGitHubBranchesOutcome = Readonly<{ ok: true; value: readonly GitHubBranch[] }> | GitHubFailure;
 export type FakeGitHubCommitsOutcome = Readonly<{ ok: true; value: readonly GitHubCommit[] }> | GitHubFailure;
 export type FakeGitHubDiffOutcome = Readonly<{ ok: true; value: string }> | GitHubFailure;
+export type FakeGitHubFileOutcome = Readonly<{ path: string; commitSha: string; content: string }>;
+export type FakeGitHubAncestryOutcome = GitHubCommitAncestry;
 
 export type FakeGitHubScript = Readonly<{
   branches?: FakeGitHubBranchesOutcome;
   commits?: FakeGitHubCommitsOutcome;
   diff?: FakeGitHubDiffOutcome;
+  files?: readonly FakeGitHubFileOutcome[];
+  ancestry?: readonly FakeGitHubAncestryOutcome[];
 }>;
 
 export class FakeGitHubAdapter implements GitHubEvidenceAdapter {
@@ -342,6 +399,11 @@ export class FakeGitHubAdapter implements GitHubEvidenceAdapter {
     return commit ? { ok: true, value: { id: commit.authorId, login: commit.authorLogin } } : failed("not_found");
   }
 
+  async getCommitIdentity(_repository: GitHubRepository, sha: string): Promise<GitHubResult<Readonly<{ sha: string; author: GitHubUser }>>> {
+    const commit = this.#script.commits?.ok ? this.#script.commits.value.find((item) => item.sha.toLowerCase().startsWith(sha.toLowerCase())) : undefined;
+    return commit ? { ok: true, value: { sha: commit.sha, author: { id: commit.authorId, login: commit.authorLogin } } } : failed("not_found");
+  }
+
   async listBranches(): Promise<GitHubResult<readonly GitHubBranch[]>> {
     return this.#script.branches ?? { ok: true, value: [] };
   }
@@ -352,5 +414,18 @@ export class FakeGitHubAdapter implements GitHubEvidenceAdapter {
 
   async fetchDiff(): Promise<GitHubResult<string>> {
     return this.#script.diff ?? { ok: true, value: "" };
+  }
+
+  async fetchFileAtCommit(_repository: GitHubRepository, path: string, commitSha: string): Promise<GitHubResult<string>> {
+    const file = this.#script.files?.find((item) => item.path === path && item.commitSha.toLowerCase() === commitSha.toLowerCase());
+    return file ? { ok: true, value: file.content } : failed("not_found");
+  }
+
+  async isAncestor(_repository: GitHubRepository, ancestorSha: string, descendantSha: string): Promise<GitHubResult<boolean>> {
+    if (ancestorSha.toLowerCase() === descendantSha.toLowerCase()) return { ok: true, value: true };
+    const relation = this.#script.ancestry?.find((item) =>
+      item.ancestorSha.toLowerCase() === ancestorSha.toLowerCase() &&
+      item.descendantSha.toLowerCase() === descendantSha.toLowerCase());
+    return relation ? { ok: true, value: relation.isAncestor } : failed("unavailable");
   }
 }

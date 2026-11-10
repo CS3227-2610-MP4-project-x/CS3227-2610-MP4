@@ -163,7 +163,7 @@ The system SHALL let only the task's assigned developer list commits. The server
 - **THEN** the system refuses the request without returning repository evidence
 
 ### Requirement: Assigned developers attach their own commits atomically
-The system SHALL let only the assigned developer attach commits. The server verifies authorship before writing, deduplicates SHAs in first-seen order, and attaches all or none. Repeating an attached SHA is idempotent and returns it once.
+The system SHALL let only the assigned developer attach commits through the existing `POST /api/v1/projects/{projectId}/tasks/{taskId}/attached-commits` add-only operation while the task is In Progress. The server verifies authorship before writing, deduplicates SHAs in first-seen order, and attaches all or none. Repeating an attached SHA is idempotent and returns it once. The POST operation SHALL NOT remove attachments omitted from its request; complete replacement and removal use the PUT operation below. The task SHALL remain In Progress when the attachment transaction applies.
 
 #### Scenario: Assigned developer attaches own commits
 - **WHEN** the assigned developer sends `POST /api/v1/projects/{projectId}/tasks/{taskId}/attached-commits` with `{ "commitShas": ["..."] }` containing SHAs authored by that developer in the linked repository
@@ -177,6 +177,10 @@ The system SHALL let only the assigned developer attach commits. The server veri
 #### Scenario: Caller is not the assignee
 - **WHEN** a project member who is not the task's assigned developer submits an attachment request
 - **THEN** the route returns the safe authorization error and makes no changes
+
+#### Scenario: Task is not In Progress
+- **WHEN** the assigned developer submits an add-only attachment request while the task is not In Progress, or the task leaves In Progress before the attachment transaction applies
+- **THEN** the route returns the safe forbidden response and makes no changes
 
 #### Scenario: Provider cannot verify a selected commit
 - **WHEN** GitHub cannot provide current authorship evidence for any submitted SHA
@@ -197,6 +201,106 @@ The system SHALL let only the assigned developer attach commits. The server veri
 #### Scenario: Already attached commits are idempotent
 - **WHEN** the assigned developer submits own commits and some or all are already attached
 - **THEN** the request succeeds with HTTP 201, attaches any new commits, and returns each selected SHA once
+
+### Requirement: Assigned developers replace their attached commit selection
+The system SHALL provide `PUT /api/v1/projects/{projectId}/tasks/{taskId}/attached-commits` for complete replacement of a task's attached-commit set. Its JSON body SHALL have exactly one property, `attachments`, containing an array of objects with exactly `sha` and `sourceBranch` properties; each SHA SHALL contain 7 to 64 hexadecimal characters and each `sourceBranch` SHALL be a non-empty string or `null`. A null source branch SHALL be accepted only for a SHA already attached to the task. An empty array SHALL remove every attachment. The request SHALL be available only to the assigned developer while the task is In Progress. The server SHALL apply all additions and removals atomically and return HTTP 200 with `{ "attachments": [{ "sha": "...", "sourceBranch": "..." }] }`, where each returned `sourceBranch` is a string or `null`, representing the complete resulting set in request order; legacy retained rows SHALL return `sourceBranch: null`. The response SHALL use `Cache-Control: no-store`.
+
+For each requested SHA already attached to the task, the server SHALL preserve the attachment row and its original source branch regardless of the submitted `sourceBranch` value; a retained legacy row SHALL remain null. For each newly added SHA, the server SHALL treat the submitted branch as untrusted, verify that it is a current branch of the linked repository, verify that the commit is reachable from that branch, and verify commit authorship against the assigned developer's verified GitHub identity before writing. Provider calls SHALL occur outside the database transaction. Before applying changes, the transaction SHALL recheck task assignment and that the task remains In Progress. The operation SHALL leave the entire attachment set unchanged if validation, authorization, provider verification, or persistence fails.
+
+#### Scenario: Developer saves the complete desired selection
+- **WHEN** the assigned developer sends a valid `PUT` request with the desired attachments
+- **THEN** the server adds newly selected commits, removes omitted commits, preserves provenance on retained rows, and returns HTTP 200 with the complete resulting attachment set
+
+#### Scenario: Developer removes all attachments
+- **WHEN** the assigned developer sends `{ "attachments": [] }` while the task is In Progress
+- **THEN** the server removes every attached commit atomically and returns HTTP 200 with `{ "attachments": [] }`
+
+#### Scenario: Retained attachment keeps its original provenance
+- **WHEN** the requested selection retains an attached SHA but supplies a different branch or `null`
+- **THEN** the saved attachment keeps its original source branch
+- **AND** if the retained row is legacy and has no source branch, it remains null
+
+#### Scenario: New attachment branch is verified
+- **WHEN** the request adds a SHA with a source branch that is not a current branch of the linked repository, or the commit is not reachable from that branch
+- **THEN** the server refuses the entire replacement and leaves every attachment unchanged
+
+#### Scenario: New attachment author is verified
+- **WHEN** the request adds a commit not authored by the assigned developer's verified GitHub identity
+- **THEN** the server refuses the entire replacement and leaves every attachment unchanged
+
+#### Scenario: Replacement request is strictly validated
+- **WHEN** the request has missing or extra fields, a malformed SHA, an invalid or missing source branch for a new attachment, duplicate SHAs, or a non-array `attachments` value
+- **THEN** the server returns HTTP 400 with the safe invalid-request response and leaves every attachment unchanged
+
+#### Scenario: Only assigned developer may replace attachments
+- **WHEN** a project member who is not the task's assigned developer or a nonmember sends a replacement request
+- **THEN** the server returns the existing safe authorization or not-found response and leaves every attachment unchanged
+
+#### Scenario: Task must remain In Progress when replacement applies
+- **WHEN** the assigned developer sends a replacement request while the task is not In Progress, or the task leaves In Progress before the database transaction applies the replacement
+- **THEN** the server refuses the operation with the safe forbidden response and leaves every attachment unchanged
+
+#### Scenario: Provider verification is unavailable
+- **WHEN** the server cannot verify a newly added commit's branch reachability or authorship because GitHub evidence is unavailable
+- **THEN** it returns the existing safe unavailable-evidence response and leaves every attachment unchanged
+
+#### Scenario: Repeating a replacement is idempotent
+- **WHEN** the assigned developer repeats a valid replacement request with the already saved desired attachment set
+- **THEN** the server returns HTTP 200 with the same complete attachment set and preserves all existing provenance
+
+### Requirement: Assigned developers save a staged commit selection
+The commit picker SHALL initialize its checked selection from the task's complete attached-commit set. Task-ID matches SHALL remain a preselection cue for commits not already attached and SHALL NOT write an attachment until the developer saves. Selection changes SHALL remain staged in the picker until Save; cancelling or closing without saving SHALL leave persisted attachments unchanged. Saving SHALL synchronize the complete desired selection with persisted attachments, adding selected commits and removing deselected attached commits as one atomic operation only while the task is In Progress. Authorized task-detail readers SHALL be able to review the persisted attachment list and provenance in every task state; outside In Progress, selection editing and saving SHALL be disabled, read-only or hidden. Attached commits SHALL remain reviewable regardless of the active branch, date interval, or commit-list page, and SHALL be removable from the picker regardless of those filters while the task is In Progress. The saved source branch for each newly selected commit SHALL be the branch selected in the picker when that commit was selected.
+
+#### Scenario: Previously attached commits are checked
+- **WHEN** the assigned developer opens the picker for a task with attached commits
+- **THEN** every returned commit whose SHA is attached to the task is checked
+- **AND** task-ID matches that are not attached are preselected only as unsaved choices
+
+#### Scenario: Existing selection is visible across picker filters
+- **WHEN** the developer changes the branch, date interval, or page in the picker
+- **THEN** staged choices are retained
+- **AND** every persisted attachment remains reviewable with its checked state and source branch even when it is absent from the current commit results
+
+#### Scenario: Unchecking an attached commit stages its removal
+- **WHEN** the developer unchecks a previously attached commit
+- **THEN** it remains attached until Save is activated
+- **AND** saving removes that attachment and refreshes the task's attached-commit state
+
+#### Scenario: Save synchronizes additions and removals
+- **WHEN** the developer saves a selection containing new commits and omitting previously attached commits
+- **THEN** new commits are attached with the branch selected when each was chosen, omitted commits are removed, and the picker reflects the saved selection
+- **AND** the additions and removals are committed together or none are applied
+
+#### Scenario: Cancel discards staged edits
+- **WHEN** the developer changes checked choices and closes or cancels without saving
+- **THEN** the persisted attached commits and their recorded source branches remain unchanged
+
+#### Scenario: Save requires an In Progress task
+- **WHEN** the assigned developer saves an attachment selection while the task is not In Progress
+- **THEN** the server refuses the operation with the safe forbidden response and leaves attachments unchanged
+
+#### Scenario: Save revalidates authorization and commit authorship
+- **WHEN** a caller is not the assigned developer, a selected commit is not authored by the developer, or GitHub cannot verify a newly selected commit
+- **THEN** the server refuses the save safely and applies none of its additions or removals
+
+#### Scenario: Invalid selection is atomic
+- **WHEN** a save request has malformed commit or branch data, duplicate conflicting entries, or fields outside its approved schema
+- **THEN** the server returns the safe invalid-request error and leaves all attachments unchanged
+
+#### Scenario: Task state changes while saving
+- **WHEN** the task leaves In Progress before the save transaction applies
+- **THEN** the server refuses the save and leaves all attachments unchanged
+
+### Requirement: Each attached commit records its picker source branch
+Each attached commit SHALL store the source branch selected in the commit picker when it was saved. The source branch records the picker context for that attachment and SHALL NOT be represented as an exclusive or permanent property of the Git commit. Existing attachments without recorded source branch SHALL remain readable and be represented as branch not recorded.
+
+#### Scenario: Commit is attached from a selected branch
+- **WHEN** the assigned developer saves a commit selected while a branch is active in the picker
+- **THEN** the attachment records that selected branch as its source branch
+
+#### Scenario: Legacy attachment has no source branch
+- **WHEN** task detail reads an attachment created before source-branch recording
+- **THEN** it returns the attachment and identifies its source branch as not recorded
 
 ### Requirement: Unavailable GitHub evidence is reported distinctly
 The system SHALL report GitHub evidence as unavailable when the linked installation or repository cannot be reached, access is revoked or suspended, or GitHub rate limits are hit. It SHALL NOT report unavailable evidence as an empty commit list.

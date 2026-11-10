@@ -7,6 +7,27 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // “Access is enforced by project role on the server”. No formal IDs exist.
 // Exercise real handlers/services/repositories with only external boundaries
 // replaced. Fixtures are synthetic; no network, credentials, or database is used.
+//
+// Task 4.1 replaced the project read and creation stubs: task-management "Signed-in
+// people create projects" and identity-and-access "Project details require membership"
+// and "Project creation is functional"; design.md Q4, Q6 and S1 to S6. Detailed project-route
+// coverage lives in tests/unit/project-routes.test.ts.
+//
+// Task 4.2 replaced the task create, read and edit stubs: identity-and-access "Task creation is
+// functional", "Task read is functional" and "Task field edit is functional"; design.md T1, T8
+// and T16. Their default bodies below are now valid (T2, T4), because the body is validated
+// before the session (T8). The authorized-success cases for those routes, which write, live in
+// tests/unit/task-routes.test.ts; this file keeps the denial, concealment and safe-error
+// cases.
+//
+// Task 4.3 replaced the task-state stub: identity-and-access "Task state transition is functional
+// and enforces lifecycle permissions" and "Invalid state transition uses the permission
+// response"; task-management "Task lifecycle" and "Task state route"; design.md L1, L2 and the
+// 4.3 check order. The state body is now {state, version} (L1) and is validated before the
+// session, so the default state body below is valid. The 501 stub assertions are superseded
+// ("Superseded tests" conflict resolution). This file's database fake refuses every write, so
+// it keeps the 403 matrix denials and body validation; the authorized transitions, which write,
+// are covered in tests/unit/task-lifecycle-routes.test.ts.
 const fixtures = vi.hoisted(() => ({
   authId: "11111111-1111-4111-8111-111111111111",
   personId: "22222222-2222-4222-8222-222222222222",
@@ -26,6 +47,12 @@ const fixtures = vi.hoisted(() => ({
   assigneeId: "22222222-2222-4222-8222-222222222222",
   status: "to_do",
   failure: "" as "" | "people" | "projects" | "memberships" | "tasks",
+  // Task 4.1: only project creation may write, and only to projects and memberships.
+  allowProjectCreation: false,
+  created: [] as { table: string; values: readonly unknown[] }[],
+  transaction: [] as string[],
+  projectKey: "WEB",
+  projectName: "Synthetic project",
 }));
 
 vi.mock("server-only", () => ({}));
@@ -48,6 +75,8 @@ vi.mock("@/server/auth/supabase-auth", () => ({
 vi.mock("pg", () => {
   class Pool {
     query = fixtures.query;
+    // Task 4.1 (design.md S6): transactions use pool.connect(), then BEGIN/COMMIT/ROLLBACK.
+    async connect() { return { query: fixtures.query, release: () => undefined }; }
   }
   return { Pool, default: { Pool } };
 });
@@ -78,10 +107,19 @@ async function requestEndpoint(endpoint: Endpoint, options: {
     : endpoint === "projectRead" ? projectPath
       : endpoint === "taskCreate" ? `${projectPath}/tasks`
         : endpoint === "taskState" ? `${taskPath}/state` : taskPath;
+  // Task 4.1 (D3, Q4): project creation validates its body before the session, so the
+  // default creation body is a valid {key, name}.
+  const defaultBody = endpoint === "taskState" ? { state: "In Progress", version: 1 }
+    : endpoint === "projectCreate" ? { key: "WEB", name: "Synthetic project" }
+      : endpoint === "taskCreate" ? {
+        title: "Synthetic task", description: "Synthetic description", assigneeId: fixtures.otherPersonId,
+        dueDate: "2026-11-30", acceptanceCriteria: ["Synthetic criterion"],
+      }
+        : endpoint === "taskEdit" ? { version: 1, title: "Synthetic edited title" } : {};
   const request = new NextRequest(`https://synthetic-app.example${path}`, {
     method,
     headers: { "content-type": "application/json", origin: "https://synthetic-app.example" },
-    ...(method === "GET" ? {} : { body: options.body ?? JSON.stringify(endpoint === "taskState" ? { state: "In Progress" } : {}) }),
+    ...(method === "GET" ? {} : { body: options.body ?? JSON.stringify(defaultBody) }),
   });
   const context = { params: Promise.resolve({ projectId, taskId }) };
   switch (endpoint) {
@@ -111,6 +149,9 @@ beforeEach(() => {
   fixtures.assigneeId = fixtures.personId;
   fixtures.status = "to_do";
   fixtures.failure = "";
+  fixtures.allowProjectCreation = false;
+  fixtures.created.length = 0;
+  fixtures.transaction.length = 0;
   fixtures.getUser.mockResolvedValue({
     data: { user: {
       id: fixtures.authId,
@@ -121,6 +162,18 @@ beforeEach(() => {
   fixtures.query.mockImplementation(async (statement: string | { text: string; values?: readonly unknown[] }, values?: readonly unknown[]) => {
     const sql = typeof statement === "string" ? statement : statement.text;
     const parameters = values ?? (typeof statement === "string" ? [] : statement.values ?? []);
+    if (/^\s*(begin|start transaction|commit|rollback)\b/i.test(sql)) {
+      fixtures.transaction.push(sql.trim().split(/\s+/)[0].toUpperCase());
+      return { rows: [], rowCount: 0 };
+    }
+    const insertTable = /^\s*insert\s+into\s+"?app"?\."?(projects|memberships)"?/i.exec(sql)?.[1]?.toLowerCase();
+    if (fixtures.allowProjectCreation && insertTable) {
+      fixtures.created.push({ table: insertTable, values: parameters });
+      const row = insertTable === "projects"
+        ? { id: fixtures.otherProjectId, key: fixtures.projectKey, name: fixtures.projectName, last_task_number: 0 }
+        : { id: "88888888-8888-4888-8888-888888888888", project_id: fixtures.otherProjectId, person_id: fixtures.personId, role: "product_manager" };
+      return { rows: [row], rowCount: 1 };
+    }
     if (/\b(insert|update|delete|merge|truncate|call)\b/i.test(sql)) {
       fixtures.writes.push(sql);
       throw new Error("Authorization stubs must never issue writes");
@@ -136,10 +189,14 @@ beforeEach(() => {
         assignee_id: fixtures.assigneeId, status: fixtures.status,
       }] : [];
     } else if (/\bapp\.memberships\b/i.test(sql)) {
+      // A statement joining projects (task 4.1 project read) gets the project's columns.
+      const project = /\bapp\.projects\b/i.test(sql)
+        ? { id: fixtures.projectId, key: fixtures.projectKey, name: fixtures.projectName } : {};
       rows = fixtures.member && fixtures.projectExists && parameters.includes(fixtures.personId) && parameters.includes(fixtures.projectId)
-        ? [{ id: "77777777-7777-4777-8777-777777777777", person_id: fixtures.personId, project_id: fixtures.projectId, role: fixtures.role }] : [];
+        ? [{ id: "77777777-7777-4777-8777-777777777777", person_id: fixtures.personId, project_id: fixtures.projectId, role: fixtures.role, ...project }] : [];
     } else if (/\bapp\.projects\b/i.test(sql)) {
-      rows = fixtures.projectExists && parameters.includes(fixtures.projectId) ? [{ id: fixtures.projectId }] : [];
+      rows = fixtures.projectExists && parameters.includes(fixtures.projectId)
+        ? [{ id: fixtures.projectId, key: fixtures.projectKey, name: fixtures.projectName }] : [];
     } else if (/\bapp\.people\b/i.test(sql)) {
       rows = fixtures.personExists && parameters.includes(fixtures.authId) ? [{ id: fixtures.personId, auth_user_id: fixtures.authId }] : [];
     } else {
@@ -210,25 +267,52 @@ describe("protected API authorization stubs", () => {
     await expectError(await requestEndpoint(endpoint), 404);
   });
 
-  it.each(["developer", "product_manager"])("allows a %s to reach project and task read stubs", async (role) => {
-    fixtures.role = role;
-    await expectError(await requestEndpoint("projectRead"), 501);
-    await expectError(await requestEndpoint("taskRead"), 501);
+  // Task 4.1, Q6: creation from a valid session with no people row is 401, not 404.
+  it("refuses project creation with 401 when the session has no registered person, creating nothing", async () => {
+    fixtures.personExists = false;
+    fixtures.allowProjectCreation = true;
+    await expectError(await requestEndpoint("projectCreate"), 401);
+    expect(fixtures.created).toEqual([]);
   });
 
-  it("requires only authentication for the project creation stub", async () => {
+  // Group 7.3 replaces the read stub; full DTO/history tests use their own
+  // richer database fixture in task-detail-read.test.ts.
+  it("refuses an unassigned project developer reading task detail", async () => {
+    fixtures.assigneeId = fixtures.otherPersonId;
+    await expectError(await requestEndpoint("taskRead"), 403);
+  });
+
+  // Task 4.1: "Project details require membership" now returns 200 with the project.
+  it.each(["developer", "product_manager"])("returns the project with the requester's %s role", async (role) => {
+    fixtures.role = role;
+    const response = await requestEndpoint("projectRead");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(await response.json()).toEqual({
+      id: fixtures.projectId, key: fixtures.projectKey, name: fixtures.projectName, role,
+    });
+  });
+
+  // Task 4.1: "Project creation is functional"; any signed-in person may create (D1),
+  // and the creator becomes the product manager (D2, D3).
+  it("creates a project for a signed-in person who belongs to no project", async () => {
     fixtures.member = false;
-    fixtures.personExists = false;
-    await expectError(await requestEndpoint("projectCreate"), 501);
+    fixtures.allowProjectCreation = true;
+    const response = await requestEndpoint("projectCreate");
+    expect(response.status).toBe(201);
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(await response.json()).toEqual({
+      id: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
+      key: "WEB",
+      name: "Synthetic project",
+      role: "product_manager",
+    });
+    expect(fixtures.created.map((write) => write.table)).toEqual(["projects", "memberships"]);
+    expect(fixtures.transaction).toEqual(["BEGIN", "COMMIT"]);
   });
 
   it.each(["taskCreate", "taskEdit"] as Endpoint[])("refuses a developer calling %s directly", async (endpoint) => {
     await expectError(await requestEndpoint(endpoint), 403);
-  });
-
-  it.each(["taskCreate", "taskEdit"] as Endpoint[])("allows the project's PM to reach %s", async (endpoint) => {
-    fixtures.role = "product_manager";
-    await expectError(await requestEndpoint(endpoint), 501);
   });
 
   it.each(["projectRead", "taskRead", "taskEdit", "taskState"] as Endpoint[])("conceals missing projects on %s", async (endpoint) => {
@@ -267,52 +351,88 @@ describe("protected API authorization stubs", () => {
   });
 });
 
-describe("task state role and assignment authorization", () => {
-  it.each([
-    ["to_do", "In Progress"],
-    ["in_progress", "In Review"],
-  ])("allows the assigned developer to request %s → %s without changing state", async (current, target) => {
-    fixtures.status = current;
-    await expectError(await requestEndpoint("taskState", { body: JSON.stringify({ state: target }) }), 501);
-    expect(fixtures.status).toBe(current);
+describe("task state role and assignment authorization (task 4.3 403 matrix, L2)", () => {
+  type Actor = "assigned developer" | "unassigned developer" | "product manager";
+  const ACTORS: readonly Actor[] = ["assigned developer", "unassigned developer", "product manager"];
+  const STATUSES = ["to_do", "in_progress", "in_review", "done"] as const;
+  const TARGETS = ["To Do", "In Progress", "In Review", "Done"] as const;
+  // identity-and-access "Task state transition is functional and enforces lifecycle permissions".
+  const ALLOWED = new Set([
+    "assigned developer|to_do|In Progress",
+    "assigned developer|in_progress|In Review",
+    "product manager|in_review|Done",
+    "product manager|in_review|In Progress",
+  ]);
+  const denied = ACTORS.flatMap((actor) => STATUSES.flatMap((status) => TARGETS
+    .filter((target) => !ALLOWED.has(`${actor}|${status}|${target}`))
+    .map((target) => [actor, status, target] as const)));
+
+  function actAs(actor: Actor): void {
+    if (actor !== "assigned developer") fixtures.assigneeId = fixtures.otherPersonId;
+    if (actor === "product manager") fixtures.role = "product_manager";
+  }
+
+  it("covers every combination of role, assignment and current state that is not allowed", () => {
+    // 3 actors x 4 current states x 4 requested states, less the four allowed transitions.
+    expect(denied).toHaveLength(44);
   });
 
-  it.each([
-    ["to_do", "In Progress"],
-    ["in_progress", "In Review"],
-  ])("refuses an unassigned developer's %s → %s request", async (current, target) => {
-    fixtures.status = current;
-    fixtures.assigneeId = fixtures.otherPersonId;
-    await expectError(await requestEndpoint("taskState", { body: JSON.stringify({ state: target }) }), 403);
+  it.each(denied)("refuses the %s's request on a %s task for %s with 403 FORBIDDEN and writes nothing", async (actor, status, target) => {
+    actAs(actor);
+    fixtures.status = status;
+    await expectError(await requestEndpoint("taskState", { body: JSON.stringify({ state: target, version: 1 }) }), 403);
+    expect(fixtures.status).toBe(status);
   });
 
-  it.each(["Done", "In Progress"])("allows the PM's In Review → %s request without changing state", async (target) => {
+  it.each(["To Do", "In Progress", "In Review", "Done"])("refuses any request on a Done task, including %s, with 403", async (target) => {
     fixtures.role = "product_manager";
-    fixtures.status = "in_review";
     fixtures.assigneeId = fixtures.otherPersonId;
-    await expectError(await requestEndpoint("taskState", { body: JSON.stringify({ state: target }) }), 501);
-    expect(fixtures.status).toBe("in_review");
+    fixtures.status = "done";
+    await expectError(await requestEndpoint("taskState", { body: JSON.stringify({ state: target, version: 1 }) }), 403);
   });
 
-  it.each(["Done", "In Progress"])("refuses an assigned developer's PM-only In Review → %s request", async (target) => {
+  it("refuses the assigned developer's request for changes with feedback (Developer cannot request changes)", async () => {
     fixtures.status = "in_review";
-    await expectError(await requestEndpoint("taskState", { body: JSON.stringify({ state: target }) }), 403);
+    await expectError(await requestEndpoint("taskState", {
+      body: JSON.stringify({ state: "In Progress", version: 1, feedback: "Synthetic feedback" }),
+    }), 403);
   });
 
-  it.each([
-    ["to_do", "In Progress"],
-    ["in_progress", "In Review"],
-  ])("refuses the PM's developer-only %s → %s request", async (current, target) => {
+  it("refuses the PM's In Progress request with feedback on a To Do task with 403, before the feedback rule", async () => {
     fixtures.role = "product_manager";
-    fixtures.status = current;
-    await expectError(await requestEndpoint("taskState", { body: JSON.stringify({ state: target }) }), 403);
+    fixtures.assigneeId = fixtures.otherPersonId;
+    fixtures.status = "to_do";
+    await expectError(await requestEndpoint("taskState", {
+      body: JSON.stringify({ state: "In Progress", version: 1, feedback: "Synthetic feedback" }),
+    }), 403);
+  });
+
+  it("refuses an unassigned developer even with the largest valid version (403 before the version guard)", async () => {
+    fixtures.assigneeId = fixtures.otherPersonId;
+    await expectError(await requestEndpoint("taskState", { body: JSON.stringify({ state: "In Progress", version: 2_147_483_647 }) }), 403);
   });
 
   it.each([
-    "{}", "null", "[]", '{"state":null}', '{"state":42}',
-    '{"state":"in_progress"}', '{"state":"Unknown"}',
-    '{"state":"constructor"}', '{"state":"toString"}', '{"state":"__proto__"}',
-  ])("rejects missing or invalid state in %s", async (body) => {
+    "{}", "null", "[]", '"In Progress"',
+    '{"state":null,"version":1}', '{"state":42,"version":1}',
+    '{"state":"in_progress","version":1}', '{"state":"in progress","version":1}', '{"state":"Unknown","version":1}',
+    '{"state":"constructor","version":1}', '{"state":"toString","version":1}', '{"state":"__proto__","version":1}',
+    '{"state":"In Progress"}', '{"state":"In Progress","version":null}', '{"state":"In Progress","version":0}',
+    '{"state":"In Progress","version":-1}', '{"state":"In Progress","version":1.5}', '{"state":"In Progress","version":"1"}',
+    '{"state":"In Progress","version":2147483648}', '{"state":"In Progress","version":true}',
+    '{"version":1}',
+    '{"state":"In Progress","version":1,"assigneeId":"22222222-2222-4222-8222-222222222222"}',
+    '{"state":"In Progress","version":1,"note":"x"}',
+    '{"state":"Done","version":1,"feedback":"Synthetic feedback"}',
+    '{"state":"In Review","version":1,"feedback":"Synthetic feedback"}',
+    '{"state":"To Do","version":1,"feedback":"Synthetic feedback"}',
+  ])("rejects the invalid state body %s with 400 INVALID_REQUEST", async (body) => {
     await expectError(await requestEndpoint("taskState", { body }), 400);
+  });
+
+  it("rejects an invalid state body with 400 before the session check (check order)", async () => {
+    fixtures.getUser.mockResolvedValue({ data: { user: null }, error: null });
+    await expectError(await requestEndpoint("taskState", { body: JSON.stringify({ state: "Done", version: 1, feedback: "x" }) }), 400);
+    expect(fixtures.query).not.toHaveBeenCalled();
   });
 });

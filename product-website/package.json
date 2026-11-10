@@ -1,0 +1,13 @@
+{
+  "name": "product-website",
+  "version": "1.0.0",
+  "description": "MarkBind product website for CS3227-2610-MP4",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/run-markbind.mjs build",
+    "serve": "node scripts/run-markbind.mjs serve"
+  },
+  "devDependencies": {
+    "markbind-cli": "7.2.0"
+  }
+}
