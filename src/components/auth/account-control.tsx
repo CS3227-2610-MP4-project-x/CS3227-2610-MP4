@@ -4,6 +4,7 @@ import Image from "next/image";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 export type AccountControlProps = Readonly<{
   githubUsername: string;
@@ -62,17 +63,28 @@ function useAccountSignOut(): Readonly<{ isSigningOut: boolean; hasSignOutError:
       setIsSigningOut(false);
     }
   }
-
   return { isSigningOut, hasSignOutError, signOut };
 }
 
-function accountMenuContents(githubUsername: string, state: ReturnType<typeof useAccountSignOut>): ReactNode {
-  return <div className="account-menu">
-    <p className="account-menu-label">GitHub account</p>
-    <p className="account-menu-username">@{githubUsername}</p>
-    {state.hasSignOutError && <p className="account-error" role="alert">Try again later</p>}
-    <button className="sign-out-button" type="button" onClick={state.signOut} disabled={state.isSigningOut}>
-      {state.isSigningOut ? "Signing out…" : "Sign out"}
-    </button>
-  </div>;
+function accountMenuContents(
+    githubUsername: string,
+    state: ReturnType<typeof useAccountSignOut>,
+): ReactNode {
+  return (
+      <div className="account-menu">
+        {state.hasSignOutError && (
+            <p className="account-error" role="alert">Try again later</p>
+        )}
+        <button
+            className="sign-out-button"
+            type="button"
+            onClick={state.signOut}
+            disabled={state.isSigningOut}
+            aria-busy={state.isSigningOut}
+        >
+          {state.isSigningOut ? "Signing out…" : "Sign out"}
+          {state.isSigningOut && <LoadingSpinner />}
+        </button>
+      </div>
+  );
 }

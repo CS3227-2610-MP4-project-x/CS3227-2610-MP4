@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PendingLink } from "@/components/ui/pending-link";
 import { CreateProjectForm } from "@/components/projects";
 import { requireWorkspaceSession } from "@/server/auth";
 import { getServerComposition } from "@/server/composition";
@@ -12,7 +12,7 @@ export default async function CreateProjectPage() {
     <main className="min-h-screen bg-[#1a1a1a] px-5 py-10 text-neutral-100 sm:px-8">
       <div className="mx-auto max-w-3xl">
         <nav aria-label="Breadcrumb" className="mb-8 text-sm text-neutral-400">
-          <Link href="/" className="hover:text-white">Workspace</Link><span aria-hidden="true"> / </span><span>Create project</span>
+          <PendingLink href="/" className="hover:text-white">Workspace</PendingLink><span aria-hidden="true"> / </span><span>Create project</span>
         </nav>
         <header className="mb-8">
           <p className="text-xs font-semibold uppercase tracking-[.16em] text-neutral-400">New workspace</p>

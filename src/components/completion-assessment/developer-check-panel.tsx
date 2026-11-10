@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CheckHistory, type CheckHistoryEntry } from "./check-history";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 export type DeveloperCheckPanelProps = Readonly<{
   projectId: string;
@@ -155,9 +156,10 @@ export function DeveloperCheckPanel({ projectId, taskId, checkHistory }: Develop
           <h2 id="acceptance-check-heading" className="text-xl font-semibold tracking-tight text-neutral-100">Acceptance Criteria Check</h2>
           <p className="mt-1 text-sm text-neutral-400">Advisory result for the task’s attached commits.</p>
         </div>
-        <button type="button" onClick={runCheck} disabled={loading}
+        <button type="button" onClick={runCheck} disabled={loading} aria-busy={loading}
           className="inline-flex min-h-10 items-center justify-center rounded-xl bg-emerald-500 px-4 text-sm font-semibold text-[#08200f] transition hover:bg-emerald-400 disabled:cursor-wait disabled:opacity-60">
           {loading ? "Checking…" : "Run check"}
+          {loading && <LoadingSpinner />}
         </button>
       </header>
       {loading && <p role="status" aria-live="polite" className="text-sm text-neutral-400">Running the check against the attached commits…</p>}
