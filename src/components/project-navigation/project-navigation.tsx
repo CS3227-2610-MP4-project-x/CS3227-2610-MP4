@@ -1,9 +1,18 @@
 "use client";
 
-import Link from "next/link";
+import { PendingLink } from "@/components/ui/pending-link";
 import { useSelectedLayoutSegment } from "next/navigation";
+import { AccountControl } from "@/components/auth/account-control";
+import { ProjectSwitcher } from "./project-switcher";
+import type { ProjectView } from "@/server/projects";
 
-export type ProjectNavigationProps = Readonly<{ projectId: string; role: "product_manager" | "developer" }>;
+export type ProjectNavigationProps = Readonly<{
+  projectId: string;
+  role: "product_manager" | "developer";
+  identity: Readonly<{ githubUsername: string; avatarUrl: string | null }>;
+  projects?: readonly ProjectView[];
+  accountId?: string;
+}>;
 
 type Tab = Readonly<{ label: string; segment: string | null; managerOnly: boolean }>;
 
@@ -23,22 +32,28 @@ function tabSegmentOf(segment: string | null): string | null {
   return segment === "tasks" ? "board" : segment;
 }
 
-export function ProjectNavigation({ projectId, role }: ProjectNavigationProps) {
+export function ProjectNavigation({ projectId, role, identity, projects, accountId }: ProjectNavigationProps) {
   const active = tabSegmentOf(useSelectedLayoutSegment());
   const tabs = TABS.filter((tab) => role === "product_manager" || !tab.managerOnly);
   return (
     <>
-      <div className="mb-3">
-        <Link className="workspace-project-link" href="/">Back to Project Space</Link>
+      <div className="project-navigation-row">
+        {projects && accountId && <ProjectSwitcher projectId={projectId} projects={projects} accountId={accountId} />}
+        <nav className="workspace-nav project-nav" aria-label="Project navigation">
+          {tabs.map((tab) => tab.segment === null
+            // F6: a disabled tab looks distinct from an inactive one and says why it cannot be used.
+            ? <span key={tab.label} className="workspace-nav-link project-nav-link-disabled" aria-disabled="true" title="Coming soon">
+                {tab.label}<span className="sr-only"> (coming soon)</span>
+              </span>
+            : <PendingLink key={tab.label}
+                className={tab.segment === active ? "workspace-nav-link workspace-nav-link-active" : "workspace-nav-link"}
+                href={`/projects/${encodeURIComponent(projectId)}/${tab.segment}`}
+                aria-current={tab.segment === active ? "page" : undefined}>
+                {tab.label}
+              </PendingLink>)}
+        </nav>
+        <AccountControl githubUsername={identity.githubUsername} avatarUrl={identity.avatarUrl} />
       </div>
-      <nav className="workspace-nav project-nav" aria-label="Project navigation">
-        {tabs.map((tab) => <Link key={tab.label}
-              className={tab.segment === active ? "workspace-nav-link workspace-nav-link-active" : "workspace-nav-link"}
-              href={`/projects/${encodeURIComponent(projectId)}/${tab.segment}`}
-              aria-current={tab.segment === active ? "page" : undefined}>
-              {tab.label}
-            </Link>)}
-      </nav>
     </>
   );
 }

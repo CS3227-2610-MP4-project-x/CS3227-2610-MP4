@@ -12,7 +12,7 @@ export type TaskDetailView = Readonly<{
     dueDate: string; branchName: string | null;
     acceptanceCriteria: readonly Readonly<{ id: string; position: number; description: string }>[];
   }>;
-  attachedCommits: readonly Readonly<{ id: string; sha: string; attachedBy: Readonly<{ id: string; githubUsername: string }>; attachedAt: string }>[];
+  attachedCommits: readonly Readonly<{ id: string; sha: string; sourceBranch: string | null; attachedBy: Readonly<{ id: string; githubUsername: string }>; attachedAt: string }>[];
   progressUpdates: readonly Readonly<{ id: string; author: Readonly<{ id: string; githubUsername: string }>; body: string; createdAt: string }>[];
   reviewFeedback: readonly Readonly<{ id: string; author: Readonly<{ id: string; githubUsername: string }>; feedback: string; createdAt: string }>[];
   checkHistory: readonly StoredCheckResult[];

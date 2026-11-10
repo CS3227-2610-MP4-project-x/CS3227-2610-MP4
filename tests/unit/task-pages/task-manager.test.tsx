@@ -29,7 +29,12 @@ function nodes(node: ReactNode): Node[] {
 }
 let current: ReturnType<typeof TaskManager>;
 function render(existing = true, members: typeof dev[] | null = [dev]) { h.active = true; h.cursor = 0; current = TaskManager({ projectId: "project-id", task: existing ? task : undefined, members }); return current; }
-function button(label: string) { const found = nodes(current).find(n => n.type === "button" && n.props.children === label); if (!found) throw new Error(`Missing button ${label}`); return found; }
+function childText(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(childText).join("");
+  return isValidElement<Node["props"]>(node) ? childText(node.props.children) : "";
+}
+function button(label: string) { const found = nodes(current).find(n => n.type === "button" && childText(n.props.children) === label); if (!found) throw new Error(`Missing button ${label}`); return found; }
 async function click(label: string) { await (button(label).props.onClick as () => unknown)(); }
 async function submit() { const form = nodes(current).find(n => n.type === "form")!; await (form.props.onSubmit as (e: unknown) => unknown)({ preventDefault() {} }); }
 function change(name: string, value: string) { const input = nodes(current).find(n => n.props.name === name)!; (input.props.onChange as (e: unknown) => void)({ target: { value } }); }

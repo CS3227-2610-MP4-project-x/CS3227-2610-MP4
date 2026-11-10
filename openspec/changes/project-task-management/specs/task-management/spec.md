@@ -6,13 +6,86 @@ Defines how project members are organized and how product managers and developer
 
 ## ADDED Requirements
 
+<!-- Dashboard/project-switching revision approved by the human in this chat on 9 November 2026 after requirements review. See the recorded design extension for browser preference and public own-task projection decisions. -->
+
+### Requirement: Signed-in people reopen their selected project
+After sign-in, `/` SHALL redirect a person with projects to `/projects/{projectId}/dashboard` for their last selected project when they remain a member. When there is no valid last selection, it SHALL select the first project in the existing name-then-ID ordering. The system SHALL remember the signed-in person's selected project in the same browser; synchronization across browsers or devices is not required.
+
+#### Scenario: Returning project member
+- **WHEN** a signed-in person opens `/` and remains a member of their last selected project
+- **THEN** the person is redirected to that project's dashboard
+- **AND** the dashboard presentation follows their current role in that project
+
+#### Scenario: Missing or inaccessible last selection
+- **WHEN** no project selection is remembered or the person is no longer a member of that project
+- **THEN** `/` redirects to the first currently accessible project's dashboard using project name then ID ordering
+- **AND** no inaccessible project contents are disclosed
+
+#### Scenario: No project memberships
+- **WHEN** a signed-in person has no projects
+- **THEN** `/` shows an empty dashboard with empty Project Progress, Task Summary and My tasks cards
+- **AND** Create project is visually emphasized and links to `/projects/new`
+- **AND** no fabricated project or tasks are shown
+
+### Requirement: Project switching preserves dashboard or board view
+A top-left project selector SHALL list accessible projects and identify the selection. Dashboard and Board SHALL reflect that same project. Switching SHALL retain the current section when it exists and the person's destination-project role permits access, otherwise open Dashboard. Existing server-side membership and role authorization SHALL remain authoritative.
+
+#### Scenario: Project navigation visual states
+- **WHEN** a member views any project page
+- **THEN** the full-width navigation row has a bottom border and lighter background, with no duplicate project-name heading above the selector
+- **AND** Dashboard and Board appear as uncontained tabs beside the selector
+- **AND** the active tab has a soft fill and inactive tabs receive a light hover highlight
+
+#### Scenario: Shared navigation aligns with developer content
+- **WHEN** a developer views Dashboard or Board
+- **THEN** the project selector's outer left edge aligns with the developer dashboard body's outer content edge at the same viewport width
+- **AND** the shared Dashboard/Board navigation places AccountControl at its far right for both developers and product managers
+- **AND** both roles use the same developer-style account control with verified identity, avatar fallback and existing sign-out behavior
+- **AND** the dashboard body does not duplicate the account control
+
+#### Scenario: Project creation remains distinct in the switcher
+- **WHEN** a member opens the project selector
+- **THEN** a divider separates the project choices from Create project
+- **AND** a plus icon appears before the Create project label
+- **AND** the labeled link still opens `/projects/new`
+
+#### Scenario: Board returns to its project dashboard
+- **WHEN** a member views the selected project's Board
+- **THEN** the Board breadcrumb is replaced by a back link to `/projects/{projectId}/dashboard`
+- **AND** the link identifies the project dashboard as its destination
+
+#### Scenario: Switch projects from Board
+- **WHEN** a member selects another project while viewing Board
+- **THEN** they open `/projects/{selectedProjectId}/board`
+- **AND** the selector, tabs and board reflect that selected project and its current role
+
+#### Scenario: Switch projects from Dashboard
+- **WHEN** a member selects another project while viewing Dashboard
+- **THEN** they open `/projects/{selectedProjectId}/dashboard`
+- **AND** a developer receives the developer dashboard and a product manager receives the existing product-manager overview
+
+#### Scenario: Switch from another permitted section
+- **WHEN** a member switches projects from Settings or Review Queue and their role in the destination project permits that section
+- **THEN** the destination project's same section opens
+- **AND** otherwise the destination project's dashboard opens without exposing restricted contents
+
+#### Scenario: Switch from task detail
+- **WHEN** a member switches projects while viewing a task detail belonging to the source project
+- **THEN** the destination project's dashboard opens
+- **AND** the source task identifier is not reused as a destination-project task
+
 ### Requirement: Project members open the project dashboard
-The system SHALL provide a dynamically rendered dashboard at `/projects/{projectId}/dashboard` to both project roles. The shared Dashboard tab SHALL be enabled and current on that page. Existing role-specific tabs, the return link and workspace board links SHALL retain their behavior.
+The system SHALL provide a dynamic dashboard at `/projects/{projectId}/dashboard` with an enabled, current Dashboard tab. Product managers SHALL retain Project Overview, Project Progress, Task Summary, Task Allocation and manager actions. Developers SHALL receive Project Progress, Task Summary and My tasks, following `frontend_mockup_1.png`. Existing role-specific tabs and board contents SHALL retain their behavior.
 
 #### Scenario: Member opens dashboard
 - **WHEN** a project member opens the dashboard
-- **THEN** the Header, Project Progress, Task Summary and Task Allocation render
+- **THEN** the role-specific dashboard cards render
 - **AND** Dashboard is an enabled link and the current project tab
+
+#### Scenario: Developer mockup scope
+- **WHEN** a developer opens the dashboard
+- **THEN** the cards expand into the space otherwise occupied by Recent activity in the mockup
+- **AND** Recent activity, search, notifications, task checkboxes and Check ready are absent
 
 #### Scenario: Session or membership is unavailable
 - **WHEN** a visitor has no valid session or is not a project member
@@ -20,7 +93,7 @@ The system SHALL provide a dynamically rendered dashboard at `/projects/{project
 - **AND** no dashboard data is disclosed
 
 ### Requirement: Dashboard reads expose authorized aggregates
-The dashboard SHALL call a server-only read service that independently checks current project membership. Both roles SHALL receive project-wide aggregate counts and allocation labels, without task detail or member-management data. The read SHALL use a consistent snapshot, exclude deleted tasks, add no HTTP route and retain no persistent cache.
+The dashboard SHALL independently check membership in a server-only service. Project-wide aggregates SHALL omit other developers' task details and member-management data. Developer Task Summary and My tasks SHALL use only their live assigned tasks through existing own-task read services. Aggregate reads SHALL retain consistent snapshots, exclude deleted tasks, add no HTTP route and use no persistent cache.
 
 #### Scenario: Developer receives aggregate data
 - **WHEN** a developer reads a project containing other developers' tasks
@@ -33,11 +106,11 @@ The dashboard SHALL call a server-only read service that independently checks cu
 - **THEN** it returns the safe not-found outcome without dashboard contents
 
 ### Requirement: Dashboard progress and task summary agree
-Project Progress and Task Summary SHALL use live project tasks, showing Done divided by total as the nearest whole percentage, or 0% when total is zero. The summary SHALL show Done/total, a corresponding progress bar, current member count including the PM, and View all linking to the existing role-scoped board.
+Project Progress SHALL show project-wide Done/total as a whole percentage rounded to nearest, or 0% for zero tasks. PM Task Summary SHALL retain project-wide Done/total, progress bar, member count including PM and View all linking to Board. Developer Task Summary SHALL show To Do, In Progress, In Review and Done counts for their live assigned tasks, unaffected by the My tasks filter.
 
 #### Scenario: Progress excludes deleted tasks
 - **WHEN** a project has three live tasks, one Done, and one deleted Done task
-- **THEN** both progress sections show 33% and one of three complete
+- **THEN** Project Progress and the product-manager Task Summary show 33% and one of three complete
 - **AND** the deleted task contributes to no metric
 
 #### Scenario: Empty project
@@ -45,8 +118,34 @@ Project Progress and Task Summary SHALL use live project tasks, showing Done div
 - **THEN** progress is 0%, completed and total counts are zero
 - **AND** an explicit empty state is shown
 
+#### Scenario: Developer summary differs from project progress
+- **WHEN** a project has four live tasks with two Done, but the developer owns only one To Do and one Done task
+- **THEN** Project Progress shows 50% for the entire project
+- **AND** the developer Task Summary shows To Do 1, In Progress 0, In Review 0 and Done 1
+- **AND** other developers' task details are absent
+
+### Requirement: Developer My tasks filters and links work
+My tasks SHALL list only the developer's live assigned tasks, offering All, To Do, In Progress, In Review and Done filters with counts, initially All. Selected states SHALL filter the list; All SHALL restore it. View task SHALL use existing authorized detail routes. State cues SHALL use grey for To Do, blue for In Progress, yellow for In Review and green for Done, with text labels. Rows SHALL follow the mockup's fields.
+
+#### Scenario: Full task-row metadata
+- **WHEN** the developer sees an assigned task row
+- **THEN** it shows the task's title, description, state, due date, optional branch, progress-update count, attached-commit count and View task link
+- **AND** counts come from that task's stored progress updates and attached commits
+- **AND** task text is plain text and no other developer's task details are included
+
+#### Scenario: Developer filters assigned tasks
+- **WHEN** the developer chooses In Review
+- **THEN** My tasks shows only their assigned In Review tasks for the selected project
+- **AND** Project Progress and Task Summary remain unchanged
+- **AND** a filter with no matching tasks shows an explicit empty state
+
+#### Scenario: Developer opens task detail
+- **WHEN** the developer activates View task
+- **THEN** the link opens `/projects/{projectId}/tasks/{taskId}` for that task
+- **AND** existing task-detail authorization is enforced
+
 ### Requirement: Dashboard allocation filters project task states
-Allocation SHALL support selection of the four task states, initially all selected. Each row SHALL show username, count and nearest whole percentage of all live tasks in selected states. It SHALL include current developers with zero counts and a labeled PM row when retained tasks contribute. Rows SHALL sort by lowercase username then person ID.
+On the product-manager dashboard, Allocation SHALL support selection of the four task states, initially all selected. Each row SHALL show username, count and nearest whole percentage of all live tasks in selected states. It SHALL include current developers with zero counts and a labeled PM row when retained tasks contribute. Rows SHALL sort by lowercase username then person ID. The developer dashboard SHALL show My tasks in place of Task Allocation.
 
 #### Scenario: Filter changes allocation
 - **WHEN** the member changes selected task states
@@ -64,7 +163,7 @@ Allocation SHALL support selection of the four task states, initially all select
 - **AND** their allocation appears in a labeled PM row without duplication
 
 ### Requirement: Dashboard shows SGT completions today
-The allocation heading SHALL show the distinct number of live project tasks approved today, using approval state-change events and database time in Asia/Singapore. Today SHALL include its start midnight and exclude the next midnight. Allocation filters SHALL NOT change this count.
+On the product-manager dashboard, the allocation heading SHALL show the distinct number of live project tasks approved today, using approval state-change events and database time in Asia/Singapore. Today SHALL include its start midnight and exclude the next midnight. Allocation filters SHALL NOT change this count.
 
 #### Scenario: SGT day boundaries
 - **WHEN** approval events fall immediately before, exactly at and after SGT midnight
@@ -72,7 +171,7 @@ The allocation heading SHALL show the distinct number of live project tasks appr
 - **AND** task edits after approval do not alter the approval date
 
 ### Requirement: Dashboard header and PM actions reuse existing flows
-The Header SHALL display verified account identity, avatar fallback and project role, with an accessible account/settings trigger. Only the PM SHALL receive New Task, Review Queue and Progress Report actions. New Task SHALL reuse the existing inline creation flow; Review Queue SHALL link to its existing page; Progress Report SHALL remain disabled with an explanation until task 8.3.
+Verified account identity and avatar fallback SHALL appear in the shared navigation's accessible AccountControl for both roles, replacing the dashboard body's account/settings control. The dashboard SHALL retain its project-role label. Only the PM SHALL receive New Task, Review Queue and Progress Report actions. New Task SHALL reuse existing inline creation; Review Queue SHALL link to its page; Progress Report SHALL remain disabled with an explanation until task 8.3.
 
 #### Scenario: PM uses dashboard actions
 - **WHEN** the PM opens the dashboard
@@ -505,7 +604,7 @@ The system SHALL provide task detail through `GET /api/v1/projects/{projectId}/t
 
 The `task` object SHALL contain `id` (task UUID), `projectKey`, `taskKey` (the readable key formed from the project key and task number, such as `WEB-12`), `title`, `description`, `status` (the stored task status), `version` (the task's current integer version, which the task write routes require), `assignee` (`{ "id", "githubUsername" }`), `dueDate` (an ISO calendar date), `branchName` (string or null), and `acceptanceCriteria` (objects containing `id`, `position`, and `description`, ordered by `position` ascending then `id` ascending).
 
-`attachedCommits` SHALL contain objects with `id`, `sha`, `attachedBy` (`{ "id", "githubUsername" }`), and `attachedAt`, ordered by `attachedAt` ascending then `id` ascending. `progressUpdates` SHALL contain objects with `id`, `author` (`{ "id", "githubUsername" }`), `body`, and `createdAt`, ordered by `createdAt` ascending then `id` ascending. `reviewFeedback` SHALL contain objects with `id`, `author` (`{ "id", "githubUsername" }`), `feedback`, and `createdAt`, ordered by `createdAt` ascending then `id` ascending. Timestamps SHALL be ISO 8601 UTC strings. The response SHALL contain only fields needed by the client and SHALL NOT expose auth-user IDs, GitHub numeric user IDs, credentials, tokens, or ORM-private fields.
+`attachedCommits` SHALL contain objects with `id`, `sha`, `sourceBranch` (string or null), `attachedBy` (`{ "id", "githubUsername" }`), and `attachedAt`, ordered by `attachedAt` ascending then `id` ascending. A legacy attachment without recorded provenance SHALL return `sourceBranch: null`. `progressUpdates` SHALL contain objects with `id`, `author` (`{ "id", "githubUsername" }`), `body`, and `createdAt`, ordered by `createdAt` ascending then `id` ascending. `reviewFeedback` SHALL contain objects with `id`, `author` (`{ "id", "githubUsername" }`), `feedback`, and `createdAt`, ordered by `createdAt` ascending then `id` ascending. Timestamps SHALL be ISO 8601 UTC strings. The response SHALL contain only fields needed by the client and SHALL NOT expose auth-user IDs, GitHub numeric user IDs, credentials, tokens, or ORM-private fields.
 
 `checkHistory` SHALL contain one entry per distinct stored check result, ordered by `createdAt` descending then `id` descending, with each entry containing `id`, `anchorSha`, `createdAt`, `redacted`, and `payload`. The project manager's access is read-only.
 
@@ -651,6 +750,15 @@ Inside the submission transaction the system SHALL recheck that the task's attac
 - **WHEN** the attached commit set or the criteria hash changes after the tip was resolved and before the submission is stored
 - **THEN** the task moves to In Review with no check-result reference, and no stale reference is stored
 
+#### Scenario: Changed selection cannot reference a stale check
+- **WHEN** the assigned developer changes the saved commit selection after running a check and then submits the task
+- **THEN** the submission references a check only if its anchor SHA matches the unique tip of the current attached commit set and its criteria hash matches the current criteria
+- **AND** prior check results remain in check history even when they no longer match the current selection
+
+#### Scenario: Attached selection is frozen during review and after approval
+- **WHEN** a developer attempts to save attachment changes while a task is In Review or Done
+- **THEN** the save is refused and the commits presented for review or retained after approval remain unchanged
+
 #### Scenario: Check never changes state
 - **WHEN** a check result is stored or read during a submission
 - **THEN** the check itself does not approve, reject, submit, or change the task's state
@@ -761,15 +869,71 @@ The board SHALL let the assigned developer move their own task from To Do to In 
 - **THEN** no To Do to In Progress or In Progress to In Review option is offered
 
 ### Requirement: Task detail page
-The system SHALL show a task-detail page at `/projects/{projectId}/tasks/{taskId}` to the assigned developer and the project's product manager, using the task-detail read. It SHALL show the title, description, acceptance criteria, assignee, due date, branch, progress updates, attached commits, review feedback and distinct check history, and SHALL display the stored status as its state name.
+The system SHALL show a task-detail page at `/projects/{projectId}/tasks/{taskId}` to the assigned developer and the project's product manager, using the task-detail read. It SHALL show the title, description, acceptance criteria, assignee, due date, branch, progress updates, attached commits, review feedback and distinct check history, and SHALL display the stored status as its state name. For both authorized roles, each attached-commit row SHALL show its recorded source branch, or “Branch not recorded” when provenance is null.
 
 #### Scenario: Unassigned developer or nonmember
 - **WHEN** a developer who is not assigned to the task opens it
 - **THEN** the page shows a safe unavailable view and no task or check data
 - **AND** a nonmember, a missing task or a deleted task shows the safe not-found result
 
+### Requirement: Task detail breadcrumb stays within the project
+An authorized task-detail page SHALL show Project Dashboard / Board / TaskID as its breadcrumb. Project Dashboard SHALL link to `/projects/{projectId}/dashboard`, and Board SHALL link to `/projects/{projectId}/board`. TaskID SHALL display the current readable task key as the non-link current item.
+
+#### Scenario: Navigate back within the current project
+- **WHEN** the assigned developer or product manager opens task `WEB-12`
+- **THEN** the breadcrumb reads Project Dashboard / Board / WEB-12
+- **AND** its first two links target the task's project dashboard and board
+- **AND** it does not substitute a Workspace link or expose another project's data
+
+### Requirement: Developer task detail groups content into main and supporting cards
+Developer task detail SHALL use a main left card for title, readable task ID, description, acceptance criteria and the progress-update composer. A right column SHALL contain details, progress-update timeline and attached-commits cards. On mobile the supporting column SHALL stack below the main card. PM layout SHALL remain unchanged apart from the breadcrumb and the shared attached-commit source-branch labels. Existing role restrictions and unspecified panel/action placements SHALL remain unchanged.
+
+#### Scenario: Main task content and supporting details
+- **WHEN** the assigned developer opens task detail in its two-column layout
+- **THEN** the left card shows the title, readable task key, plain-text description and ordered acceptance criteria
+- **AND** the right details card shows assignee, the source branches represented by attached commits with a count for each branch, status name and due date
+- **AND** if no commits are attached, the branch summary shows an explicit empty state
+- **AND** a branch with no recorded provenance is summarized as “Branch not recorded” with its attachment count
+- **AND** the right column separately shows the progress-update timeline and attached commits
+
+#### Scenario: Existing developer features keep their placements
+- **WHEN** the assigned developer opens the rearranged task detail
+- **THEN** the commit picker remains in the Attached commits card in the right column
+- **AND** each attached-commit row shows its source branch, or “Branch not recorded” for a legacy attachment
+- **AND** while the task is In Progress, the developer can stage and save attachment selection changes in that card
+- **AND** in every task state, the developer can review the persisted attached-commits list and its provenance
+- **AND** outside In Progress, the developer cannot change the selection and any selection-editing controls are hidden, disabled, or read-only
+- **AND** Run check remains in the existing Acceptance Criteria Check panel
+- **AND** Submit for review remains available under its existing role and task-state conditions at the top-right of the main card
+- **AND** review feedback and check history retain their existing placements and behavior
+
+#### Scenario: Product-manager layout is preserved
+- **WHEN** the product manager opens task detail
+- **THEN** the existing layout, PM task-management controls and read-only check history remain unchanged
+- **AND** only the breadcrumb adopts the project dashboard and board links
+- **AND** the PM Details card continues to show the task's configured branch, without adopting the developer's attached-commit branch summary
+- **AND** the Attached commits card shows each commit's recorded source branch, or “Branch not recorded” for a legacy attachment
+
+#### Scenario: Narrow-screen reading order
+- **WHEN** the assigned developer opens task detail on mobile
+- **THEN** the supporting column stacks below the main card
+- **AND** its details, timeline and attached-commits cards retain their order
+
+#### Scenario: Compose an update without replacing the timeline
+- **WHEN** the assigned developer opens task detail
+- **THEN** the existing progress-update composer appears in the main left card
+- **AND** existing updates appear newest first in the right timeline with their authors and timestamps
+- **AND** each update is marked along a connected vertical guide to communicate its place in the timeline
+- **AND** the server/API collection retains its recorded ascending ordering
+- **AND** successful submission refreshes the timeline through the existing flow without changing task state
+
+#### Scenario: Empty histories and optional branch
+- **WHEN** the assigned developer opens a task with no progress updates, attached commits or recorded branch
+- **THEN** the respective supporting cards show safe explicit empty states and a no-branch label
+- **AND** the rest of the authorized task content and actions remain available
+
 ### Requirement: Task detail actions follow the role
-The assigned developer SHALL see Run check, the commit picker, a progress-update form and, while the task is In Progress, a Submit for review action that is not blocked when no matching check exists. The product manager SHALL see none of those actions and SHALL read check history only.
+The assigned developer SHALL see Run check, the attached-commits list, a progress-update form and, while the task is In Progress, editable commit-picker controls and a Submit for review action that is not blocked when no matching check exists. Outside In Progress, the developer SHALL retain read-only access to the attached-commits list and provenance; selection-editing controls SHALL be hidden, disabled or read-only. The product manager SHALL see no developer-only actions and SHALL have read-only access to check history and attached-commit provenance.
 
 #### Scenario: Assigned developer opens a task
 - **WHEN** the assigned developer opens an In Progress task
@@ -785,7 +949,8 @@ The assigned developer SHALL see Run check, the commit picker, a progress-update
 
 #### Scenario: Progress update appears
 - **WHEN** the assigned developer posts a progress update
-- **THEN** it appears in the task's progress updates after the page refreshes, in `createdAt` order
+- **THEN** it appears in the developer's progress-update timeline after the page refreshes, newest first
+- **AND** the server/API `progressUpdates` collection remains ordered by `createdAt` ascending then ID ascending
 
 ### Requirement: Product manager reads the review queue
 The system SHALL show the project's product manager the review queue at `/projects/{projectId}/review-queue`: every non-deleted task in In Review, each with its attached commits, its `checkHistory` in the existing entry shape, and the check result referenced by the task's most recent `submission` event (if any). The referenced result SHALL be exposed by the review read only, not by the task-detail read.

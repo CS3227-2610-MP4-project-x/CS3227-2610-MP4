@@ -3,6 +3,7 @@
 import { useId, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { postProgressUpdate } from "./task-requests";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 export type ProgressUpdateFormProps = Readonly<{ projectId: string; taskId: string }>;
 
@@ -50,9 +51,10 @@ export function ProgressUpdateForm({ projectId, taskId }: ProgressUpdateFormProp
         className="w-full rounded-xl border border-white/10 bg-[#1b1b1b] px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-emerald-400/60 focus:outline-none"
         placeholder="What changed since your last update?" />
       <div className="flex flex-wrap items-center gap-3">
-        <button type="submit" disabled={busy || refreshing}
+        <button type="submit" disabled={busy || refreshing} aria-busy={busy || refreshing}
           className="inline-flex min-h-10 items-center justify-center rounded-xl border border-white/10 bg-white/10 px-4 text-sm font-semibold text-neutral-100 transition hover:bg-white/15 disabled:cursor-wait disabled:opacity-60">
           {busy ? "Posting…" : "Post update"}
+          {(busy || refreshing) && <LoadingSpinner />}
         </button>
         {message && <p role="status" aria-live="polite" className="text-sm text-amber-200">{message}</p>}
       </div>

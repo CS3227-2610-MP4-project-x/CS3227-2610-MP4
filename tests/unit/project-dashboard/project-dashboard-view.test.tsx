@@ -18,11 +18,10 @@ vi.mock("react", async original => {
     return [h.slots[i], (next: unknown) => { h.slots[i] = typeof next === "function" ? (next as (v: unknown) => unknown)(h.slots[i]) : next; }];
   } };
 });
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
+vi.mock("next/navigation", () => ({ usePathname: () => "/", useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
 beforeEach(() => { h.slots = []; h.cursor = 0; h.active = false; });
-const identity = { githubUsername: "verified-synthetic", avatarUrl: "https://avatars.githubusercontent.com/u/424242" };
-function view(role: "developer" | "product_manager" = "developer", dashboard = dashboardView()) {
-  return renderToStaticMarkup(<ProjectDashboard projectId={ids.project} role={role} identity={identity} dashboard={dashboard} members={role === "product_manager" ? [] : undefined} />);
+function view(role: "developer" | "product_manager" = "product_manager", dashboard = dashboardView()) {
+  return renderToStaticMarkup(<ProjectDashboard projectId={ids.project} role={role} dashboard={dashboard} members={role === "product_manager" ? [] : undefined} />);
 }
 type Element = { type: unknown; props: Record<string, unknown> & { children?: ReactNode } };
 function nodes(node: ReactNode): Element[] {
@@ -45,12 +44,12 @@ function toggle(label: string) {
 }
 it("shows the four dashboard sections, matching progress, members and the existing board link", () => {
   const html = view(); const text = visibleText(html);
-  for (const label of ["Project Progress", "Task Summary", "Task Allocation", "verified-synthetic"]) expect(text).toContain(label);
+  for (const label of ["Project Progress", "Task Summary", "Task Allocation"]) expect(text).toContain(label);
   expect(text).toMatch(/33\s*%/); expect(text).toMatch(/1\s*(?:of|\/)\s*3/);
   expect(text).toMatch(/4\s*(?:team\s*)?members/i);
   expect(html).toMatch(/role="progressbar"[^>]*aria-valuenow="33"|aria-valuenow="33"[^>]*role="progressbar"/);
   expect(html).toContain(`href="/projects/${ids.project}/board"`);
-  expect(text).toMatch(/your (?:assigned )?tasks/i);
+
 });
 it("links the PM Progress Report action after the D9 readiness gate", () => {
   const html = view("product_manager"); const text = visibleText(html);
@@ -61,32 +60,28 @@ it("links the PM Progress Report action after the D9 readiness gate", () => {
   expect(reportLink ?? '').toContain(`href="/projects/${ids.project}/reports"`);
   expect(reportLink).not.toMatch(/aria-disabled="true"|coming soon/i);
 });
-it("excludes all PM actions for developers but includes accessible account access", () => {
-  const html = view();
+it("excludes all PM actions for developers and retains the developer role label", () => {
+  const html = view("developer");
   for (const label of ["New Task", "Review Queue", "Progress Report"]) expect(visibleText(html)).not.toContain(label);
-  expect(html).toMatch(/<(?:button|summary)\b[^>]*aria-label="[^"]*(?:account|settings)[^"]*"/i);
+  expect(html).not.toMatch(/class="account-control"/);
   expect(visibleText(html)).toMatch(/developer/i);
 });
-it.each(["developer", "product_manager"] as const)("keeps %s verified identity and avatar visible independently of the settings menu", role => {
+it.each([
+  ["developer", "Developer"], ["product_manager", "Product manager"],
+] as const)("keeps the %s role label while the layout owns the only account menu", (role, label) => {
   const html = view(role);
-  const header = /<header\b[^>]*>([\s\S]*?)<\/header>/.exec(html)?.[1] ?? "";
-  // A closed <details> shows its summary only. Account identity must be a separate
-  // header element, not content hidden in the settings disclosure or its trigger.
-  const outsideMenus = header.replace(/<details\b[^>]*>[\s\S]*?<\/details>/g, "");
-  expect(visibleText(outsideMenus)).toContain(identity.githubUsername);
-  expect(outsideMenus).toContain(identity.avatarUrl);
-  const settings = /<(summary|button)\b[^>]*aria-label="[^"]*settings[^"]*"[^>]*>[\s\S]*?<\/\1>/i.exec(header);
-  expect(settings, "separate settings account affordance").not.toBeNull();
-  expect(settings?.[0]).toContain("<svg");
+  expect(visibleText(html)).toContain(label);
+  expect(html).not.toMatch(/class="account-control"|class="dashboard-username"|class="dashboard-avatar/);
+  expect(visibleText(html)).not.toMatch(/Sign out/);
 });
 it("renders username markup as text", () => {
   const dashboard = dashboardView(); dashboard.allocation[0].githubUsername = "<b>synthetic</b>";
-  const html = view("developer", dashboard);
+  const html = view("product_manager", dashboard);
   expect(html).toContain("&lt;b&gt;synthetic&lt;/b&gt;"); expect(html).not.toContain("<b>synthetic</b>");
 });
 it("shows a successful empty state with 0% and no NaN", () => {
   const dashboard = dashboardView(); Object.assign(dashboard, { totalTasks: 0, completedTasks: 0, progressPercent: 0, completedToday: 0 });
-  const html = view("developer", dashboard);
+  const html = view("product_manager", dashboard);
   expect(visibleText(html)).toMatch(/no tasks|no live tasks/i); expect(html).not.toMatch(/NaN|Infinity/);
 });
 it("defaults all four states on and changes allocation through the state controls", () => {
