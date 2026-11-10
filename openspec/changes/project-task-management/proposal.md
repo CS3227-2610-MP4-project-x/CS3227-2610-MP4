@@ -13,6 +13,7 @@ Small software teams lose time to status reporting: product managers chase devel
 - **Developer AI feature: Acceptance Criteria Check.** For each criterion, the AI reports addressed, not addressed, or unclear, with evidence quoted from the diff, plus possible gaps. There is no numeric score. The latest result is attached to the submission for the product manager.
 - **Product manager AI feature: Progress Report.** An on-demand summary for a date range (default: today, SGT) built from structured activity, with every statement citing task IDs.
 - AI safeguards for both features: untrusted-input handling, secret redaction, output validation, per-person quotas, and usage logging.
+- Shared interaction feedback: actions that wait for a request or navigation show a trailing loading indicator while they are in progress.
 
 ## Capabilities
 
@@ -27,6 +28,7 @@ Small software teams lose time to status reporting: product managers chase devel
 - `data-persistence`: The PostgreSQL schema, its migrations, and the integrity rules the database enforces.
 - `continuous-integration`: GitHub Actions checks (lint, type-check, unit tests, build, secret scanning, and dependency audit) that gate changes to `master`.
 - `environment-configuration`: Separate development and production environments, environment variables documented in `.env.example`, and server-only credentials.
+- `interaction-feedback`: Consistent loading feedback for asynchronous actions and internal navigation across the application.
 
 ### Modified Capabilities
 

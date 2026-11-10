@@ -1,8 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
-import { AccountSettingsControl } from "@/components/auth/account-control";
 import { TaskManager } from "@/components/tasks/task-manager";
 import type { ProjectMemberView } from "@/server/projects";
 import type { ProjectDashboardView } from "@/server/project-dashboard";
@@ -10,7 +8,6 @@ import { TaskAllocation } from "./task-allocation";
 
 type Props = Readonly<{
   projectId: string; role: "developer" | "product_manager";
-  identity: Readonly<{ githubUsername: string; avatarUrl: string | null }>;
   dashboard: ProjectDashboardView; members?: readonly ProjectMemberView[] | null;
 }>;
 
@@ -20,20 +17,12 @@ function ProgressBar({ value, label }: Readonly<{ value: number; label: string }
   </div>;
 }
 
-export function ProjectDashboard({ projectId, role, identity, dashboard, members }: Props) {
+export function ProjectDashboard({ projectId, role, dashboard, members }: Props) {
   const manager = role === "product_manager";
   return <main className="px-5 pb-16 pt-6 sm:px-8"><div className="mx-auto max-w-5xl">
     <header className="dashboard-header">
       <div><p className="workspace-kicker">PROJECT DASHBOARD</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">Project Overview</h1>
-        <p className="mt-2 text-sm text-neutral-400">{manager ? "Project activity and progress" : "Project activity and progress · Your board shows your tasks"}</p>
-      </div>
-      <div className="dashboard-account-area">
-        <div className="dashboard-identity">
-          {identity.avatarUrl ? <Image className="dashboard-avatar" src={identity.avatarUrl} alt="" width={40} height={40} unoptimized />
-            : <span className="dashboard-avatar dashboard-avatar-fallback" aria-hidden="true">{identity.githubUsername.slice(0, 1).toUpperCase()}</span>}
-          <div><span className="dashboard-username">@{identity.githubUsername}</span><span className="dashboard-role">{manager ? "Product manager" : "Developer"}</span></div>
-        </div>
-        <AccountSettingsControl githubUsername={identity.githubUsername} />
+        <p className="mt-2 text-sm text-neutral-400"><span className="dashboard-role-label">{manager ? "Product manager" : "Developer"}</span> {manager ? "Project activity and progress" : "Project activity and progress · Your board shows your tasks"}</p>
       </div>
     </header>
     {manager && <div className="mt-7"><h2 className="sr-only">Project actions</h2><div className="dashboard-actions">

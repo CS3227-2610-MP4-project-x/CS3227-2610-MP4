@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { createProject } from "./project-actions";
 
 function createFailureMessage(response: Response): string {
@@ -61,8 +62,9 @@ export function CreateProjectForm() {
         </label>
       </div>
       {message && <p role="alert" aria-live="polite" className="mt-5 rounded-lg border border-amber-500/20 bg-amber-500/[.06] px-4 py-3 text-sm text-amber-200">{message}</p>}
-      <button type="submit" disabled={pending} className="mt-7 inline-flex min-h-11 items-center justify-center rounded-lg bg-emerald-500 px-5 text-sm font-semibold text-black transition hover:bg-emerald-400 disabled:cursor-wait disabled:opacity-60">
+      <button type="submit" disabled={pending} aria-busy={pending} className="mt-7 inline-flex min-h-11 items-center justify-center rounded-lg bg-emerald-500 px-5 text-sm font-semibold text-black transition hover:bg-emerald-400 disabled:cursor-wait disabled:opacity-60">
         {pending ? "Creating project…" : "Create project"}
+        {pending && <LoadingSpinner />}
       </button>
     </form>
   );

@@ -338,3 +338,14 @@ it("offers New Task only to the PM and never loads developer member choices", as
   const devHtml = renderToStaticMarkup(await Page({ params: Promise.resolve({ projectId }) }));
   expect(devHtml).not.toContain("New Task"); expect(listMembers).not.toHaveBeenCalled();
 });
+
+it.each(["developer", "product_manager"])("shows %s a project-dashboard return link instead of the Board breadcrumb", async role => {
+  if (role === "developer") asDeveloper();
+  const html = await render();
+  const back = [...html.matchAll(/<a\b[^>]*>[\s\S]*?<\/a>/g)].map(match => match[0]).filter(anchor => visibleText(anchor).includes("Back to Project Dashboard"));
+  expect(back).toHaveLength(1);
+  expect(back[0]).toContain(`href="/projects/${projectId}/dashboard"`);
+  expect(html.indexOf(back[0])).toBeLessThan(html.indexOf("<h1"));
+  const breadcrumb = /<nav\b[^>]*aria-label="Breadcrumb"[^>]*>[\s\S]*?<\/nav>/i.exec(html)?.[0];
+  expect(breadcrumb ?? "").not.toMatch(/Workspace[\s\S]*Board/);
+});

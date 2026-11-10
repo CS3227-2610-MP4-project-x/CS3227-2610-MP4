@@ -366,6 +366,7 @@ describe("Group 7 public GitHub evidence service configuration reads", () => {
       listBranches: vi.fn(async () => ({ ok: true as const, value: [{ name: "feature", sha: shaA }, { name: "main", sha: shaC }] })),
       fetchFileAtCommit: vi.fn(async () => ({ ok: true as const, value: JSON.stringify(rules) })),
       getCommitAuthor: vi.fn(async () => ({ ok: true as const, value: { id: 123, login: "synthetic" } })),
+      getCommitIdentity: vi.fn(async (_repository, sha) => ({ ok: true as const, value: { sha, author: { id: 123, login: "synthetic" } } })),
       listCommits: vi.fn(async () => ({ ok: true as const, value: [] })),
       fetchDiff: vi.fn(async () => ({ ok: true as const, value: diff })),
       isAncestor: vi.fn(async () => ({ ok: true as const, value: true })),

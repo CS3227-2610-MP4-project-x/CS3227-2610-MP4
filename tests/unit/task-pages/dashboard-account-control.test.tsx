@@ -44,6 +44,10 @@ function text(node: ReactNode): string {
   if (Array.isArray(node)) return node.map(text).join("");
   return isValidElement<Props>(node) ? text(node.props.children) : "";
 }
+function accountMenuText(tree: ReactNode): string {
+  const menu = elements(tree).find(n => n.props.className === "account-menu");
+  return menu ? text(menu.props.children) : "";
+}
 beforeEach(() => {
   h.slots = []; h.cursor = 0; h.active = false; vi.clearAllMocks();
   vi.stubGlobal("fetch", h.fetch); h.fetch.mockResolvedValue({ ok: true, status: 204 });
@@ -67,7 +71,8 @@ it("exports an accessible settings trigger with an icon and existing account men
   const trigger = elements(tree).find(n => (n.type === "button" || n.type === "summary") && /settings/i.test(String(n.props["aria-label"])));
   expect(trigger, "settings trigger is named for assistive technology").toBeDefined();
   expect(elements(trigger!.props.children).some(n => n.type === "svg")).toBe(true);
-  expect(text(tree)).toContain("synthetic-account"); expect(signOut(tree).props.disabled).toBeFalsy();
+  expect(elements(tree).some(n => String(n.props["aria-label"] ?? "").includes("synthetic-account"))).toBe(true);
+  expect(accountMenuText(tree)).not.toContain("synthetic-account"); expect(signOut(tree).props.disabled).toBeFalsy();
 });
 it("preserves the original account trigger, fallback identity and sign-out", () => {
   const html = renderToStaticMarkup(render("original"));
@@ -89,7 +94,8 @@ it.each([
   await signOut(render(presentation)).props.onClick!(); const tree = render(presentation);
   const alerts = elements(tree).filter(n => n.props.role === "alert");
   expect(alerts.some(n => /try again later/i.test(text(n.props.children)))).toBe(true);
-  expect(text(tree)).toContain("synthetic-account"); expect(text(tree)).not.toContain("synthetic-private-provider-detail");
+  expect(elements(tree).some(n => String(n.props["aria-label"] ?? "").includes("synthetic-account"))).toBe(true);
+  expect(accountMenuText(tree)).not.toContain("synthetic-account"); expect(text(tree)).not.toContain("synthetic-private-provider-detail");
   expect(signOut(tree).props.disabled).toBeFalsy(); expect(h.replace).not.toHaveBeenCalled(); expect(h.refresh).not.toHaveBeenCalled();
 });
 it.each(["settings", "original"] as const)("%s disables sign-out while its existing request is pending", async presentation => {

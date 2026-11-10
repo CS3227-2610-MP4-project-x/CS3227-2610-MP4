@@ -62,7 +62,10 @@ const LAYOUT = "../../../src/app/projects/[projectId]/layout";
 type Role = "product_manager" | "developer";
 
 beforeEach(() => {
-  f.getUser.mockReset().mockResolvedValue({ data: { user: { id: ids.authUser } }, error: null });
+  f.getUser.mockReset().mockResolvedValue({ data: { user: {
+    id: ids.authUser, user_metadata: { user_name: "editable-name", avatar_url: "https://example.test/editable.png" },
+    identities: [{ provider: "github", provider_id: "424242", identity_data: { user_name: "verified-nav-user", avatar_url: "https://avatars.githubusercontent.com/u/424242" } }],
+  } }, error: null });
   f.findPerson.mockReset().mockResolvedValue(ids.pm);
   f.projectExists.mockReset().mockResolvedValue(true);
   f.findRole.mockReset().mockResolvedValue("product_manager");
@@ -82,7 +85,8 @@ beforeEach(() => {
 
 async function navigation(role: Role): Promise<string> {
   const { ProjectNavigation } = await import("@/components/project-navigation/project-navigation");
-  return renderToStaticMarkup(<ProjectNavigation projectId={projectId} role={role} />);
+  const props = { projectId, role, identity: { githubUsername: "verified-nav-user", avatarUrl: "https://avatars.githubusercontent.com/u/424242" } };
+  return renderToStaticMarkup(<ProjectNavigation {...props} />);
 }
 
 /** Anchors whose visible text contains `label`. */
@@ -109,27 +113,16 @@ function expectLinkedTab(html: string, label: string, href: string) {
 }
 
 describe("project navigation tabs (B4, O1-a)", () => {
-  // Task 4.5 approved addendum: "Return to Project Space". This ordinary link
-  // precedes every project tab for both roles, without using browser history.
-  it.each([
-    ["developer", "board"], ["developer", "tasks"],
-    ["product_manager", "board"], ["product_manager", "tasks"],
-  ] as const)("shows %s a return link before project tabs on %s", async (role, segment) => {
-    f.segment = segment;
+  // Approved shared-header follow-up supersedes the former Back to Project Space link.
+  it.each(["developer", "product_manager"] as const)("renders one shared account menu after the tabs for %s", async role => {
     const html = await navigation(role);
-    const back = links(html, "Back to Project Space");
-    expect(back).toHaveLength(1);
-    expect(hrefOf(back[0])).toBe("/");
-    expect(back[0]).not.toMatch(/aria-current="page"|aria-disabled="true"/);
-    const tabLabels = role === "product_manager"
-      ? ["Dashboard", "Board", "Review Queue", "Reports", "Settings"]
-      : ["Dashboard", "Board"];
-    const visible = visibleText(html);
-    const backPosition = visible.indexOf("Back to Project Space");
-    for (const label of tabLabels) {
-      const tabPosition = visible.indexOf(label);
-      expect(tabPosition).toBeGreaterThan(backPosition);
-    }
+    expect(links(html, "Back to Project Space")).toEqual([]);
+    const accountMenus = [...html.matchAll(/<details\b[^>]*class="[^"]*account-control[^"]*"[^>]*>[\s\S]*?<\/details>/g)];
+    expect(accountMenus).toHaveLength(1);
+    expect(accountMenus[0][0]).toContain("verified-nav-user");
+    expect(accountMenus[0][0]).toContain("https://avatars.githubusercontent.com/u/424242");
+    expect(visibleText(accountMenus[0][0])).toMatch(/Sign out/);
+    expect(html.indexOf(accountMenus[0][0])).toBeGreaterThan(html.indexOf("</nav>"));
   });
 
   it("shows the product manager Dashboard, Board, Review Queue, Reports (disabled) and Settings", async () => {
@@ -251,6 +244,23 @@ describe("project layout (A4)", () => {
     expect(name).toBeGreaterThanOrEqual(0);
     expect(html).not.toContain("<i>layout</i>");
     expect(name).toBeLessThan(html.indexOf("<nav"));
+  });
+
+  it("uses the verified session identity for the shared account instead of editable metadata", async () => {
+    const html = await layout();
+    expect(html).toContain("verified-nav-user"); expect(html).toContain("https://avatars.githubusercontent.com/u/424242");
+    expect(html).not.toContain("editable-name"); expect(html).not.toContain("https://example.test/editable.png");
+    expect((html.match(/class="account-control"/g) ?? [])).toHaveLength(1);
+  });
+
+  it("keeps outer gutters outside the maximum-width navigation content container", async () => {
+    const html = await layout();
+    const containers = [...html.matchAll(/<div\b[^>]*class="([^"]*max-w-7xl[^"]*)"[^>]*>/g)];
+    expect(containers.length).toBeGreaterThan(0);
+    // Matches developer content topology: the width limit itself carries no horizontal inset.
+    // Browser QA verifies actual edge coordinates and responsive wrapping.
+    for (const container of containers) expect(container[1]).not.toMatch(/(?:^|\s)(?:sm:)?px-(?:5|8)(?:\s|$)/);
+    expect(html.slice(0, containers[0].index)).toMatch(/class="[^"]*\bpx-5\b[^"]*sm:px-8[^"]*"/);
   });
 
   it("reveals no detail when the project name cannot be read (F3)", async () => {

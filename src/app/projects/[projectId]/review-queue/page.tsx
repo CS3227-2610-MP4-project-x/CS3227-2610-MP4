@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PendingLink } from "@/components/ui/pending-link";
 import { CheckHistory, CheckResultCard } from "@/components/completion-assessment/check-history";
 import { ReviewActions } from "@/components/tasks/review-actions";
 import { AttachedCommitList, ReadFailureNotice, TaskPageShell, UnavailableNotice, formatDueDate } from "@/components/tasks/task-page-parts";
@@ -52,7 +52,7 @@ function QueueEntry({ projectId, entry }: Readonly<{ projectId: string; entry: R
         <div>
           <span className="font-mono text-sm text-neutral-400">{entry.taskKey}</span>
           <h2 id={headingId} className="mt-1 text-xl font-semibold tracking-tight text-neutral-100">
-            <Link href={`/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(entry.id)}`} className="hover:underline">{entry.title}</Link>
+            <PendingLink href={`/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(entry.id)}`} className="hover:underline">{entry.title}</PendingLink>
           </h2>
           <p className="mt-1 text-sm text-neutral-400">
             {entry.assignee.githubUsername} · due <time dateTime={entry.dueDate}>{formatDueDate(entry.dueDate)}</time>

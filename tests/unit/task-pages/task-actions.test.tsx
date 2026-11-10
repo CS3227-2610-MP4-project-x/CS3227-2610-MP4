@@ -102,12 +102,12 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: h.refresh, push: vi.fn(), replace: vi.fn() }),
   usePathname: () => "/",
 }));
-// The Group 7 picker is replaced by a stub that reports one attach through its onAttached prop.
+// The Group 7 picker is replaced by a stub that reports one save through its onSaved prop.
 vi.mock("@/components/github-evidence/commit-picker", async () => {
   const { createElement } = await import("react");
   return {
-    CommitPicker: (props: { onAttached?: (shas: readonly string[]) => void }) =>
-      createElement("button", { type: "button", onClick: () => props.onAttached?.(["a".repeat(40)]) }, "synthetic-attach"),
+    CommitPicker: (props: { onSaved?: () => void }) =>
+      createElement("button", { type: "button", onClick: () => props.onSaved?.() }, "synthetic-save"),
   };
 });
 vi.mock("@/components/tasks/task-status", () => ({
@@ -416,12 +416,12 @@ describe("Task detail actions follow the role: progress update", () => {
 
 describe("Task detail actions follow the role: attached commits refresh (reviewer round 1)", () => {
   // Seam already built: src/components/tasks/task-commit-picker.tsx
-  // TaskCommitPicker({ projectId, taskId }) hosts the unchanged CommitPicker.
-  it("refreshes the page after commits are attached", async () => {
+  // TaskCommitPicker({ projectId, taskId }) hosts CommitPicker.
+  it("refreshes the page after commits are saved", async () => {
     const view = await harness("picker", "TaskCommitPicker", { projectId, taskId });
 
     expect(h.refresh).not.toHaveBeenCalled();
-    await view.activate(/synthetic-attach/);
+    await view.activate(/synthetic-save/);
 
     await vi.waitFor(() => expect(h.refresh).toHaveBeenCalled());
     expect(h.fetch).not.toHaveBeenCalled();
