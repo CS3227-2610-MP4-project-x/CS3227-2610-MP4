@@ -867,6 +867,54 @@ The system SHALL show a task-detail page at `/projects/{projectId}/tasks/{taskId
 - **THEN** the page shows a safe unavailable view and no task or check data
 - **AND** a nonmember, a missing task or a deleted task shows the safe not-found result
 
+### Requirement: Task detail breadcrumb stays within the project
+An authorized task-detail page SHALL show Project Dashboard / Board / TaskID as its breadcrumb. Project Dashboard SHALL link to `/projects/{projectId}/dashboard`, and Board SHALL link to `/projects/{projectId}/board`. TaskID SHALL display the current readable task key as the non-link current item.
+
+#### Scenario: Navigate back within the current project
+- **WHEN** the assigned developer or product manager opens task `WEB-12`
+- **THEN** the breadcrumb reads Project Dashboard / Board / WEB-12
+- **AND** its first two links target the task's project dashboard and board
+- **AND** it does not substitute a Workspace link or expose another project's data
+
+### Requirement: Developer task detail groups content into main and supporting cards
+Developer task detail SHALL use a main left card for title, readable task ID, description, acceptance criteria and the progress-update composer. A right column SHALL contain details, progress-update timeline and attached-commits cards. On mobile the supporting column SHALL stack below the main card. PM layout SHALL remain unchanged apart from the breadcrumb. Existing role restrictions and unspecified panel/action placements SHALL remain unchanged.
+
+#### Scenario: Main task content and supporting details
+- **WHEN** the assigned developer opens task detail in its two-column layout
+- **THEN** the left card shows the title, readable task key, plain-text description and ordered acceptance criteria
+- **AND** the right details card shows assignee, optional branch, status name and due date
+- **AND** the right column separately shows the progress-update timeline and attached commits
+
+#### Scenario: Existing developer features keep their placements
+- **WHEN** the assigned developer opens the rearranged task detail
+- **THEN** the commit picker remains in the Attached commits card in the right column
+- **AND** Run check remains in the existing Acceptance Criteria Check panel
+- **AND** Submit for review remains available under its existing role and task-state conditions at the top-right of the main card
+- **AND** review feedback and check history retain their existing placements and behavior
+
+#### Scenario: Product-manager layout is preserved
+- **WHEN** the product manager opens task detail
+- **THEN** the existing layout, PM task-management controls and read-only check history remain unchanged
+- **AND** only the breadcrumb adopts the project dashboard and board links
+
+#### Scenario: Narrow-screen reading order
+- **WHEN** the assigned developer opens task detail on mobile
+- **THEN** the supporting column stacks below the main card
+- **AND** its details, timeline and attached-commits cards retain their order
+
+#### Scenario: Compose an update without replacing the timeline
+- **WHEN** the assigned developer opens task detail
+- **THEN** the existing progress-update composer appears in the main left card
+- **AND** existing updates appear newest first in the right timeline with their authors and timestamps
+- **AND** each update is marked along a connected vertical guide to communicate its place in the timeline
+- **AND** the server/API collection retains its recorded ascending ordering
+- **AND** successful submission refreshes the timeline through the existing flow without changing task state
+
+#### Scenario: Empty histories and optional branch
+- **WHEN** the assigned developer opens a task with no progress updates, attached commits or recorded branch
+- **THEN** the respective supporting cards show safe explicit empty states and a no-branch label
+- **AND** the rest of the authorized task content and actions remain available
+
 ### Requirement: Task detail actions follow the role
 The assigned developer SHALL see Run check, the commit picker, a progress-update form and, while the task is In Progress, a Submit for review action that is not blocked when no matching check exists. The product manager SHALL see none of those actions and SHALL read check history only.
 
@@ -884,7 +932,8 @@ The assigned developer SHALL see Run check, the commit picker, a progress-update
 
 #### Scenario: Progress update appears
 - **WHEN** the assigned developer posts a progress update
-- **THEN** it appears in the task's progress updates after the page refreshes, in `createdAt` order
+- **THEN** it appears in the developer's progress-update timeline after the page refreshes, newest first
+- **AND** the server/API `progressUpdates` collection remains ordered by `createdAt` ascending then ID ascending
 
 ### Requirement: Product manager reads the review queue
 The system SHALL show the project's product manager the review queue at `/projects/{projectId}/review-queue`: every non-deleted task in In Review, each with its attached commits, its `checkHistory` in the existing entry shape, and the check result referenced by the task's most recent `submission` event (if any). The referenced result SHALL be exposed by the review read only, not by the task-detail read.

@@ -160,11 +160,20 @@ describe("Task detail page", () => {
     expectDetailFields(html);
   });
 
-  it("shows progress updates in createdAt order", async () => {
+  it("presents developer updates newest first without mutating the ascending service collection", async () => {
+    const value = detail();
+    const originalOrder = value.progressUpdates.map((update) => update.id);
+    Object.freeze(value.progressUpdates);
+    f.getTaskDetail.mockResolvedValue(value);
+
     const html = await render();
 
-    expect(html.indexOf("Synthetic update earlier")).toBeGreaterThanOrEqual(0);
-    expect(html.indexOf("Synthetic update earlier")).toBeLessThan(html.indexOf("Synthetic update later"));
+    expect(html.indexOf("Synthetic update later")).toBeGreaterThanOrEqual(0);
+    expect(html.indexOf("Synthetic update later")).toBeLessThan(html.indexOf("Synthetic update earlier"));
+    expect(value.progressUpdates.map((update) => update.id)).toEqual(originalOrder);
+    for (const update of value.progressUpdates) {
+      expect(html).toContain(`dateTime="${update.createdAt}"`);
+    }
   });
 
   it("shows an unassigned developer a safe unavailable view with no task or check data", async () => {
@@ -303,4 +312,180 @@ it("offers edit/reassign/delete only to the PM without developer member reads", 
   const pmHtml = renderToStaticMarkup(await Page({ params: Promise.resolve({ projectId, taskId }) }));
   expect(pmHtml).toContain(">Edit<"); expect(pmHtml).toContain(">Reassign<"); expect(pmHtml).toContain(">Delete<");
   expect(listMembers).toHaveBeenCalledWith(projectId, ids.pm);
+});
+
+// Approved unnumbered task-detail UI follow-up. These assertions use content containment
+// and semantic reading order, leaving actual desktop/mobile geometry to browser QA.
+function markupContainers(html: string): string[] {
+  const stack: { tag: string; start: number }[] = [];
+  const containers: string[] = [];
+  for (const token of html.matchAll(/<\/?(article|section|aside|header|nav|div|hgroup)\b[^>]*>/g)) {
+    const tag = token[1];
+    if (token[0].startsWith("</")) {
+      const opened = stack.pop();
+      if (!opened || opened.tag !== tag) throw new Error("Unbalanced semantic task-page markup");
+      containers.push(html.slice(opened.start, token.index + token[0].length));
+    } else {
+      stack.push({ tag, start: token.index });
+    }
+  }
+  return containers;
+}
+
+function smallestContainer(html: string, marker: string, tags = "article|section"): string {
+  const matches = markupContainers(html)
+    .filter((container) => new RegExp(`^<(?:${tags})\\b`).test(container) && container.includes(marker))
+    .sort((a, b) => a.length - b.length);
+  expect(matches.length, `semantic container for ${marker}`).toBeGreaterThan(0);
+  return matches[0];
+}
+
+function namedCard(html: string, heading: string): string {
+  const marker = [...html.matchAll(/<h[1-6]\b[^>]*>[\s\S]*?<\/h[1-6]>/g)]
+    .find((match) => visibleText(match[0]) === heading)?.[0];
+  expect(marker, `heading for ${heading}`).toBeDefined();
+  return smallestContainer(html, marker!);
+}
+
+function expectReadingOrder(html: string, markers: string[]) {
+  let previous = -1;
+  for (const marker of markers) {
+    const current = html.indexOf(marker);
+    expect(current, `${marker} follows the previous content`).toBeGreaterThan(previous);
+    previous = current;
+  }
+}
+
+describe("Approved task-detail UI follow-up", () => {
+  it.each(["developer", "product_manager"])("links the %s breadcrumb to the current project's dashboard and board", async (role) => {
+    if (role === "product_manager") asProductManager();
+    const html = await render();
+    const breadcrumb = smallestContainer(html, 'aria-label="Breadcrumb"', "nav");
+    const links = [...breadcrumb.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/g)]
+      .map((match) => ({ href: match[1].match(/href="([^"]*)"/)?.[1], text: visibleText(match[2]) }));
+
+    expect(links).toEqual([
+      { href: `/projects/${projectId}/dashboard`, text: "Project Dashboard" },
+      { href: `/projects/${projectId}/board`, text: "Board" },
+    ]);
+    expect(visibleText(breadcrumb)).toBe("Project Dashboard / Board / WEB-12");
+    expect(visibleText(breadcrumb.replace(/<a\b[^>]*>[\s\S]*?<\/a>/g, ""))).toContain("WEB-12");
+  });
+
+  it("groups developer content in the main card before Details, timeline and attached commits", async () => {
+    const html = await render();
+    const main = smallestContainer(html, "Synthetic detail title");
+    const details = namedCard(html, "Details");
+    const timeline = namedCard(html, "Progress updates");
+    const commits = namedCard(html, "Attached commits");
+
+    for (const marker of ["WEB-12", "Synthetic detail title", "Synthetic detail description", "Synthetic criterion one", "Synthetic criterion two", 'data-stub="progress-update-form"']) {
+      expect(main).toContain(marker);
+    }
+    expectReadingOrder(main, ["Synthetic criterion one", "Synthetic criterion two"]);
+    expect(main).not.toContain("Synthetic update later");
+    expect(main).not.toContain("1".repeat(7));
+    expect(main).not.toContain(details);
+    for (const marker of ["Assignee", usernames.developer, "Branch", "feature/synthetic-branch", "Status", "In Progress", "Due date", "2026-11-30"]) {
+      expect(details).toContain(marker);
+    }
+    expect(timeline).toContain("Synthetic update later");
+    expect(timeline).toContain(usernames.developer);
+    expect(timeline).not.toContain('data-stub="progress-update-form"');
+    expect(commits).toContain("1".repeat(7));
+    expect(commits).toContain("Add commits");
+    expect(commits).not.toContain("Run check");
+    expectReadingOrder(html, [main, details, timeline, commits]);
+  });
+
+  it("connects every developer progress event to a shared vertical timeline guide", async () => {
+    const html = await render();
+    const timeline = namedCard(html, "Progress updates");
+    const list = timeline.match(/<ol\b[^>]*>[\s\S]*?<\/ol>/)?.[0];
+    expect(list, "the timeline preserves ordered event semantics").toBeDefined();
+    const listClasses = list!.match(/^<ol\b[^>]*class="([^"]*)"/)?.[1] ?? "";
+    const decorativeGuide = [...list!.matchAll(/<(?:span|div)\b[^>]*>/g)].some(([element]) => {
+      const classes = element.match(/class="([^"]*)"/)?.[1] ?? "";
+      return element.includes('aria-hidden="true"') && /(?:^|\s)(?:w-px|border-l|border-s)(?:\s|$)/.test(classes)
+        && /(?:^|\s)(?:h-full|inset-y-0)(?:\s|$)/.test(classes);
+    });
+    expect(/(?:^|\s)border-(?:l|s)(?:-\d+)?(?:\s|$)/.test(listClasses) || decorativeGuide,
+      "all events share one connected vertical guide").toBe(true);
+    const events = [...list!.matchAll(/<li\b[^>]*>[\s\S]*?<\/li>/g)].map(([event]) => event);
+    expect(events).toHaveLength(detail().progressUpdates.length);
+    for (const event of events) {
+      const markers = [...event.matchAll(/<(?:span|div)\b[^>]*>/g)].filter(([element]) =>
+        element.includes('aria-hidden="true"') && /class="[^"]*\brounded-full\b/.test(element));
+      expect(markers, "each event has exactly one decorative circular marker").toHaveLength(1);
+      expect(event).toContain(usernames.developer);
+      expect(event).toContain("<time ");
+    }
+    expectReadingOrder(list!, ["Synthetic update later", "Synthetic update earlier"]);
+  });
+
+  it("keeps Submit for review near the task heading and review/check panels below the developer task content", async () => {
+    const html = await render();
+    const header = smallestContainer(html, "Synthetic detail title", "header");
+    const feedback = namedCard(html, "Review feedback");
+    const checks = namedCard(html, "Acceptance Criteria Check");
+    const commits = namedCard(html, "Attached commits");
+
+    expect(header).toContain('data-stub="submit-for-review"');
+    expect(feedback).toContain("Synthetic review feedback");
+    expect(checks).toContain("Run check");
+    for (const entry of detail().checkHistory) expect(checks).toContain(entry.anchorSha.slice(0, 7));
+    expectReadingOrder(html, [commits, feedback, checks]);
+  });
+
+  it("groups the developer title and task key opposite the submit action in the main-card header", async () => {
+    const html = await render();
+    const main = smallestContainer(html, "Synthetic detail title");
+    const header = smallestContainer(main, "Synthetic detail title", "header");
+    const titleGroup = smallestContainer(header, "Synthetic detail title", "div|hgroup");
+
+    expect(titleGroup).toContain("WEB-12");
+    expect(titleGroup).not.toContain('data-stub="submit-for-review"');
+    expect(stubs(header, "submit-for-review")).toHaveLength(1);
+    // The heading and separate action share the top header; frontend QA checks
+    // the action's top-right coordinates at desktop and narrow viewports.
+    expectReadingOrder(header, [titleGroup, 'data-stub="submit-for-review"']);
+  });
+
+  it("preserves the PM header, panel order, ascending history and management controls", async () => {
+    asProductManager();
+    const html = await render();
+    const header = smallestContainer(html, "Synthetic detail title", "header");
+    for (const marker of ["Assignee", usernames.developer, "Due date", "2026-11-30", "Branch", "feature/synthetic-branch"]) {
+      expect(header).toContain(marker);
+    }
+    expect(visibleText(html)).not.toMatch(/\bDetails\b/);
+    expectReadingOrder(html, [
+      "Synthetic detail title", ">Edit<", namedCard(html, "Description"),
+      namedCard(html, "Acceptance criteria"), namedCard(html, "Attached commits"),
+      namedCard(html, "Progress updates"), namedCard(html, "Review feedback"),
+      namedCard(html, "Acceptance Criteria Check"),
+    ]);
+    expect(html.indexOf("Synthetic update earlier")).toBeLessThan(html.indexOf("Synthetic update later"));
+    expect(html).toContain(">Reassign<");
+    expect(html).toContain(">Delete<");
+    expect(visibleText(html)).not.toMatch(/Run check|Add commits/);
+    expect(stubs(html, "progress-update-form")).toEqual([]);
+    expect(stubs(html, "submit-for-review")).toEqual([]);
+  });
+
+  it("keeps supporting cards and actions usable with empty histories and no recorded branch", async () => {
+    const value = detail({ empty: true });
+    value.progressUpdates = [];
+    f.getTaskDetail.mockResolvedValue({ ...value, task: { ...value.task, branchName: null } });
+    const html = await render();
+
+    expect(namedCard(html, "Details")).toContain("No branch recorded");
+    expect(namedCard(html, "Progress updates")).toContain("No progress updates yet.");
+    const commits = namedCard(html, "Attached commits");
+    expect(commits).toContain("No commits are attached yet.");
+    expect(commits).toContain("Add commits");
+    expect(namedCard(html, "Acceptance Criteria Check")).toContain("Run check");
+    expect(stubs(html, "progress-update-form")).toHaveLength(1);
+    expect(stubs(html, "submit-for-review")).toHaveLength(1);
+  });
 });
