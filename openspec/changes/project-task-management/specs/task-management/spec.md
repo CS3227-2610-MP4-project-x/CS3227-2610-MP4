@@ -6,13 +6,86 @@ Defines how project members are organized and how product managers and developer
 
 ## ADDED Requirements
 
+<!-- Dashboard/project-switching revision approved by the human in this chat on 9 November 2026 after requirements review. See the recorded design extension for browser preference and public own-task projection decisions. -->
+
+### Requirement: Signed-in people reopen their selected project
+After sign-in, `/` SHALL redirect a person with projects to `/projects/{projectId}/dashboard` for their last selected project when they remain a member. When there is no valid last selection, it SHALL select the first project in the existing name-then-ID ordering. The system SHALL remember the signed-in person's selected project in the same browser; synchronization across browsers or devices is not required.
+
+#### Scenario: Returning project member
+- **WHEN** a signed-in person opens `/` and remains a member of their last selected project
+- **THEN** the person is redirected to that project's dashboard
+- **AND** the dashboard presentation follows their current role in that project
+
+#### Scenario: Missing or inaccessible last selection
+- **WHEN** no project selection is remembered or the person is no longer a member of that project
+- **THEN** `/` redirects to the first currently accessible project's dashboard using project name then ID ordering
+- **AND** no inaccessible project contents are disclosed
+
+#### Scenario: No project memberships
+- **WHEN** a signed-in person has no projects
+- **THEN** `/` shows an empty dashboard with empty Project Progress, Task Summary and My tasks cards
+- **AND** Create project is visually emphasized and links to `/projects/new`
+- **AND** no fabricated project or tasks are shown
+
+### Requirement: Project switching preserves dashboard or board view
+A top-left project selector SHALL list accessible projects and identify the selection. Dashboard and Board SHALL reflect that same project. Switching SHALL retain the current section when it exists and the person's destination-project role permits access, otherwise open Dashboard. Existing server-side membership and role authorization SHALL remain authoritative.
+
+#### Scenario: Project navigation visual states
+- **WHEN** a member views any project page
+- **THEN** the full-width navigation row has a bottom border and lighter background, with no duplicate project-name heading above the selector
+- **AND** Dashboard and Board appear as uncontained tabs beside the selector
+- **AND** the active tab has a soft fill and inactive tabs receive a light hover highlight
+
+#### Scenario: Shared navigation aligns with developer content
+- **WHEN** a developer views Dashboard or Board
+- **THEN** the project selector's outer left edge aligns with the developer dashboard body's outer content edge at the same viewport width
+- **AND** the shared Dashboard/Board navigation places AccountControl at its far right for both developers and product managers
+- **AND** both roles use the same developer-style account control with verified identity, avatar fallback and existing sign-out behavior
+- **AND** the dashboard body does not duplicate the account control
+
+#### Scenario: Project creation remains distinct in the switcher
+- **WHEN** a member opens the project selector
+- **THEN** a divider separates the project choices from Create project
+- **AND** a plus icon appears before the Create project label
+- **AND** the labeled link still opens `/projects/new`
+
+#### Scenario: Board returns to its project dashboard
+- **WHEN** a member views the selected project's Board
+- **THEN** the Board breadcrumb is replaced by a back link to `/projects/{projectId}/dashboard`
+- **AND** the link identifies the project dashboard as its destination
+
+#### Scenario: Switch projects from Board
+- **WHEN** a member selects another project while viewing Board
+- **THEN** they open `/projects/{selectedProjectId}/board`
+- **AND** the selector, tabs and board reflect that selected project and its current role
+
+#### Scenario: Switch projects from Dashboard
+- **WHEN** a member selects another project while viewing Dashboard
+- **THEN** they open `/projects/{selectedProjectId}/dashboard`
+- **AND** a developer receives the developer dashboard and a product manager receives the existing product-manager overview
+
+#### Scenario: Switch from another permitted section
+- **WHEN** a member switches projects from Settings or Review Queue and their role in the destination project permits that section
+- **THEN** the destination project's same section opens
+- **AND** otherwise the destination project's dashboard opens without exposing restricted contents
+
+#### Scenario: Switch from task detail
+- **WHEN** a member switches projects while viewing a task detail belonging to the source project
+- **THEN** the destination project's dashboard opens
+- **AND** the source task identifier is not reused as a destination-project task
+
 ### Requirement: Project members open the project dashboard
-The system SHALL provide a dynamically rendered dashboard at `/projects/{projectId}/dashboard` to both project roles. The shared Dashboard tab SHALL be enabled and current on that page. Existing role-specific tabs, the return link and workspace board links SHALL retain their behavior.
+The system SHALL provide a dynamic dashboard at `/projects/{projectId}/dashboard` with an enabled, current Dashboard tab. Product managers SHALL retain Project Overview, Project Progress, Task Summary, Task Allocation and manager actions. Developers SHALL receive Project Progress, Task Summary and My tasks, following `frontend_mockup_1.png`. Existing role-specific tabs and board contents SHALL retain their behavior.
 
 #### Scenario: Member opens dashboard
 - **WHEN** a project member opens the dashboard
-- **THEN** the Header, Project Progress, Task Summary and Task Allocation render
+- **THEN** the role-specific dashboard cards render
 - **AND** Dashboard is an enabled link and the current project tab
+
+#### Scenario: Developer mockup scope
+- **WHEN** a developer opens the dashboard
+- **THEN** the cards expand into the space otherwise occupied by Recent activity in the mockup
+- **AND** Recent activity, search, notifications, task checkboxes and Check ready are absent
 
 #### Scenario: Session or membership is unavailable
 - **WHEN** a visitor has no valid session or is not a project member
@@ -20,7 +93,7 @@ The system SHALL provide a dynamically rendered dashboard at `/projects/{project
 - **AND** no dashboard data is disclosed
 
 ### Requirement: Dashboard reads expose authorized aggregates
-The dashboard SHALL call a server-only read service that independently checks current project membership. Both roles SHALL receive project-wide aggregate counts and allocation labels, without task detail or member-management data. The read SHALL use a consistent snapshot, exclude deleted tasks, add no HTTP route and retain no persistent cache.
+The dashboard SHALL independently check membership in a server-only service. Project-wide aggregates SHALL omit other developers' task details and member-management data. Developer Task Summary and My tasks SHALL use only their live assigned tasks through existing own-task read services. Aggregate reads SHALL retain consistent snapshots, exclude deleted tasks, add no HTTP route and use no persistent cache.
 
 #### Scenario: Developer receives aggregate data
 - **WHEN** a developer reads a project containing other developers' tasks
@@ -33,11 +106,11 @@ The dashboard SHALL call a server-only read service that independently checks cu
 - **THEN** it returns the safe not-found outcome without dashboard contents
 
 ### Requirement: Dashboard progress and task summary agree
-Project Progress and Task Summary SHALL use live project tasks, showing Done divided by total as the nearest whole percentage, or 0% when total is zero. The summary SHALL show Done/total, a corresponding progress bar, current member count including the PM, and View all linking to the existing role-scoped board.
+Project Progress SHALL show project-wide Done/total as a whole percentage rounded to nearest, or 0% for zero tasks. PM Task Summary SHALL retain project-wide Done/total, progress bar, member count including PM and View all linking to Board. Developer Task Summary SHALL show To Do, In Progress, In Review and Done counts for their live assigned tasks, unaffected by the My tasks filter.
 
 #### Scenario: Progress excludes deleted tasks
 - **WHEN** a project has three live tasks, one Done, and one deleted Done task
-- **THEN** both progress sections show 33% and one of three complete
+- **THEN** Project Progress and the product-manager Task Summary show 33% and one of three complete
 - **AND** the deleted task contributes to no metric
 
 #### Scenario: Empty project
@@ -45,8 +118,34 @@ Project Progress and Task Summary SHALL use live project tasks, showing Done div
 - **THEN** progress is 0%, completed and total counts are zero
 - **AND** an explicit empty state is shown
 
+#### Scenario: Developer summary differs from project progress
+- **WHEN** a project has four live tasks with two Done, but the developer owns only one To Do and one Done task
+- **THEN** Project Progress shows 50% for the entire project
+- **AND** the developer Task Summary shows To Do 1, In Progress 0, In Review 0 and Done 1
+- **AND** other developers' task details are absent
+
+### Requirement: Developer My tasks filters and links work
+My tasks SHALL list only the developer's live assigned tasks, offering All, To Do, In Progress, In Review and Done filters with counts, initially All. Selected states SHALL filter the list; All SHALL restore it. View task SHALL use existing authorized detail routes. State cues SHALL use grey for To Do, blue for In Progress, yellow for In Review and green for Done, with text labels. Rows SHALL follow the mockup's fields.
+
+#### Scenario: Full task-row metadata
+- **WHEN** the developer sees an assigned task row
+- **THEN** it shows the task's title, description, state, due date, optional branch, progress-update count, attached-commit count and View task link
+- **AND** counts come from that task's stored progress updates and attached commits
+- **AND** task text is plain text and no other developer's task details are included
+
+#### Scenario: Developer filters assigned tasks
+- **WHEN** the developer chooses In Review
+- **THEN** My tasks shows only their assigned In Review tasks for the selected project
+- **AND** Project Progress and Task Summary remain unchanged
+- **AND** a filter with no matching tasks shows an explicit empty state
+
+#### Scenario: Developer opens task detail
+- **WHEN** the developer activates View task
+- **THEN** the link opens `/projects/{projectId}/tasks/{taskId}` for that task
+- **AND** existing task-detail authorization is enforced
+
 ### Requirement: Dashboard allocation filters project task states
-Allocation SHALL support selection of the four task states, initially all selected. Each row SHALL show username, count and nearest whole percentage of all live tasks in selected states. It SHALL include current developers with zero counts and a labeled PM row when retained tasks contribute. Rows SHALL sort by lowercase username then person ID.
+On the product-manager dashboard, Allocation SHALL support selection of the four task states, initially all selected. Each row SHALL show username, count and nearest whole percentage of all live tasks in selected states. It SHALL include current developers with zero counts and a labeled PM row when retained tasks contribute. Rows SHALL sort by lowercase username then person ID. The developer dashboard SHALL show My tasks in place of Task Allocation.
 
 #### Scenario: Filter changes allocation
 - **WHEN** the member changes selected task states
@@ -64,7 +163,7 @@ Allocation SHALL support selection of the four task states, initially all select
 - **AND** their allocation appears in a labeled PM row without duplication
 
 ### Requirement: Dashboard shows SGT completions today
-The allocation heading SHALL show the distinct number of live project tasks approved today, using approval state-change events and database time in Asia/Singapore. Today SHALL include its start midnight and exclude the next midnight. Allocation filters SHALL NOT change this count.
+On the product-manager dashboard, the allocation heading SHALL show the distinct number of live project tasks approved today, using approval state-change events and database time in Asia/Singapore. Today SHALL include its start midnight and exclude the next midnight. Allocation filters SHALL NOT change this count.
 
 #### Scenario: SGT day boundaries
 - **WHEN** approval events fall immediately before, exactly at and after SGT midnight
@@ -72,7 +171,7 @@ The allocation heading SHALL show the distinct number of live project tasks appr
 - **AND** task edits after approval do not alter the approval date
 
 ### Requirement: Dashboard header and PM actions reuse existing flows
-The Header SHALL display verified account identity, avatar fallback and project role, with an accessible account/settings trigger. Only the PM SHALL receive New Task, Review Queue and Progress Report actions. New Task SHALL reuse the existing inline creation flow; Review Queue SHALL link to its existing page; Progress Report SHALL remain disabled with an explanation until task 8.3.
+Verified account identity and avatar fallback SHALL appear in the shared navigation's accessible AccountControl for both roles, replacing the dashboard body's account/settings control. The dashboard SHALL retain its project-role label. Only the PM SHALL receive New Task, Review Queue and Progress Report actions. New Task SHALL reuse existing inline creation; Review Queue SHALL link to its page; Progress Report SHALL remain disabled with an explanation until task 8.3.
 
 #### Scenario: PM uses dashboard actions
 - **WHEN** the PM opens the dashboard

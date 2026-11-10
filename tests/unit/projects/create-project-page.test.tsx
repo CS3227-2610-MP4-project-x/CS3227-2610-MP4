@@ -6,6 +6,7 @@ const f = vi.hoisted(() => ({
   composition: {} as Record<string, unknown>, getUser: vi.fn(), findPerson: vi.fn(),
   projectExists: vi.fn(), findRole: vi.fn(), listProjects: vi.fn(), listMembers: vi.fn(),
 }));
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }) }));
 vi.mock("server-only", () => ({}));
 import { ProjectError } from "@/server/projects";
 vi.mock("@/server/composition", () => ({ getServerComposition: () => f.composition }));
@@ -13,6 +14,7 @@ vi.mock("@/server/auth/supabase-auth", () => ({ createRequestSupabaseClient: asy
 vi.mock("next/navigation", () => ({
   redirect: (url: string): never => { throw new Error(`REDIRECT:${url}`); },
   notFound: (): never => { throw new Error("NEXT_NOT_FOUND"); },
+  usePathname: () => "/",
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }),
 }));
 
@@ -46,17 +48,18 @@ async function settings() {
 }
 
 describe("Signed-in people use the create-project page (4.5)", () => {
-  it.each([
-    { state: "empty", projects: [] },
-    { state: "populated", projects: [{ id: projectId, key: "WEB", name: "Synthetic", role: "developer" }] },
-  ])("shows the create entry for $state projects", async ({ projects }) => {
-    f.listProjects.mockResolvedValue(projects);
+  it("shows prominent create-project links on the successful empty dashboard", async () => {
     const { default: Home } = await import("@/app/page");
     const html = renderToStaticMarkup(await Home());
-    const section = [...html.matchAll(/<section\b[^>]*>[\s\S]*?<\/section>/g)].map((match) => match[0])
-      .find((markup) => /<h[1-6]\b[^>]*>\s*My projects\s*<\/h[1-6]>/i.test(markup));
-    expect(section, "the My projects section").toBeDefined();
-    expect(section).toMatch(/<a\b[^>]*href="\/projects\/new"[^>]*>[\s\S]*?Create project/i);
+    expect(html).toMatch(/<a\b[^>]*href="\/projects\/new"[^>]*>[\s\S]*?Create project/i);
+    expect(html).toContain("workspace-project-link-primary");
+    for (const label of ["Project progress", "Task summary", "My tasks"]) expect(html).toContain(label);
+  });
+
+  it("redirects populated membership lists to the selected project's dashboard", async () => {
+    f.listProjects.mockResolvedValue([{ id: projectId, key: "WEB", name: "Synthetic", role: "developer" }]);
+    const { default: Home } = await import("@/app/page");
+    await expect(Home()).rejects.toThrow(`REDIRECT:/projects/${projectId}/dashboard`);
   });
 
   it("renders a dynamic static-route page with labeled key/name inputs without project access lookup", async () => {

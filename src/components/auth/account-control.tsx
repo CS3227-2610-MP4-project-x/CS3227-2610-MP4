@@ -72,8 +72,6 @@ function accountMenuContents(
 ): ReactNode {
   return (
       <div className="account-menu">
-        <p className="account-menu-label">GitHub account</p>
-        <p className="account-menu-username">@{githubUsername}</p>
         {state.hasSignOutError && (
             <p className="account-error" role="alert">Try again later</p>
         )}

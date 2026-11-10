@@ -73,6 +73,14 @@ Recommended spacing:
 
 ## Screens
 
+### Approved developer dashboard extension (9 November 2026)
+
+At `/projects/{projectId}/dashboard`, developers see the supplied `frontend_mockup_1.png` composition: Project progress and Task summary side by side on desktop, with My tasks spanning the available width below. Stack these cards on narrow screens. Omit Recent activity, search, notifications, task checkboxes and Check ready. Project progress is project-wide; summary and My tasks contain only the developer's live assignments. My tasks has working All/status filters and task-detail links, descriptions, optional branches, due dates and update/attached-commit counts. Developers see My tasks instead of Task Allocation. Keep the existing product-manager overview and actions.
+
+Place a project selector at the top left beside the project navigation. The selected project is shared by Dashboard and Board. Keep Create project discoverable. With no memberships, `/` shows empty Project progress, Task summary and My tasks cards and emphasizes Create project. Errors remain distinct from successful empty reads.
+
+This extension supersedes the monochrome-only status guidance below: use grey for To Do, blue for In Progress, yellow for In Review and green for Done. Always retain text labels and accessible contrast.
+
 | Screen | Who | Contents |
 |---|---|---|
 | Project dashboard | Both | Header, Project Progress, Action Buttons (product manager only), Task Summary Card, Task Allocation |
@@ -132,14 +140,18 @@ The developer Acceptance Criteria Check and task-detail screens use the human-su
 - Keep rows airy and minimal, with no visible dividers unless extremely subtle.
 
 ### Top Navigation
-- Use a compact full-width bar with rounded capsule styling.
+- Use a compact full-width bar with a subtle bottom border and a slightly lighter background than the page.
+- Place the project selector at the left and make its button the same height as the account control button.
+- Align the selector's outer left edge with the page content below it at desktop and mobile widths.
+- Place the developer-style AccountControl at the far right of this row for both project roles; do not duplicate account controls in dashboard bodies.
+- Show the selected project name inside the selector, without a duplicate project heading above it.
+- Place Dashboard and Board beside the selector without a shared capsule background. Keep the active tab softly filled; lightly highlight inactive tabs on hover.
 - Tabs: Dashboard, Board, and, for product managers, Review Queue, Reports, and Settings.
-- Active tab gets a brighter icon/text treatment and a soft filled indicator.
-- Inactive tabs should remain visible but subdued.
+- Inactive tabs should remain visible but subdued, with a light hover highlight.
 
 ## Shape Language
 - Prefer border radii between `18px` and `28px`.
-- Use full pill radii for chips, segmented controls, and nav containers.
+- Use full pill radii for chips and segmented controls; navigation containers can remain unboxed.
 - Icons should be simple line icons with slight softness, not sharp enterprise-style icons.
 - Avoid sharp corners anywhere in the interface.
 

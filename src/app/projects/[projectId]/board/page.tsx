@@ -48,7 +48,10 @@ export default async function BoardPage({ params }: { params: Promise<{ projectI
   const cardAction: CardAction = isManager ? managerCardAction : developerCardAction;
 
   return (
-    <TaskPageShell crumb="Board">
+    <TaskPageShell crumb="Board" backLink={{
+      href: `/projects/${encodeURIComponent(projectId)}/dashboard`,
+      label: "Back to Project Dashboard",
+    }}>
       <header className="mb-6">
         <h1 className="text-3xl font-semibold tracking-tight">Board</h1>
         <p className="mt-2 text-sm text-neutral-400">

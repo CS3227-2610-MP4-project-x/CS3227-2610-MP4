@@ -38,6 +38,8 @@ Depends on: 3.
 
 ### Tracking note for tasks 4.5 to 4.7
 
+- [x] Extend the approved dashboard with the developer mockup cards, own-task filters/metadata/detail links, membership-validated browser-local project selection, role-aware section preservation, and empty landing cards/Create project emphasis. Preserve the PM overview; verify with behavioral tests, browser UI inspection and independent review. Human approved this extension on 9 November 2026; see the design's developer dashboard and project switching extension. Implemented and locally checked; the new PostgreSQL test is added but skipped without TEST_DATABASE_URL. Full-suite baseline failures and release-validation gaps remain disclosed in workflow/handoffs/developer-dashboard-project-switching.md.
+
 Added on 9 November 2026 at the request of thegrimbee (Developer B). Task 4.4's decision B1 in `design.md` deferred the members screen, the product-manager task controls, and the dashboard to "a later approved change or task", but no task tracked them, and no task covered a UI for project creation. Without 4.5 and 4.6 the complete Developer and Product Manager journeys required by 9.2 cannot be performed through the UI. Member removal and role change remain out of scope (D7). Tasks 4.5 to 4.7 depend on 4.4 for the shared project navigation and page-access helper.
 
 ### Completion evidence for task 4.4
