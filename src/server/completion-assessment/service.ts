@@ -81,7 +81,13 @@ function stringArray(value: unknown): value is string[] { return Array.isArray(v
 
 type SafeCriterion = Readonly<{ id: string; description: string; modelDescription: string; position: number; redactionCount: number }>;
 
-function outputValidator(criteria: readonly SafeCriterion[], anchorSha: string, omittedFiles: readonly string[], modelOmittedFiles: readonly string[], diffLineSources: ReadonlyMap<string, ReadonlySet<string>>) {
+function normalizeEvidenceLine(value: string): string {
+  const trimmed = value.trim();
+  const withoutMarker = trimmed.length > 0 && ["+", "-", " "].includes(trimmed[0]) ? trimmed.slice(1) : trimmed;
+  return withoutMarker.trim();
+}
+
+function outputValidator(criteria: readonly SafeCriterion[], anchorSha: string, omittedFiles: readonly string[], modelOmittedFiles: readonly string[], diffLineSources: ReadonlyMap<string, readonly string[]>) {
   const ordered = criteria;
   const expected = new Map(ordered.map((item) => [item.id, item.modelDescription]));
   return (value: unknown): { ok: true; value: CheckResultPayload } | { ok: false } => {
@@ -98,8 +104,8 @@ function outputValidator(criteria: readonly SafeCriterion[], anchorSha: string, 
       if (!expected.has(id) || ids.has(id) || item.criterion !== expected.get(id)) return { ok: false };
       ids.add(id);
       const verified = item.evidence.flatMap((line) => {
-        const sources = diffLineSources.get(line);
-        return sources?.size === 1 ? [[...sources][0]] : [];
+        const sources = diffLineSources.get(sanitizePromptData(normalizeEvidenceLine(line)));
+        return sources?.length === 1 ? [sources[0]] : [];
       });
       const hasUnverified = verified.length !== item.evidence.length;
       byId.set(id, { criterionId: id, criterion: ordered.find((criterion) => criterion.id === id)!.description,
@@ -179,12 +185,12 @@ export class CompletionAssessmentService {
       modelOmittedFiles = parsedModelOmittedFiles;
     } catch { throw new CompletionAssessmentError("EVIDENCE_UNAVAILABLE"); }
     const redactedDiff = redactSecrets(assembled.value.diff);
-    const diffLineSources = new Map<string, Set<string>>();
+    const diffLineSources = new Map<string, string[]>();
     for (const line of redactedDiff.text.split(/\r?\n/)) {
-      const modelLine = sanitizePromptData(line);
-      const sources = diffLineSources.get(modelLine) ?? new Set<string>();
-      sources.add(line);
-      diffLineSources.set(modelLine, sources);
+      const normalizedLine = sanitizePromptData(normalizeEvidenceLine(line));
+      const sources = diffLineSources.get(normalizedLine) ?? [];
+      sources.push(line);
+      diffLineSources.set(normalizedLine, sources);
     }
     const modelCriteria: readonly SafeCriterion[] = criteriaInOrder(snapshot.criteria).map(({ id, description, position }) => {
       const redacted = redactSecrets(description);

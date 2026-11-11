@@ -323,12 +323,98 @@ describe("Group 7.2 output association and failure handling", () => {
     expect((await run(h)).reused).toBe(false); expect(h.complete).toHaveBeenCalledTimes(2); expect(h.writes).toHaveLength(1);
   });
 
-  it("downgrades unverifiable evidence to unclear and removes unverified lines", async () => {
-    const value = payload(); value.criteria[0].evidence.push("validate(input);");
-    const h = harness([success(value)]); await run(h);
-    expect(h.writes[0].payload.criteria[0]).toMatchObject({ status: "unclear", evidence: ["+validate(input);"] });
+  it("keeps an exact unique diff-line quote verified", async () => {
+    const h = harness();
+    const result = await run(h);
+    expect(result.check.payload.criteria[0]).toMatchObject({ status: "addressed", evidence: ["+validate(input);"] });
+    expect(h.writes[0].payload.criteria[0]).toMatchObject({ status: "addressed", evidence: ["+validate(input);"] });
     expect(h.complete).toHaveBeenCalledTimes(1);
   });
+
+  for (const marker of ["+", "-", " "]) {
+    it.each(["validate(input);", "+validate(input);", "-validate(input);", " validate(input);", " \t+validate(input); \t"])(
+      `verifies a whole-line quote %j against a unique ${JSON.stringify(marker)} diff marker and preserves the source`,
+      async (quote) => {
+        const originalLine = `${marker}validate(input); \t`;
+        const value = payload(); value.criteria[0].evidence = [quote];
+        const h = harness([success(value)]);
+        const assessedDiff = diff.replace("+validate(input);", originalLine);
+        h.evidence.fetchDiff.mockImplementation(async (_repository, sha) => sha === shaA ? assessedDiff : "");
+
+        const result = await run(h);
+
+        expect(result.check.payload.criteria[0]).toMatchObject({ status: "addressed", evidence: [originalLine] });
+        expect(h.writes[0].payload.criteria[0]).toMatchObject({ status: "addressed", evidence: [originalLine] });
+        expect(h.complete).toHaveBeenCalledTimes(1);
+      },
+    );
+  }
+
+  it("trims whitespace again after removing a marker and preserves the original assessed line", async () => {
+    const originalLine = "+  return true; \t";
+    const value = payload(); value.criteria[0].evidence = ["\t+   return true; \t"];
+    const h = harness([success(value)]);
+    h.evidence.fetchDiff.mockImplementation(async (_repository, sha) => sha === shaA ? file("core/validate.ts", "  return true; \t") : "");
+
+    const result = await run(h);
+
+    expect(result.check.payload.criteria[0]).toMatchObject({ status: "addressed", evidence: [originalLine] });
+    expect(h.writes[0].payload.criteria[0]).toMatchObject({ status: "addressed", evidence: [originalLine] });
+    expect(h.complete).toHaveBeenCalledTimes(1);
+  });
+
+  it("removes exactly one leading marker from each line", async () => {
+    const value = payload(); value.criteria[0].evidence = ["++validate(input);"];
+    const h = harness([success(value)]);
+    h.evidence.fetchDiff.mockImplementation(async (_repository, sha) => sha === shaA ? file("core/validate.ts", "+validate(input);") : "");
+
+    const result = await run(h);
+
+    expect(result.check.payload.criteria[0]).toMatchObject({ status: "addressed", evidence: ["++validate(input);"] });
+    expect(h.writes[0].payload.criteria[0]).toMatchObject({ status: "addressed", evidence: ["++validate(input);"] });
+  });
+
+  it("does not remove multiple leading markers to create a match", async () => {
+    const value = payload(); value.criteria[0].evidence = ["++validate(input);"];
+    const h = harness([success(value)]);
+
+    const result = await run(h);
+
+    expect(result.check.payload.criteria[0]).toMatchObject({ status: "unclear", evidence: [] });
+    expect(h.writes[0].payload.criteria[0]).toMatchObject({ status: "unclear", evidence: [] });
+  });
+
+  it.each(["files", "commits", "same hunk", "different markers", "different whitespace"])(
+    "rejects evidence matching multiple line occurrences across %s",
+    async (location) => {
+      const value = payload(); value.criteria[0].evidence = ["+validate(input);"];
+      const h = harness([success(value)]);
+      h.evidence.fetchDiff.mockImplementation(async (_repository, sha) => {
+        if (location === "commits") return diff;
+        if (sha !== shaA) return "";
+        if (location === "files") return diff + file("core/other.ts", "validate(input);");
+        if (location === "same hunk") return diff.replace("@@ -1 +1 @@", "@@ -1 +1,2 @@").replace("+validate(input);", "+validate(input);\n+validate(input);");
+        if (location === "different markers") return diff.replace("-old", "-validate(input);");
+        return diff + file("core/other.ts", "validate(input); \t");
+      });
+
+      const result = await run(h);
+
+      expect(result.check.payload.criteria[0]).toMatchObject({ status: "unclear", evidence: [] });
+      expect(h.writes[0].payload.criteria[0]).toMatchObject({ status: "unclear", evidence: [] });
+      expect(h.complete).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(["invented(input);", "validate(input)", "input", "+validate", "validate( input);"])(
+    "downgrades unmapped or substring-only evidence %j and removes only the unverified quote",
+    async (quote) => {
+      const value = payload(); value.criteria[0].evidence.push(quote);
+      const h = harness([success(value)]); await run(h);
+      expect(h.writes[0].payload.criteria[0]).toMatchObject({ status: "unclear", evidence: ["+validate(input);"] });
+      expect(h.complete).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it.each(["anchor", "omissions", "text", "score", "status", "evidence-type"])("refuses mismatching %s payload", async (kind) => {
     const value: Record<string, unknown> = payload();
