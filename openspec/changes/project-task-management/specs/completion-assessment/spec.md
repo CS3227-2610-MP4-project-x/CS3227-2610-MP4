@@ -58,7 +58,7 @@ The assigned developer SHALL initiate a check through `POST /api/v1/projects/{pr
 - **THEN** a new result is produced for the new set of commits and becomes the latest result
 
 ### Requirement: Evidence is verified against the diff
-The system SHALL verify that every quoted evidence line appears in the diff that was assessed. A criterion whose evidence cannot be verified SHALL be shown as unclear.
+The system SHALL compare evidence and assessed diff lines as whole lines after trimming surrounding whitespace, removing, when present, exactly one leading unified diff marker (`+`, `-`, or space), then trimming surrounding whitespace again. It SHALL verify an evidence entry only when this normalized whole-line comparison matches exactly one occurrence in the assessed diff. It SHALL NOT use substring matching. The system SHALL preserve the original assessed diff line as the verified evidence. Evidence that is ambiguous or cannot be mapped to a diff line SHALL remain unverified. A criterion whose evidence cannot be verified SHALL be shown as unclear.
 
 #### Scenario: Model quotes a line that is not in the diff
 - **WHEN** the model returns evidence for a criterion that does not appear in the assessed diff
@@ -69,10 +69,12 @@ The system SHALL verify that every quoted evidence line appears in the diff that
 - **THEN** the gateway retries once using its existing schema-validation behavior
 - **AND** if the retried output still has invalid criterion associations, the request fails with HTTP 502 `INVALID_OUTPUT` and no check result is created
 
-#### Scenario: Evidence entries are exact diff lines
-- **WHEN** the model returns evidence for a criterion
-- **THEN** each evidence entry exactly matches one line of the assessed diff
-- **AND** any criterion with evidence that cannot be verified is shown as unclear without displaying unverified evidence as fact
+#### Scenario: Evidence matches a unique diff line after normalization
+- **WHEN** the model returns an evidence entry that, after trimming surrounding whitespace, removing one leading `+`, `-`, or space marker when present from both the quote and a diff line, and trimming surrounding whitespace again, exactly matches that diff line as a whole line
+- **THEN** the evidence is verified only if exactly one diff-line occurrence matches
+- **AND** the stored and displayed evidence preserves that original assessed diff line, including its marker and whitespace
+- **AND** a quote matching multiple diff-line occurrences, or matching only as a substring, remains unverified
+- **AND** a quote that cannot be mapped unambiguously remains unverified, and its criterion is shown as unclear without displaying the quote as fact
 
 ### Requirement: Check input is limited to what the assessment needs
 The system SHALL send the model only the task's acceptance criteria, identified by stable criterion ID and text, and the filtered diff of the attached commits. Lockfiles, generated files, and binary files SHALL be excluded. A file SHALL be excluded as binary when GitHub's diff marks that file as binary. The input budget SHALL be 48,000 characters. Eligible files SHALL be included or omitted whole. The result SHALL list every eligible file omitted because of that budget; excluded files SHALL NOT appear in the omitted-file list.
