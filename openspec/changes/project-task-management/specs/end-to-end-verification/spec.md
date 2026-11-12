@@ -59,6 +59,11 @@ CI SHALL execute Chromium role journeys as a separate reported check using dispo
 - **THEN** all success and failure journey scenarios have executed and passed locally and in CI on a fresh database
 - **AND** evidence discloses synthetic authentication limits and preserves manual deployed checks under task 9.4
 
+#### Scenario: Implementation complete with CI pending
+- **WHEN** the required journey tests and CI configuration are implemented, local fresh-database journeys pass and independent code review has no unresolved findings
+- **THEN** task 9.2's implementation checkbox can be marked complete
+- **AND** its evidence explicitly records any pending CI execution, and the checkbox does not claim CI verification or release readiness
+
 #### Scenario: Journey failure evidence
 - **WHEN** a journey fails in CI
 - **THEN** the check fails and bounded sanitized traces or screenshots are retained for diagnosis
