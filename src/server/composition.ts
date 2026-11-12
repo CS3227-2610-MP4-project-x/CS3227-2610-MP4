@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
 import { Pool } from "pg";
 import { AI_LIMITS, FakeAdapter, LlmGateway, SoclaasAdapter, type LlmAdapter } from "@/server/ai";
 import { getServerConfig, type AiConfig, type ServerConfig } from "@/server/config";
@@ -9,7 +10,7 @@ import { PeopleRepository } from "@/server/repositories/people-repository";
 import { ProjectAccessRepository } from "@/server/repositories/project-access-repository";
 import { TaskAccessRepository } from "@/server/repositories/task-access-repository";
 import { GitHubAppAdapter } from "@/server/github";
-import { GitHubEvidenceRepository, GitHubEvidenceService } from "@/server/github-evidence";
+import { createReportGithubMetadata, GitHubEvidenceRepository, GitHubEvidenceService } from "@/server/github-evidence";
 import { ProjectRepository, ProjectService } from "@/server/projects";
 import { TaskLifecycleService, TaskRepository, TaskService } from "@/server/tasks";
 import {
@@ -18,6 +19,7 @@ import {
   GitHubRepositoryLinkService,
 } from "@/server/github-repository-link";
 import { UsageRepository } from "@/server/repositories/usage-repository";
+import { ProviderCallRepository } from "@/server/repositories/provider-call-repository";
 import {
   CompletionAssessmentRepository,
   CompletionAssessmentService,
@@ -30,6 +32,8 @@ import { TaskDetailReadRepository, TaskDetailService } from "@/server/task-detai
 import { TaskBoardRepository, TaskBoardService } from "@/server/task-board";
 import { ReviewQueueRepository, ReviewQueueService } from "@/server/review-queue";
 import { ProjectDashboardRepository, ProjectDashboardService } from "@/server/project-dashboard";
+import { createProgressReportGenerationService, createProgressReportRepository, createProgressReportService, createReportCacheRepository } from "@/server/progress-report";
+import { createProjectAiUsageRepository, createProjectAiUsageService, ProjectAiUsageError } from "@/server/project-ai-usage";
 
 export type ServerComposition = Readonly<{
   authService: AuthService;
@@ -46,6 +50,9 @@ export type ServerComposition = Readonly<{
   taskBoardService: TaskBoardService;
   reviewQueueService: ReviewQueueService;
   projectDashboardService: ProjectDashboardService;
+  progressReportService: ReturnType<typeof createProgressReportService>;
+  progressReportGenerationService: ReturnType<typeof createProgressReportGenerationService>;
+  projectAiUsageService: ReturnType<typeof createProjectAiUsageService>;
   config: ReturnType<typeof getServerConfig>;
   llmGateway: LlmGateway;
 }>;
@@ -98,11 +105,17 @@ export function getServerComposition(): ServerComposition {
   const githubEvidenceRepository = new GitHubEvidenceRepository(pool);
   const githubEvidenceAdapter = new GitHubAppAdapter({ appId: config.githubAppId, privateKey: config.githubAppPrivateKey });
   const githubEvidenceService = new GitHubEvidenceService(githubEvidenceRepository, githubEvidenceAdapter);
+  const providerCallPermits = config.ai.provider === "soclaas" ? new ProviderCallRepository(pool) : undefined;
+  const providerKeyFingerprint = config.ai.provider === "soclaas"
+    ? createHash("sha256").update(config.ai.apiKey, "utf8").digest("hex")
+    : undefined;
   const llmGateway = new LlmGateway({
     adapter: createLlmAdapter(config.ai),
     usage: new UsageRepository(pool),
     environment: config.appEnvironment,
     limits: AI_LIMITS[config.appEnvironment],
+    providerCallPermits,
+    providerKeyFingerprint,
   });
   const taskSnapshotService = new TaskSnapshotService(new TaskSnapshotRepository(pool));
   const completionAssessmentService = new CompletionAssessmentService({
@@ -122,6 +135,34 @@ export function getServerComposition(): ServerComposition {
   const taskBoardService = new TaskBoardService(new TaskBoardRepository(pool));
   const reviewQueueService = new ReviewQueueService(new ReviewQueueRepository(pool), completionAssessmentService);
   const projectDashboardService = new ProjectDashboardService(new ProjectDashboardRepository(pool), projectAccessRepository);
+  const progressReportService = createProgressReportService({ repository: createProgressReportRepository(pool), githubMetadata: createReportGithubMetadata({ adapter: githubEvidenceAdapter }) });
+  const progressReportGenerationService = createProgressReportGenerationService({
+    assembly: progressReportService,
+    repository: createReportCacheRepository(pool),
+    gateway: llmGateway,
+    providerModel: config.ai.provider === "soclaas" ? `${config.ai.provider}:${config.ai.model}` : "fake:fake",
+  });
+  const projectAiUsageRepository = createProjectAiUsageRepository({
+    query: async <Row,>(text: string, values?: readonly unknown[]) => {
+      const result = await pool.query(text, values ? [...values] : []);
+      return { rows: result.rows as Row[] };
+    },
+  });
+  const projectAiUsageService = createProjectAiUsageService({
+    repository: projectAiUsageRepository,
+    authorizeProductManager: async ({ projectId, actorId }) => {
+      const role = await projectAccessRepository.findProjectRole(projectId, actorId);
+      if (!role) throw new ProjectAiUsageError("NOT_FOUND");
+      if (role !== "product_manager") throw new ProjectAiUsageError("FORBIDDEN");
+    },
+    readCurrentSgtDate: async () => {
+      const result = await pool.query<{ date: string }>("SELECT (now() AT TIME ZONE 'Asia/Singapore')::date::text AS date");
+      const date = result.rows[0]?.date;
+      if (!date) throw new Error("Could not read the current SGT date.");
+      return date;
+    },
+    environment: config.appEnvironment,
+  });
   composition = Object.freeze({
     authService: new AuthService(config.appOrigin, peopleRepository),
     peopleRepository,
@@ -137,6 +178,9 @@ export function getServerComposition(): ServerComposition {
     taskBoardService,
     reviewQueueService,
     projectDashboardService,
+    progressReportService,
+    progressReportGenerationService,
+    projectAiUsageService,
     config,
     llmGateway,
   });

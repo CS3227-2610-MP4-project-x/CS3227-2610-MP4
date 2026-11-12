@@ -80,6 +80,7 @@ export function runtimeTablePrivileges(table: string): readonly TablePrivilege[]
     case ENTITY_TABLES.tasks:
       return ["SELECT", "INSERT", "UPDATE"];
     case ENTITY_TABLES.taskEvents:
+    case "provider_call_permits":
       return ["SELECT", "INSERT"];
     default:
       return READ_WRITE;

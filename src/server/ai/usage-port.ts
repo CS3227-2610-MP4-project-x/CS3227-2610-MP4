@@ -43,3 +43,7 @@ export interface UsagePort {
   // Records a cached result with zero tokens and no limit check (G7).
   recordCacheHit(input: UsageCacheHit): Promise<void>;
 }
+
+export interface ProviderCallPermitPort {
+  acquire(fingerprint: string, limit: number): Promise<boolean>;
+}

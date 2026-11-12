@@ -106,17 +106,32 @@ describe("src/server/ai source boundaries", () => {
 describe("usage table ownership (AC23, G8)", () => {
   const sourceDirectory = join(repositoryRoot, "src");
   const usageRepositoryPath = join(sourceDirectory, "server", "repositories", "usage-repository.ts");
+  const usageReaderPath = join(sourceDirectory, "server", "project-ai-usage", "repository.ts");
 
   it("has the usage repository", () => {
     expect(existsSync(usageRepositoryPath)).toBe(true);
   });
 
-  it("names usage_records and usage_quota_days only in the usage repository", () => {
+  it("names usage tables only in the gateway writer and approved project aggregate reader (8.3 D8)", () => {
     const entries = readdirSync(sourceDirectory, { recursive: true, withFileTypes: true });
     const mentioning = entries
       .filter((entry) => entry.isFile() && /\.(ts|tsx|js|mjs|cjs)$/.test(entry.name))
       .map((entry) => join(entry.parentPath, entry.name))
       .filter((path) => /\busage_(records|quota_days)\b/.test(withoutComments(readFileSync(path, "utf8"))));
-    expect(mentioning).toEqual([usageRepositoryPath]);
+    expect(mentioning.sort()).toEqual([usageRepositoryPath, usageReaderPath].sort());
+  });
+
+  it("keeps the project aggregate reader read-only and outside quota storage (8.3 D8)", () => {
+    expect(existsSync(usageReaderPath)).toBe(true);
+    const code = withoutComments(readFileSync(usageReaderPath, "utf8"));
+    expect(code).toMatch(/\busage_records\b/);
+    expect(code).not.toMatch(/\busage_quota_days\b/);
+    // Coarse source guard: catches DML/DDL, including writable CTEs, and SQL
+    // procedural execution. Runtime database tests and review remain necessary.
+    expect(code).not.toMatch(/\b(INSERT|UPDATE|DELETE|MERGE|TRUNCATE|CREATE|ALTER|DROP|GRANT|REVOKE|COPY|CALL|DO|EXECUTE|VACUUM|REINDEX|REFRESH)\b/i);
+    expect(code).not.toMatch(/\.\s*(execute|exec|mutate|transaction)\s*\(/i);
+    for (const specifier of importSpecifiers(code)) {
+      expect(specifier).not.toMatch(/usage-repository|composition/);
+    }
   });
 });

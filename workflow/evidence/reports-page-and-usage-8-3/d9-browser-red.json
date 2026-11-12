@@ -1,0 +1,19 @@
+{
+  "environment": "synthetic Vite component harness; intercepted requests; no live auth or provider",
+  "passed": [
+    "report opening is read-only",
+    "verified zero replacement count has no disclosure",
+    "report failed request clears old result and supports retry",
+    "pending report prevents duplicate button submission and range changes discard stale result",
+    "usage shows separated totals and configured environment",
+    "usage distinguishes unavailable and zero states with retry",
+    "usage mobile avoids document overflow"
+  ],
+  "failures": [
+    {
+      "name": "generated report renders plain text, internal citations and sorted developer labels",
+      "error": "expect(locator).toContainText(expected) failed\n\nLocator: locator('main')\nExpected substring: \"Sensitive content was redacted: 3 replacements.\"\nReceived string:    \"Progress Report · SGTProject progressChoose up to seven inclusive dates. Generating a report uses the project AI feature.Report date rangeStart date (SGT)End date (SGT)Generate reportReport · 2026-11-10 to 2026-11-10 SGTShowing a report reused because project activity has not changed.Generated 11/10/2026, 9:00:00 AMSome GitHub evidence was unavailable. This report may not include all commit activity.synthetic-alphaCompletedSynthetic completed task.SYN-2synthetic-zetaIn progress<img src=x onerror=\\\"window.syntheticInjection=true\\\"> Synthetic progress.SYN-1\"\nTimeout: 5000ms\n\nCall log:\n  - Expect \"toContainText\" locator('main') with timeout 5000ms\n  - waiting for locator('main')\n    13 × locator resolved to <main class=\"min-h-screen bg-[#1a1a1a] px-5 py-10 text-neutral-100 sm:px-8\">…</main>\n       - unexpected value \"Progress Report · SGTProject progressChoose up to seven inclusive dates. Generating a report uses the project AI feature.Report date rangeStart date (SGT)End date (SGT)Generate reportReport · 2026-11-10 to 2026-11-10 SGTShowing a report reused because project activity has not changed.Generated 11/10/2026, 9:00:00 AMSome GitHub evidence was unavailable. This report may not include all commit activity.synthetic-alphaCompletedSynthetic completed task.SYN-2synthetic-zetaIn progress<img src=x onerror=\"window.syntheticInjection=true\"> Synthetic progress.SYN-1\"\n"
+    }
+  ],
+  "consoleErrors": []
+}

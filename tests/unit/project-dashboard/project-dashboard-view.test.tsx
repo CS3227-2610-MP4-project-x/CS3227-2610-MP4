@@ -51,12 +51,14 @@ it("shows the four dashboard sections, matching progress, members and the existi
   expect(html).toContain(`href="/projects/${ids.project}/board"`);
 
 });
-it("shows PM actions with the deferred report visibly disabled", () => {
+it("links the PM Progress Report action after the D9 readiness gate", () => {
   const html = view("product_manager"); const text = visibleText(html);
   expect(text).toContain("New Task"); expect(text).toContain("Review Queue"); expect(text).toContain("Progress Report");
   expect(html).toContain(`href="/projects/${ids.project}/review-queue"`);
-  expect(html).toMatch(/<(?:button|span)\b[^>]*(?:disabled|aria-disabled="true")[^>]*>[\s\S]*?Progress Report/);
-  expect(html).toMatch(/coming soon/i); expect(html).not.toContain(`/projects/${ids.project}/reports`);
+  const reportLink = [...html.matchAll(/<a\b[^>]*>[\s\S]*?<\/a>/g)].map(match => match[0]).find(anchor => visibleText(anchor).includes('Progress Report'));
+  expect(reportLink, 'ready Progress Report action link').toBeDefined();
+  expect(reportLink ?? '').toContain(`href="/projects/${ids.project}/reports"`);
+  expect(reportLink).not.toMatch(/aria-disabled="true"|coming soon/i);
 });
 it("excludes all PM actions for developers and retains the developer role label", () => {
   const html = view("developer");

@@ -1,7 +1,7 @@
 import { isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { StoredCheckResult } from "@/server/completion-assessment";
+import type { CheckHistoryEntry as StoredCheckResult } from "@/components/completion-assessment/check-history";
 
 // Approved completion-assessment requirements: Developer runs an acceptance
 // criteria check; Check results are reused; Check history is visible to both
@@ -55,6 +55,24 @@ function check(id = "33333333-3333-4333-8333-333333333333", createdAt = "2026-11
       omittedFiles: ["src/domain/large-change.ts", "tests/large-fixture.ts"],
     },
   };
+}
+
+// Approved version 2 persisted contract. No guessed provenance is added to legacy fixtures.
+function groupedCheck() {
+  const legacy = check();
+  return { ...legacy, payload: { ...legacy.payload, assessmentVersion: 2 as const, criteria: [{
+    ...legacy.payload.criteria[0], evidence: [], modelStatus: "addressed" as const,
+    verification: { state: "verified" as const, reasonCodes: [] },
+    evidenceFiles: [
+      { path: "src/discount.ts", commitSha: "b".repeat(40), excerpts: [
+        { hunkId: "h1", lines: [{ reference: "r1", text: "+  return roundToCents(price);" }] },
+        { hunkId: "h2", lines: [{ reference: "r2", text: "+  validate(price);" }] },
+      ] },
+      { path: "tests/discount.test.ts", commitSha: "c".repeat(40), excerpts: [
+        { hunkId: "h3", lines: [{ reference: "r3", text: "+  expect(discount(200, 25)).toBe(150);" }] },
+      ] },
+    ],
+  }] } };
 }
 
 type ElementProps = { children?: ReactNode; onClick?: () => void | Promise<void>; disabled?: boolean };
@@ -116,6 +134,47 @@ beforeEach(() => {
 afterEach(() => { boundary.active = false; vi.unstubAllGlobals(); });
 
 describe("shared developer and PM read-only check history", () => {
+  it("renders version 2 evidence in separate labeled file/commit groups and excerpts", async () => {
+    const value = groupedCheck();
+    const html = await history([value]);
+    for (const file of value.payload.criteria[0].evidenceFiles) {
+      expect(html).toContain(file.path);
+      expect(html).toContain(file.commitSha.slice(0, 7));
+    }
+    const excerpts = [...html.matchAll(/<pre\b[^>]*>([\s\S]*?)<\/pre>/g)].map((match) => match[1]);
+    expect(excerpts).toHaveLength(3);
+    expect(excerpts.filter((excerpt) => excerpt.includes("roundToCents") && excerpt.includes("expect(discount"))).toEqual([]);
+    for (const file of value.payload.criteria[0].evidenceFiles) for (const excerpt of file.excerpts) {
+      for (const line of excerpt.lines) expect(html).toContain(escape(line.text));
+    }
+  });
+
+  it("wraps long unbroken evidence and paths while preserving whitespace", async () => {
+    const value = groupedCheck();
+    const longLine = "+  " + "x".repeat(800);
+    value.payload.criteria[0].evidenceFiles[0].path = "src/" + "p".repeat(400) + ".ts";
+    value.payload.criteria[0].evidenceFiles[0].excerpts[0].lines[0].text = longLine;
+    const html = await history([value]);
+    const pre = [...html.matchAll(/<pre\b([^>]*)>([\s\S]*?)<\/pre>/g)].find((match) => match[2].includes(longLine));
+    expect(pre, "long evidence remains visible").toBeDefined();
+    expect(pre![1]).toMatch(/whitespace-pre-wrap|white-space:\s*pre-wrap/);
+    expect(pre![1]).toMatch(/break-all|overflow-wrap[^\"; ]*|word-break:\s*break-all/);
+    expect(html).toMatch(/min-w-0/);
+    expect(html).toContain(value.payload.criteria[0].evidenceFiles[0].path);
+  });
+
+  it("shows verification downgrades separately from the model status", async () => {
+    const value = groupedCheck();
+    const downgraded = { ...value, payload: { ...value.payload, criteria: [{
+      ...value.payload.criteria[0], status: "unclear" as const,
+      verification: { state: "downgraded" as const, reasonCodes: ["unknown_reference" as const] },
+    }] } };
+    const html = await history([downgraded]);
+    expect(html).toMatch(/verification|could not.*verif|unverified/i);
+    expect(html).toMatch(/model[\s\S]{0,80}addressed/i);
+    expect(html).toMatch(/reference|evidence/i);
+    expect(html).not.toContain(privateDetail);
+  });
   it("shows an explicit empty state without invoking an API", async () => {
     const html = await history([]);
     expect(html).toMatch(/no (?:acceptance criteria )?checks|no .*results|no .*history|not .*run/i);
@@ -182,6 +241,12 @@ describe("shared developer and PM read-only check history", () => {
     expect(html).not.toMatch(/\b\d+\s*%|numeric score|completion score/i);
   });
 
+  it("labels legacy excerpts without inventing file provenance", async () => {
+    const html = await history([check()]);
+    expect(html).toContain("File provenance unavailable for this historical result.");
+    expect(html).not.toContain("src/discount.ts");
+  });
+
   it("provides expandable diff evidence, including removed and added lines", async () => {
     const value = check();
     const html = await history([value]);
@@ -232,6 +297,33 @@ describe("shared developer and PM read-only check history", () => {
 });
 
 describe("developer Run check interactions", () => {
+  it("accepts the version 2 response and retains file-grouped evidence in history", async () => {
+    const value = groupedCheck();
+    boundary.fetch.mockResolvedValue(success(value));
+    const harness = await developer();
+    await harness.run().props.onClick!();
+    const html = markup(harness.render());
+    expect(html).toContain("src/discount.ts");
+    expect(html).toContain("tests/discount.test.ts");
+    expect(html).not.toContain('role="alert"');
+  });
+
+  it.each(["unknown version", "invalid lines", "invalid diagnostics"])("rejects a malformed version 2 response: %s", async (kind) => {
+    const value = groupedCheck();
+    const payload: Record<string, unknown> = structuredClone(value.payload);
+    if (kind === "unknown version") payload.assessmentVersion = 3;
+    if (kind === "invalid lines") payload.criteria = [{ ...value.payload.criteria[0], evidenceFiles: [
+      { path: "src/discount.ts", commitSha: "b".repeat(40), excerpts: [{ hunkId: "h1", lines: [null] }] },
+    ] }];
+    if (kind === "invalid diagnostics") payload.criteria = [{ ...value.payload.criteria[0], verification: {
+      state: "downgraded", reasonCodes: ["provider-private-error"],
+    } }];
+    boundary.fetch.mockResolvedValue({ ok: true, status: 200, json: async () => ({ check: { ...value, payload }, reused: false }) });
+    const harness = await developer();
+    await harness.run().props.onClick!();
+    expect(markup(harness.render())).toContain('role="alert"');
+    expect(markup(harness.render())).not.toContain("provider-private-error");
+  });
   it.each(["http error", "network error", "invalid result"])("keeps task B's error when task A returns a late %s", async (lateResponse) => {
     const requestA = deferredResponse();
     const requestB = deferredResponse();

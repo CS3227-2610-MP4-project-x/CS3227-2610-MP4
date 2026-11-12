@@ -176,9 +176,9 @@ describe("SubmissionTipLookup agrees with the stored check key (F5)", () => {
     };
     // The synthetic model answer the check service validates: every criterion, in a fixed order.
     const ordered = [...input.criteria].sort((a, b) => a.position - b.position || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-    const answer = { anchorSha: input.tip, criteria: ordered.map((criterion) => ({
-      criterionId: criterion.id, criterion: criterion.description, status: "unclear", evidence: [],
-    })), possibleGaps: [], omittedFiles: [] };
+    const answer = { criteria: ordered.map((criterion) => ({
+      criterionId: criterion.id, status: "unclear", evidenceRefs: [],
+    })), possibleGaps: [] };
     const usage: UsagePort = {
       reserve: vi.fn(async () => ({ ok: true as const, usageRecordId: "synthetic-usage" })),
       settle: vi.fn(async () => {}), recordCacheHit: vi.fn(async () => {}),

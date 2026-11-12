@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckHistory, type CheckHistoryEntry } from "./check-history";
+import { CheckHistory, type CheckHistoryEntry, type CheckStatus } from "./check-history";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 export type DeveloperCheckPanelProps = Readonly<{
@@ -54,16 +54,62 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
 }
 
+const CHECK_STATUSES: readonly CheckStatus[] = ["addressed", "not_addressed", "unclear"];
+const VERIFICATION_REASONS = ["unknown_reference", "missing_evidence"] as const;
+
+function isStatus(value: unknown): value is CheckStatus {
+  return typeof value === "string" && CHECK_STATUSES.includes(value as CheckStatus);
+}
+
 function isCheckPayload(value: unknown): value is CheckHistoryEntry["payload"] {
   if (!isRecord(value) || typeof value.anchorSha !== "string" || value.anchorSha.length === 0 ||
       !Array.isArray(value.criteria) || !isStringArray(value.possibleGaps) || !isStringArray(value.omittedFiles)) return false;
+  if ("assessmentVersion" in value) {
+    if (value.assessmentVersion !== 2) return false;
+    const criterionIds = new Set<string>();
+    for (const criterion of value.criteria) {
+      if (!isVersion2Criterion(criterion) || criterionIds.has(criterion.criterionId)) return false;
+      criterionIds.add(criterion.criterionId);
+    }
+    return true;
+  }
+  // New fields without their version marker are malformed v2, not legacy data.
+  if (value.criteria.some((criterion) => isRecord(criterion) &&
+      ("evidenceFiles" in criterion || "modelStatus" in criterion || "verification" in criterion))) return false;
   const criterionIds = new Set<string>();
   for (const criterion of value.criteria) {
     if (!isRecord(criterion) || typeof criterion.criterionId !== "string" || criterion.criterionId.length === 0 ||
         criterionIds.has(criterion.criterionId) || typeof criterion.criterion !== "string" ||
-        typeof criterion.status !== "string" || !["addressed", "not_addressed", "unclear"].includes(criterion.status) ||
+        !isStatus(criterion.status) ||
         !isStringArray(criterion.evidence)) return false;
     criterionIds.add(criterion.criterionId);
+  }
+  return true;
+}
+
+function isVersion2Criterion(value: unknown): boolean {
+  if (!isRecord(value) || typeof value.criterionId !== "string" || value.criterionId.length === 0 ||
+      typeof value.criterion !== "string" || !isStatus(value.status) || !Array.isArray(value.evidence) ||
+      value.evidence.length !== 0 || !isStatus(value.modelStatus) || !isRecord(value.verification) ||
+      !["verified", "downgraded"].includes(String(value.verification.state)) ||
+      !Array.isArray(value.verification.reasonCodes) ||
+      !value.verification.reasonCodes.every((reason) => VERIFICATION_REASONS.includes(reason as typeof VERIFICATION_REASONS[number])) ||
+      !Array.isArray(value.evidenceFiles)) return false;
+  const fileKeys = new Set<string>();
+  for (const file of value.evidenceFiles) {
+    if (!isRecord(file) || typeof file.path !== "string" || file.path.length === 0 ||
+        typeof file.commitSha !== "string" || file.commitSha.length === 0 || !Array.isArray(file.excerpts)) return false;
+    const fileKey = `${file.commitSha}\0${file.path}`;
+    if (fileKeys.has(fileKey)) return false;
+    fileKeys.add(fileKey);
+    for (const excerpt of file.excerpts) {
+      if (!isRecord(excerpt) || typeof excerpt.hunkId !== "string" || excerpt.hunkId.length === 0 ||
+          !Array.isArray(excerpt.lines)) return false;
+      for (const line of excerpt.lines) {
+        if (!isRecord(line) || typeof line.reference !== "string" || line.reference.length === 0 ||
+            typeof line.text !== "string") return false;
+      }
+    }
   }
   return true;
 }
@@ -150,7 +196,7 @@ export function DeveloperCheckPanel({ projectId, taskId, checkHistory }: Develop
   }
 
   return (
-    <section aria-labelledby="acceptance-check-heading" className="space-y-4">
+    <section aria-labelledby="acceptance-check-heading" className="min-w-0 max-w-full space-y-4">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 id="acceptance-check-heading" className="text-xl font-semibold tracking-tight text-neutral-100">Acceptance Criteria Check</h2>

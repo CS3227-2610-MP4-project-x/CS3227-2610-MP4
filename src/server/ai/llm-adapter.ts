@@ -12,6 +12,12 @@ export type LlmRequest = {
   maxOutputTokens: number;
 };
 
+export type ProviderCapabilities = Readonly<{
+  contextTokens: number;
+  requestsPerMinute: number;
+  sharedKeyLimit: boolean;
+}>;
+
 export type LlmUsage = {
   inputTokens: number;
   outputTokens: number;
@@ -44,6 +50,9 @@ export type LlmFailure = {
 export type LlmResult = LlmSuccess | LlmFailure;
 
 export interface LlmAdapter {
+  // Provider limits are fetched from official metadata endpoints. Implementations may
+  // cache valid metadata for at most 60 seconds per instance.
+  getCapabilities(): Promise<ProviderCapabilities>;
   // Resolves to a success or a failure; does not reject for provider failures.
   complete(request: LlmRequest): Promise<LlmResult>;
 }

@@ -1,0 +1,15 @@
+{
+  "environment": "synthetic Vite component harness; intercepted requests; no live auth or provider",
+  "passed": [
+    "report opening is read-only",
+    "generated report renders plain text, internal citations and sorted developer labels",
+    "verified zero replacement count has no disclosure",
+    "report failed request clears old result and supports retry",
+    "pending report prevents duplicate button submission and range changes discard stale result",
+    "usage shows separated totals and configured environment",
+    "usage distinguishes unavailable and zero states with retry",
+    "usage mobile avoids document overflow"
+  ],
+  "failures": [],
+  "consoleErrors": []
+}

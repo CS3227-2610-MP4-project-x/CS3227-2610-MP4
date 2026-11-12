@@ -3,6 +3,22 @@ import type { GitHubEvidenceAdapter, GitHubRepository } from "@/server/github";
 import type { VerifiedGitHubIdentity } from "@/server/github-repository-link";
 import { GitHubEvidenceRepository } from "./repository";
 import { evidenceFailure } from "./errors";
+import type { GitHubCommitMetadata } from "@/server/github";
+
+export function createReportGithubMetadata(input: { adapter: { getCommitMetadata(repository: GitHubRepository, sha: string): Promise<import("@/server/github").GitHubResult<GitHubCommitMetadata>> } }) {
+  return {
+    async readBySha(request: { repository: { repositoryId: number; installationId: number; owner: string; name: string }; shas: readonly string[] }) {
+      const shas = [...new Set(request.shas)];
+      if (!shas.length) return { kind: "available" as const, commits: [] as GitHubCommitMetadata[] };
+      const repository: GitHubRepository = { id: request.repository.repositoryId, installationId: request.repository.installationId, owner: request.repository.owner, name: request.repository.name };
+      const results = await Promise.allSettled(shas.map((sha) => input.adapter.getCommitMetadata(repository, sha)));
+      const commits = results.flatMap((result) => result.status === "fulfilled" && result.value.ok ? [result.value.value] : []);
+      return results.every((result) => result.status === "fulfilled" && result.value.ok)
+        ? { kind: "available" as const, commits }
+        : { kind: "unavailable" as const, ...(commits.length ? { commits } : {}) };
+    },
+  };
+}
 
 type CommitFilters = Readonly<{ since?: string; until?: string; branch?: string; page?: number; perPage?: number }>;
 const SHA = /^[0-9a-f]{7,64}$/i;
