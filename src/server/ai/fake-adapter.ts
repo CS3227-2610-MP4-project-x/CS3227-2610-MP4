@@ -1,4 +1,4 @@
-import type { LlmAdapter, LlmFailure, LlmRequest, LlmResult, LlmSuccess } from "./llm-adapter";
+import type { LlmAdapter, LlmFailure, LlmRequest, LlmResult, LlmSuccess, ProviderCapabilities } from "./llm-adapter";
 
 // Deterministic fake adapter (decision D6). Each call returns the next scripted
 // outcome; once the script is used up, or when none is given, each call returns a fixed
@@ -47,6 +47,10 @@ export class FakeAdapter implements LlmAdapter {
 
   constructor(script: readonly FakeOutcome[] = []) {
     this.#script = [...script];
+  }
+
+  async getCapabilities(): Promise<ProviderCapabilities> {
+    return { contextTokens: 262_144, requestsPerMinute: 30, sharedKeyLimit: false };
   }
 
   async complete(request: LlmRequest): Promise<LlmResult> {

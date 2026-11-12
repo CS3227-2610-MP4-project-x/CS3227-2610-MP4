@@ -58,8 +58,10 @@ const sha = "a".repeat(40);
 const timestamp = "2026-11-07T03:00:00.000Z";
 const privateDetail = "synthetic-private-provider-or-database-detail";
 const payload = {
-  anchorSha: sha,
-  criteria: [{ criterionId, criterion: "Validate callback state", status: "addressed", evidence: ["+validateState();"] }],
+  assessmentVersion: 2, anchorSha: sha,
+  criteria: [{ criterionId, criterion: "Validate callback state", status: "addressed", evidence: [], modelStatus: "addressed",
+    verification: { state: "verified", reasonCodes: [] }, evidenceFiles: [{ path: "src/domain/callback.ts", commitSha: sha,
+      excerpts: [{ hunkId: "H1", lines: [{ reference: "L1", text: "+validateState();" }] }] }] }],
   possibleGaps: ["Consider malformed callback tests"], omittedFiles: [],
 };
 const expectedCheck = { id: checkId, anchorSha: sha, createdAt: timestamp, redacted: false, payload };
@@ -139,7 +141,7 @@ beforeEach(() => {
     "--- a/src/domain/callback.ts", "+++ b/src/domain/callback.ts", "@@ -0,0 +1 @@", "+validateState();", "",
   ].join("\n") });
   boundary.gatewayRun.mockImplementation(async (options: { validate: (value: unknown) => { ok: boolean; value?: unknown } }) => {
-    const validated = options.validate(payload);
+    const validated = options.validate({ criteria: [{ criterionId, status: "addressed", evidenceRefs: ["L1"] }], possibleGaps: payload.possibleGaps });
     if (!validated.ok) throw new Error("Synthetic provider fixture failed validation");
     return { ok: true, value: validated.value, model: "synthetic-model", redaction: { redactionCount: 0 } };
   });

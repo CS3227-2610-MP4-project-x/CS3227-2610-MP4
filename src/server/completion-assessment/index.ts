@@ -1,7 +1,13 @@
 import "server-only";
 
 export { CompletionAssessmentError, CompletionAssessmentService } from "./service";
-export type { CheckCriterionResult, CheckResultPayload } from "./service";
+export type {
+  CheckCriterionResult,
+  CheckResultPayload,
+  LegacyCheckCriterionResult,
+  LegacyCheckResultPayload,
+  NewCheckResultPayload,
+} from "./service";
 export { CompletionAssessmentRepository } from "./repository";
 export type { CheckCacheKey, CheckHistoryEntry, SaveCheckInput, StoredCheckResult } from "./repository";
 export { TaskSnapshotRepository } from "./snapshot-repository";

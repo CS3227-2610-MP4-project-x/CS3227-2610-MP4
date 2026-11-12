@@ -1,7 +1,12 @@
 // Model output parsing (LLM Gateway Decisions G9): trim, remove one surrounding Markdown
 // code fence if present, then parse JSON. Internal to the AI module.
 
-export type OutputValidation<T> = { ok: true; value: T } | { ok: false };
+export type OutputCorrectionIssue = Readonly<{
+  criterionId?: string;
+  reasonCode: "unknown_reference" | "missing_evidence" | "schema_invalid";
+}>;
+
+export type OutputValidation<T> = { ok: true; value: T } | { ok: false; correction?: readonly OutputCorrectionIssue[]; fallback?: T };
 
 export type OutputValidator<T> = (value: unknown) => OutputValidation<T>;
 

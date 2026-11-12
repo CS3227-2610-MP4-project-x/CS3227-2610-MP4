@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { CheckResultPayload } from "./service";
+import type { CheckResultPayload, NewCheckResultPayload } from "./service";
 
 type Query = Readonly<{
   query<T extends Record<string, unknown> = Record<string, unknown>>(
@@ -24,7 +24,7 @@ export type StoredCheckResult = Readonly<{
 }>;
 export type CheckHistoryEntry = StoredCheckResult;
 export type SaveCheckInput = CheckCacheKey & Readonly<{
-  payload: CheckResultPayload;
+  payload: NewCheckResultPayload;
   model: string;
   redacted: boolean;
 }>;

@@ -71,7 +71,7 @@ When a task is written, the database SHALL reject it if its assignee has no Deve
 - **THEN** the task and those records remain stored, and the task is marked as deleted
 
 ### Requirement: Stored results are keyed for reuse
-The database SHALL store at most one check result per task for a given commit-set hash, acceptance-criteria hash, and normalized path-rules hash, and at most one report per project and date range, so that the reuse rules of the Acceptance Criteria Check and the Progress Report can be applied. Task ID SHALL be a separate key dimension. The commit-set hash SHALL be SHA-256 of full commit SHAs sorted lexicographically and joined by LF, with no trailing LF. The acceptance-criteria hash SHALL be SHA-256 of compact UTF-8 JSON containing `{ "id", "description" }` objects ordered by criterion position and then criterion ID, with object properties serialized as `id` then `description`. New check-result rows SHALL store a non-null SHA-256 path-rules hash. Existing rows without a path-rules hash SHALL be preserved as legacy history and SHALL NOT be reused by new checks.
+The database SHALL store at most one check result per task for a given commit-set hash, acceptance-criteria hash, and effective versioned path-rules fingerprint, and at most one report per project and date range, so that the reuse rules of the Acceptance Criteria Check and the Progress Report can be applied. Task ID SHALL be a separate key dimension. The commit-set hash SHALL be SHA-256 of full commit SHAs sorted lexicographically and joined by LF, with no trailing LF. The acceptance-criteria hash SHALL be SHA-256 of compact UTF-8 JSON containing `{ "id", "description" }` objects ordered by criterion position and then criterion ID, with object properties serialized as `id` then `description`. New check-result rows SHALL store a non-null SHA-256 path-rules hash. Existing rows without a path-rules hash SHALL be preserved as legacy history and SHALL NOT be reused by new checks.
 
 #### Scenario: Same check stored twice
 - **WHEN** a second check result is written for the same task, commit-set hash, criteria hash, and path-rules hash
@@ -105,3 +105,19 @@ The application SHALL access the database through a role that cannot change the 
 #### Scenario: Data API access
 - **WHEN** a client calls the Supabase Data API for an application table with a project member's session
 - **THEN** the request is denied
+
+### Requirement: Assessment contract version affects reuse without rewriting history
+The canonical commit-set, criteria, and normalized path-rules hashes SHALL retain their recorded calculations. Version 2 check results SHALL persist the effective `path_rules_hash` fingerprint SHA-256 of compact UTF-8 JSON with fixed property order `{ "assessmentVersion": 2, "pathRulesHash": "<canonical normalized path-rules hash>" }`. Existing cache uniqueness SHALL continue to use task, commit-set hash, criteria hash, and this effective fingerprint. Legacy rows SHALL remain unchanged and readable but SHALL NOT match the version 2 fingerprint. The result JSON SHALL carry `assessmentVersion: 2`, file-grouped verified evidence, model status, and safe verification diagnostics according to the completion-assessment contract; raw model responses SHALL NOT be persisted.
+
+#### Scenario: Contract upgrade preserves history and permits reassessment
+- **WHEN** the same task, commits, criteria, and canonical path rules previously produced a legacy check
+- **THEN** a version 2 check can be stored under its distinct effective fingerprint
+- **AND** both checks remain in history without rewriting the old row
+
+### Requirement: Provider-key permits are shared and server-only
+A new versioned migration SHALL add server-only shared provider-key permit storage owned by the usage module. The usage repository SHALL atomically serialize permit acquisition by a SHA-256 credential fingerprint and enforce the fetched request limit using database time over a rolling 60-second window. A permit exactly 60 seconds old SHALL no longer count. Storage SHALL contain no credential, prompt, response, or user content. Concurrent acquisitions across application instances SHALL NOT exceed the permitted count. Runtime grants SHALL be least privilege, and Supabase Data API access SHALL be denied. No shipped migration SHALL be modified and no hosted migration execution is authorized by this requirement. No database transaction SHALL span a provider network call. Expired permits MAY remain stored without affecting enforcement.
+
+#### Scenario: Shared permits enforce the rolling boundary
+- **WHEN** a key has its allowed number of permits newer than database time minus 60 seconds
+- **THEN** an additional acquisition is refused without creating another permit
+- **AND** a permit exactly 60 seconds old is excluded from the count

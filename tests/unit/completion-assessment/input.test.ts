@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 
-import { assembleAcceptanceCheckInput } from "../../../src/server/completion-assessment/input";
+import { assembleAcceptanceCheckInput, prepareAcceptanceCheckFiles, renderAcceptanceCheckFiles } from "../../../src/server/completion-assessment/input";
 import {
   classifyAcceptancePath,
   isConfiguredPathExcluded,
@@ -291,5 +291,56 @@ describe("whole-file diff selection", () => {
     "diff --git a/old.ts b/new.ts\nrename to different.ts\n",
   ])("returns a safe malformed-diff result for %j", (raw) => {
     expect(assembleAcceptanceCheckInput(raw, rules)).toEqual({ ok: false, reason: "malformed_diff" });
+  });
+});
+
+
+// Version 2: occurrence references carry provenance without repeating Git metadata.
+describe("source-aware compact file input", () => {
+  function render(sources: { commitSha: string; diff: string }[]) {
+    const prepared = prepareAcceptanceCheckFiles(sources, rules);
+    if (!prepared.ok) throw new Error("Expected valid synthetic patch");
+    return renderAcceptanceCheckFiles(prepared.files);
+  }
+  it("keeps identical occurrences separate across commits, files and hunks", () => {
+    const first = diff("core/a.ts", "+same\n+same\n@@ -10 +10 @@\n+same\n");
+    const result = render([{ commitSha: "a".repeat(40), diff: first + diff("test/a.ts", "+same\n") },
+      { commitSha: "b".repeat(40), diff: diff("core/a.ts", "+same\n") }]);
+    expect(result.segments).toHaveLength(3);
+    const values = [...result.sourceMap.values()].filter((line) => line.text === "+same");
+    expect(values).toHaveLength(5); expect(new Set(values.map((line) => line.reference)).size).toBe(5);
+    expect(new Set(values.map((line) => `${line.commitSha}:${line.path}:${line.hunkId}:${line.lineOccurrence}`)).size).toBe(5);
+    expect(result.segments[0].content).toContain("FILE path=core/a.ts");
+    expect(result.segments.map((s) => s.content).join("")).not.toContain("diff --git");
+  });
+  it("references triple-marker code inside a hunk and preserves source whitespace", () => {
+    const result = render([{ commitSha: "a".repeat(40), diff: diff("core/a.ts", "+++code;  \n---removed;\n context;\n") }]);
+    expect([...result.sourceMap.values()].map((line) => line.text)).toEqual(["+++code;  ", "---removed;", " context;"]);
+    expect(result.segments[0].content).toMatch(/\[\[L\d+\]\] \+\+\+code;  /);
+  });
+  it("retains assessable mode-only changes and rename provenance without redundant headers", () => {
+    const mode = "diff --git a/core/tool.sh b/core/tool.sh\nold mode 100644\nnew mode 100755\n";
+    const renamed = rename("core/old.ts", "core/new.ts");
+    const result = render([{ commitSha: "a".repeat(40), diff: mode + renamed }]);
+    const prompt = result.segments.map((segment) => segment.content).join("\n");
+    for (const text of ["old mode 100644", "new mode 100755", "rename from core/old.ts"]) {
+      expect(prompt.split(text)).toHaveLength(2);
+      expect([...result.sourceMap.values()].some((line) => line.text === text)).toBe(true);
+    }
+    expect(prompt.split("FILE path=core/new.ts")).toHaveLength(2);
+    expect(prompt).not.toContain("rename to core/new.ts");
+    expect(prompt).not.toContain("diff --git");
+  });
+  it("preserves the no-newline marker as assessable patch context", () => {
+    const result = render([{ commitSha: "a".repeat(40), diff: diff("core/a.ts", "+same\n\\ No newline at end of file\n") }]);
+    expect(result.segments[0].content).toContain("\\ No newline at end of file");
+    expect([...result.sourceMap.values()].some((line) => line.text === "\\ No newline at end of file")).toBe(true);
+  });
+  it("uses deterministic source order and sends no configured excluded content", () => {
+    const sources = [{ commitSha: "b".repeat(40), diff: diff("test/z.ts") + diff("core/a.ts") + diff("generated/client.ts", "+EXCLUDED\n") },
+      { commitSha: "a".repeat(40), diff: diff("core/a.ts") + diff("package-lock.json", "+LOCKFILE\n") }];
+    const one = render(sources), two = render([...sources].reverse());
+    expect(one).toEqual(two);
+    expect(one.segments.map((s) => s.content).join("")).not.toMatch(/EXCLUDED|LOCKFILE/);
   });
 });

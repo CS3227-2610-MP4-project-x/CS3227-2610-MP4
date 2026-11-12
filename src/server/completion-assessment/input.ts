@@ -18,6 +18,31 @@ export type AssembledAcceptanceInput = Readonly<{
   redactedKinds: readonly string[];
 }>;
 
+export type AcceptanceDiffSource = Readonly<{ commitSha: string; diff: string }>;
+export type AcceptanceDiffFile = Readonly<{
+  path: string;
+  commitSha: string;
+  category: AcceptancePathCategory;
+  text: string;
+  redactionCount: number;
+  redactedKinds: readonly string[];
+}>;
+export type AcceptanceLineReference = Readonly<{
+  reference: string;
+  commitSha: string;
+  path: string;
+  hunkId: string;
+  lineOccurrence: number;
+  text: string;
+  order: number;
+}>;
+export type RenderedAcceptanceFiles = Readonly<{
+  segments: readonly Readonly<{ name: string; content: string }>[];
+  sourceMap: ReadonlyMap<string, AcceptanceLineReference>;
+  redactionCount: number;
+  redactedKinds: readonly string[];
+}>;
+
 export type AcceptanceInputAssemblyResult =
   | Readonly<{ ok: true; value: AssembledAcceptanceInput }>
   | Readonly<{ ok: false; reason: "malformed_diff" }>;
@@ -208,6 +233,105 @@ function combineRepeatedPaths(files: readonly DiffFile[]): readonly DiffFile[] {
     existing.isBinary ||= file.isBinary;
   }
   return [...byPath.values()];
+}
+
+function combineSourceFiles(sources: readonly AcceptanceDiffSource[]): readonly Readonly<{ commitSha: string; file: DiffFile }>[] | null {
+  const combined: { commitSha: string; path: string; text: string; isBinary: boolean }[] = [];
+  for (const source of sources) {
+    const split = splitDiff(source.diff);
+    if (!split.ok) return null;
+    for (const file of split.files) {
+      const existing = combined.find((item) => item.commitSha === source.commitSha && item.path === file.path);
+      if (existing) {
+        existing.text += file.text;
+        existing.isBinary ||= file.isBinary;
+      } else {
+        combined.push({ commitSha: source.commitSha, ...file });
+      }
+    }
+  }
+  return combined.map(({ commitSha, path, text, isBinary }) => ({ commitSha, file: { path, text, isBinary } }));
+}
+
+/**
+ * Parse, redact, filter and order source-aware diff files. The legacy string-only helper
+ * below remains available for its existing callers and tests.
+ */
+export function prepareAcceptanceCheckFiles(
+  sources: readonly AcceptanceDiffSource[],
+  rules: AcceptancePathRules,
+): Readonly<{ ok: true; files: readonly AcceptanceDiffFile[] }> | Readonly<{ ok: false; reason: "malformed_diff" }> {
+  const combined = combineSourceFiles(sources);
+  if (!combined) return { ok: false, reason: "malformed_diff" };
+  const files = combined
+    .map(({ commitSha, file }) => {
+      const redaction = redactSecrets(file.text);
+      return { commitSha, path: file.path, text: redaction.text, redactionCount: redaction.redactionCount,
+        redactedKinds: redaction.kinds, isBinary: file.isBinary, category: classifyAcceptancePath(file.path, rules) };
+    })
+    .filter((file) => !file.isBinary && !isConfiguredPathExcluded(file.path, rules))
+    .sort((left, right) => {
+      const categoryDifference = CATEGORY_ORDER[left.category] - CATEGORY_ORDER[right.category];
+      if (categoryDifference) return categoryDifference;
+      if (left.path !== right.path) return left.path < right.path ? -1 : 1;
+      return left.commitSha < right.commitSha ? -1 : left.commitSha > right.commitSha ? 1 : 0;
+    })
+    .map(({ isBinary: _isBinary, ...file }) => file);
+  return { ok: true, files };
+}
+
+function splitLinesPreservingEndings(text: string): readonly string[] {
+  return text.match(/[^\n]*(?:\n|$)/g)?.filter((line) => line.length > 0) ?? [];
+}
+
+/** Render selected files with compact occurrence IDs and a server-only provenance map. */
+export function renderAcceptanceCheckFiles(files: readonly AcceptanceDiffFile[]): RenderedAcceptanceFiles {
+  const sourceMap = new Map<string, AcceptanceLineReference>();
+  let nextReference = 1;
+  let order = 0;
+  let pathRedactions = 0;
+  const segments = files.map((file, fileIndex) => {
+    let hunkNumber = 0;
+    let lineOccurrence = 0;
+    let inHunk = false;
+    const lines = splitLinesPreservingEndings(file.text).flatMap((line) => {
+      const occurrence = lineOccurrence++;
+      const content = line.endsWith("\n") ? line.slice(0, -1) : line;
+      if (content.startsWith("diff --git ")) {
+        inHunk = false;
+        return [];
+      }
+      if (content.startsWith("@@ ")) {
+        inHunk = true;
+        hunkNumber += 1;
+        return [line];
+      }
+      const isEndOfFileMarker = content.startsWith("\\ No newline at end of file");
+      const isMeaningfulMetadata = content.startsWith("rename from ") || content.startsWith("copy from ") ||
+        content.startsWith("old mode ") || content.startsWith("new mode ") ||
+        content.startsWith("new file mode ") || content.startsWith("deleted file mode ") ||
+        content === "--- /dev/null" || content === "+++ /dev/null";
+      if (!inHunk && !isMeaningfulMetadata) return [];
+      const isPatchContent = inHunk && (content.startsWith("+") || content.startsWith("-") ||
+        content.startsWith(" ") || isEndOfFileMarker);
+      if (!isPatchContent && !isMeaningfulMetadata) return [line];
+      const reference = `L${nextReference++}`;
+      sourceMap.set(reference, { reference, commitSha: file.commitSha, path: file.path,
+        hunkId: inHunk ? `H${hunkNumber}` : "META", lineOccurrence: occurrence, text: content, order: order++ });
+      const ending = line.endsWith("\n") ? "\n" : "";
+      return [`[[${reference}]] ${content}${ending}`];
+    });
+    const safePath = redactSecrets(file.path);
+    pathRedactions += safePath.redactionCount;
+    return { name: `file-${String(fileIndex + 1).padStart(4, "0")}`,
+      content: `FILE path=${safePath.text} commit=${file.commitSha}\n${lines.join("")}` };
+  });
+  const redactedKinds = [...new Set([
+    ...files.flatMap((file) => file.redactedKinds),
+    ...files.flatMap((file) => redactSecrets(file.path).kinds),
+  ])];
+  return { segments, sourceMap, redactionCount: files.reduce((sum, file) => sum + file.redactionCount, 0) + pathRedactions,
+    redactedKinds };
 }
 
 /**

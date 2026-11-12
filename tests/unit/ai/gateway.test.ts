@@ -89,6 +89,7 @@ class Harness {
   adapter(): LlmAdapter {
     const fake = new FakeAdapter(this.script);
     return {
+      getCapabilities: () => fake.getCapabilities(),
       complete: async (request: LlmRequest): Promise<LlmResult> => {
         this.events.push("adapter");
         this.requests.push(structuredClone(request) as LlmRequest);
@@ -586,6 +587,7 @@ type Step = FakeOutcome | "throw" | { clockDelta: number; outcome: FakeOutcome }
 function scriptedAdapter(harness: Harness, steps: readonly Step[]): LlmAdapter {
   let index = 0;
   return {
+    getCapabilities: () => new FakeAdapter([]).getCapabilities(),
     complete: async (sent: LlmRequest): Promise<LlmResult> => {
       harness.events.push("adapter");
       harness.requests.push(structuredClone(sent) as LlmRequest);

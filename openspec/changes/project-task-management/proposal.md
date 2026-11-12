@@ -10,9 +10,9 @@ Small software teams lose time to status reporting: product managers chase devel
 - People sign in with GitHub, so each developer's GitHub identity is verified.
 - Product managers create, edit, reassign, and delete tasks with acceptance criteria. Tasks move through To Do, In Progress, In Review, and Done, and only the product manager can approve a task or request changes.
 - The product manager links one GitHub repository to the project. Developers pick their own commits from it with a commit picker instead of pasting links.
-- **Developer AI feature: Acceptance Criteria Check.** For each criterion, the AI reports addressed, not addressed, or unclear, with evidence quoted from the diff, plus possible gaps. There is no numeric score. The latest result is attached to the submission for the product manager.
+- **Developer AI feature: Acceptance Criteria Check.** For each criterion, the AI reports addressed, not addressed, or unclear, plus possible gaps. The model cites compact diff-line references; the server verifies them and builds file/commit-grouped excerpts with safe verification diagnostics. New results use a versioned cache contract, while historical flat evidence remains readable. Evidence wraps within the UI. There is no numeric score. The latest matching result is attached to the submission for the product manager.
 - **Product manager AI feature: Progress Report.** An on-demand summary for a date range (default: today, SGT) built from structured activity, with every statement citing task IDs.
-- AI safeguards for both features: untrusted-input handling, secret redaction, output validation, per-person quotas, and usage logging.
+- AI safeguards for both features: untrusted-input handling, secret redaction, output validation, per-person quotas, and usage logging. Acceptance-check schema/evidence correction shares a two-call maximum and a complete 48,000-character prompt budget with 2,000 output tokens. Capability/context preflight and database-backed per-key permits bound every provider call, including retries.
 - Shared interaction feedback: actions that wait for a request or navigation show a trailing loading indicator while they are in progress.
 
 ## Capabilities
@@ -42,3 +42,7 @@ None.
 - Separate development and production environments (database, deployment, credentials).
 - A GitHub Actions workflow that runs without repository secrets, plus branch protection on `master` configured by a human.
 - No existing OpenSpec capability specs are present to modify.
+
+## Approved evidence follow-up scope (12 November 2026)
+
+The human approved the compact-reference evidence contract, versioned history/cache behavior, bounded correction, distributed provider-key limiter/new migration, and wrapping file-grouped UI. Preserve existing task state authority and module boundaries. Task-specific removal of logs from selected commits is excluded. Hosted migration execution, deployment and git history changes are not authorized by this follow-up. See the approved design revision and unchecked follow-up tasks for remaining verification and human review.
