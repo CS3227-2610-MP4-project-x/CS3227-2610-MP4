@@ -6,8 +6,8 @@
 - Summary: Remove ambiguity between displayed diff reference wrappers and bare source-map keys, and prevent old cached checks from being reused after the prompt/validator contract changes.
 - Human owner: Developer A (Lim-ZY)
 - Requirement IDs: Existing active OpenSpec Acceptance Criteria Check requirements; no new externally assigned backlog ID.
-- Status: Implemented and independently reviewed; existing test fixtures need follow-up updates.
-- Next human action: Review the result and decide when to refresh/run the affected tests.
+- Status: Implemented, independently reviewed, and affected unit tests updated.
+- Next human action: Review the test changes; no further action is needed for the Vite warning because it does not fail tests.
 
 ## Source and scope
 
@@ -48,10 +48,10 @@
 ## Consolidated outcome
 
 - Changed files and rationale: `input.ts` now renders bare `L<number>` references. `service.ts` asks the model to return bare IDs, accepts only exact legacy `[[L<number>]]` wrappers whose inner IDs exist in the current source map, uses a true end-of-input check, and salts the cache key with independent `evidenceReferenceVersion: 2` while retaining DTO version 2. Temporary development logging and cache bypass are absent. Proposal/design/spec/task artifacts record the approved contract; task 12.2 is checked complete.
-- Tests/checks and results: No tests were added, updated, or run under the higher-priority instruction for this turn. `npx tsc --noEmit` passed; scoped ESLint for both changed server files passed. Strict OpenSpec validation exited 1 on pre-existing long-requirement warnings across active specs. `git diff --check` found trailing whitespace in the unrelated user-guide edit, which was preserved.
+- Tests/checks and results: After the follow-up request to resolve the unit-test error, `tests/unit/completion-assessment/service.test.ts` and `tests/unit/completion-assessment/input.test.ts` were updated and all 198 tests in those files passed. Scoped ESLint and scoped `git diff --check` passed. `npx tsc --noEmit` and scoped server ESLint had passed for the implementation. Full `npm test` still has 28 unrelated environment failures in `guard-write-scope.test.ts` and `environment-configuration.test.ts` because child `git` processes fail with `EPERM` in this sandbox; 2,449 other tests passed. OpenSpec validation passed with pre-existing long-requirement warnings.
 - Generated artifacts: Implementer produced `/tmp/acceptance-reference-format-fix-diff.html` for visual inspection; no repository-generated artifacts.
 - Dependencies added: None.
-- Known gaps and unverified items: Independent review found existing service/input test fixtures still encode the old wrapper and cache hash, so those fixtures likely need updating before the affected suite passes. This is inspection-only; tests were not run. No live provider call was made. Exact historical raw invalid references remain unavailable.
+- Known gaps and unverified items: Full-suite environment tests requiring child `git` execution could not pass in this sandbox; this does not affect the two updated completion-assessment test files, which passed. No live provider call was made. Exact historical raw invalid references remain unavailable.
 - Reviewer findings: The reviewer initially found that JavaScript `$` could accept a final newline; implementer replaced it with a true end-of-input assertion, and reviewer confirmed the issue resolved. Review also identified the stale test fixtures noted above. No implementation findings remain.
 - Next action and responsible human: Developer A reviews the code and determines when the affected tests can be updated and run.
 
@@ -60,4 +60,5 @@
 | Date/time (SGT) | Role/session | Update |
 |---|---|---|
 | 2026-11-12 | orchestrator / root | Recorded approved narrow scope and ownership. |
-| 2026-11-12 | implementer / reviewer | Implemented bare references, strict known-wrapper compatibility and independent cache version; removed no additional diagnostics because they were already absent. Type/lint passed; reviewer confirmed strict end-of-input matching and reported stale test fixtures. |
+| 2026-11-12 | implementer / reviewer | Implemented bare references, strict known-wrapper compatibility and independent cache version; reviewer confirmed strict end-of-input matching and identified stale test fixtures. |
+| 2026-11-12 | test-writer / root | Updated completion-assessment service/input fixtures to the new prompt and cache contract; 198 affected tests passed. Full suite had 28 unrelated sandbox `EPERM` failures; no provider call. |
