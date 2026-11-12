@@ -8,6 +8,7 @@ const boundary = vi.hoisted(() => ({
   createRequestSupabaseClient: vi.fn(),
 }));
 
+vi.mock("server-only", () => ({}));
 vi.mock("@/server/composition", () => ({ getServerComposition: boundary.getServerComposition }));
 vi.mock("@/server/auth/supabase-auth", () => ({ createRequestSupabaseClient: boundary.createRequestSupabaseClient }));
 

@@ -336,6 +336,44 @@ describe("GitHub sign-in through server-side Supabase Auth", () => {
   });
 });
 
+describe("sign-in failure logging", () => {
+  it("logs which configuration variable is invalid, once, without any configured value", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubEnv("APP_ENV", "staging");
+    const { GET } = await import("../../src/app/api/v1/auth/sign-in/route");
+
+    const response = await GET(new NextRequest(`${appOrigin}/api/v1/auth/sign-in`));
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      error: { code: "AUTHENTICATION_FAILED", message: "Sign-in could not be started." },
+    });
+    expect(consoleError).toHaveBeenCalledOnce();
+    const line = String(consoleError.mock.calls[0][0]);
+    expect(line).toContain("server configuration");
+    expect(line).toContain("APP_ENV");
+    for (const value of ["staging", "synthetic-github-app-client-secret", "synthetic-private-key", "sb_publishable_synthetic_test_key"]) {
+      expect(line).not.toContain(value);
+    }
+    consoleError.mockRestore();
+  });
+
+  it("logs an unexpected sign-in start failure and keeps the generic response", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    boundary.signInWithOAuth.mockRejectedValueOnce(new Error("Synthetic Supabase failure"));
+    const { GET } = await import("../../src/app/api/v1/auth/sign-in/route");
+
+    const response = await GET(new NextRequest(`${appOrigin}/api/v1/auth/sign-in`));
+
+    expect(response.status).toBe(500);
+    expect(consoleError).toHaveBeenCalledOnce();
+    expect(String(consoleError.mock.calls[0][0])).toBe(
+      "[server] GitHub sign-in start failed: Error: Synthetic Supabase failure",
+    );
+    consoleError.mockRestore();
+  });
+});
+
 describe("server configuration inventory (design E5)", () => {
   it.each([
     "sslmode=disable",
