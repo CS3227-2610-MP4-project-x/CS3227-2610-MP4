@@ -215,9 +215,9 @@ dbDescribe("submission tip lookup against stored rows (task 4.3, F3 and F5)", ()
       })),
     };
     const ordered = [...read!.criteria].sort((x, y) => x.position - y.position || (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
-    const answer = { anchorSha: tip, criteria: ordered.map((criterion) => ({
-      criterionId: criterion.id, criterion: criterion.description, status: "unclear", evidence: [],
-    })), possibleGaps: [], omittedFiles: [] };
+    const answer = { criteria: ordered.map((criterion) => ({
+      criterionId: criterion.id, status: "unclear", evidenceRefs: [],
+    })), possibleGaps: [] };
     const usage: UsagePort = {
       reserve: vi.fn(async () => ({ ok: true as const, usageRecordId: "synthetic-usage" })),
       settle: vi.fn(async () => {}), recordCacheHit: vi.fn(async () => {}),

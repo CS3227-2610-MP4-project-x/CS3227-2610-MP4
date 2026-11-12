@@ -1,8 +1,8 @@
 import type { AiEnvironment, AiLimits } from "./limits";
-import type { LlmAdapter, LlmFailureCategory, LlmMessage, LlmRequest, LlmResult, LlmUsage } from "./llm-adapter";
-import { validateOutput, type OutputValidation, type OutputValidator } from "./output";
+import type { LlmAdapter, LlmFailureCategory, LlmMessage, LlmRequest, LlmResult, LlmUsage, ProviderCapabilities } from "./llm-adapter";
+import { validateOutput, type OutputCorrectionIssue, type OutputValidation, type OutputValidator } from "./output";
 import { buildPrompt, type PromptSegment, type RedactionSummary } from "./prompt";
-import type { AiFeature, UsagePort, UsageSettlement } from "./usage-port";
+import type { AiFeature, ProviderCallPermitPort, UsagePort, UsageSettlement } from "./usage-port";
 
 // LLM gateway (LLM Gateway Decisions G1-G9, Task 6.3 handoff decisions Q1-Q4). Builds the
 // prompt, reserves usage, calls the adapter at most twice (one retry on invalid output),
@@ -17,6 +17,8 @@ export type GatewayRequest<T> = Readonly<{
   segments: readonly PromptSegment[];
   maxOutputTokens: number;
   validate: OutputValidator<T>;
+  maxSerializedCharacters?: number;
+  correctionFeedbackLimit?: number;
 }>;
 
 export type GatewayErrorCode = "RATE_LIMITED" | "QUOTA_EXCEEDED" | "AI_UNAVAILABLE" | "AI_ERROR" | "INVALID_OUTPUT";
@@ -33,12 +35,15 @@ export type LlmGatewayOptions = Readonly<{
   environment: AiEnvironment;
   limits: AiLimits;
   now?: () => number;
+  providerCallPermits?: ProviderCallPermitPort;
+  providerKeyFingerprint?: string;
 }>;
 
 export type CacheHitInput = Readonly<{ feature: AiFeature; projectId: string; personId: string }>;
 
 const CHARACTERS_PER_TOKEN = 3;
 const MAX_CALLS = 2;
+const CONTEXT_FRAMING_ALLOWANCE = 1_024;
 // Segment names are code constants (G1, review decision S3).
 const SEGMENT_NAME = /^[a-z][a-z0-9_-]{0,63}$/;
 
@@ -58,9 +63,45 @@ function elapsedMs(started: number, ended: number): number {
   return Math.max(0, Math.round(ended - started));
 }
 
-function callMaximum(messages: readonly LlmMessage[], maxOutputTokens: number): number {
-  const characters = messages.reduce((total, message) => total + message.content.length, 0);
+function callMaximum(characters: number, maxOutputTokens: number): number {
   return Math.ceil(characters / CHARACTERS_PER_TOKEN) + maxOutputTokens;
+}
+
+function promptCharacters(messages: readonly LlmMessage[]): number {
+  return messages.reduce((total, message) => total + message.content.length, 0);
+}
+
+function isPositiveSafeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+}
+
+function validCapabilities(value: unknown): value is ProviderCapabilities {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return isPositiveSafeInteger(record.contextTokens) && isPositiveSafeInteger(record.requestsPerMinute) &&
+    typeof record.sharedKeyLimit === "boolean";
+}
+
+function correctionText(issues: readonly OutputCorrectionIssue[], limit: number): string {
+  const valid = issues.filter((issue) =>
+    (issue.criterionId === undefined || /^[A-Za-z0-9_-]{1,128}$/.test(issue.criterionId)) &&
+    ["unknown_reference", "missing_evidence", "schema_invalid"].includes(issue.reasonCode),
+  );
+  const safeIssues = valid.length > 0 ? valid : [{ reasonCode: "schema_invalid" as const }];
+  const textFor = (items: readonly OutputCorrectionIssue[]) => items
+    .map((issue) => `${issue.criterionId ? `criterionId=${issue.criterionId} ` : ""}reasonCode=${issue.reasonCode}`)
+    .join("\n");
+  let text = textFor(safeIssues);
+  while (text.length > limit && safeIssues.length > 1) {
+    safeIssues.pop();
+    text = textFor(safeIssues);
+  }
+  return text.length <= limit ? text : "reasonCode=schema_invalid";
+}
+
+function contextFits(messages: readonly LlmMessage[], maxOutputTokens: number, capabilities: ProviderCapabilities): boolean {
+  const bytes = messages.reduce((total, message) => total + Buffer.byteLength(message.content, "utf8"), 0);
+  return bytes + maxOutputTokens + CONTEXT_FRAMING_ALLOWANCE <= capabilities.contextTokens;
 }
 
 function providerFailureCode(category: LlmFailureCategory): GatewayErrorCode {
@@ -105,6 +146,8 @@ export class LlmGateway {
   readonly #environment: AiEnvironment;
   readonly #limits: AiLimits;
   readonly #now: () => number;
+  readonly #providerCallPermits: ProviderCallPermitPort | undefined;
+  readonly #providerKeyFingerprint: string | undefined;
 
   constructor(options: LlmGatewayOptions) {
     this.#adapter = options.adapter;
@@ -112,20 +155,30 @@ export class LlmGateway {
     this.#environment = options.environment;
     this.#limits = options.limits;
     this.#now = options.now ?? Date.now;
+    this.#providerCallPermits = options.providerCallPermits;
+    this.#providerKeyFingerprint = options.providerKeyFingerprint;
   }
 
   async run<T>(request: GatewayRequest<T>): Promise<GatewayResult<T>> {
     assertValidRequest(request);
-    const prompt = buildPrompt(request.instructions, request.segments);
-    const llmRequest: LlmRequest = { messages: prompt.messages, maxOutputTokens: request.maxOutputTokens };
-    const perCallMaximum = callMaximum(prompt.messages, request.maxOutputTokens);
+    let correction: string | undefined;
+    let prompt = buildPrompt(request.instructions, request.segments);
+    const feedbackLimit = request.correctionFeedbackLimit ?? 0;
+    const serializedCharacterLimit = request.maxSerializedCharacters;
+    if (serializedCharacterLimit !== undefined &&
+        promptCharacters(prompt.messages) + feedbackLimit > serializedCharacterLimit) {
+      return failure("AI_UNAVAILABLE");
+    }
+    const baseCharacters = promptCharacters(prompt.messages);
+    const baseMaximum = callMaximum(baseCharacters, request.maxOutputTokens);
+    const retryMaximum = callMaximum(baseCharacters + feedbackLimit, request.maxOutputTokens);
 
     const reservation = await this.#usage.reserve({
       feature: request.feature,
       projectId: request.projectId,
       personId: request.personId,
       environment: this.#environment,
-      reservedTokens: MAX_CALLS * perCallMaximum,
+      reservedTokens: baseMaximum + retryMaximum,
       limits: this.#limits,
     });
     if (!reservation.ok) {
@@ -139,6 +192,44 @@ export class LlmGateway {
       this.#usage.settle({ usageRecordId: reservation.usageRecordId, outcome, ...totals });
 
     for (let call = 0; call < MAX_CALLS; call += 1) {
+      if (correction !== undefined) {
+        prompt = buildPrompt(request.instructions, [...request.segments, { name: "correction-feedback", content: correction }]);
+      }
+      if (serializedCharacterLimit !== undefined && promptCharacters(prompt.messages) > serializedCharacterLimit) {
+        await settle("provider_error");
+        return failure("AI_UNAVAILABLE");
+      }
+      let capabilities: ProviderCapabilities;
+      try {
+        capabilities = await this.#adapter.getCapabilities();
+      } catch {
+        await settle("provider_error");
+        return failure("AI_UNAVAILABLE");
+      }
+      if (!validCapabilities(capabilities) || !contextFits(prompt.messages, request.maxOutputTokens, capabilities)) {
+        await settle("provider_error");
+        return failure("AI_UNAVAILABLE");
+      }
+      if (capabilities.sharedKeyLimit) {
+        if (!this.#providerCallPermits || !this.#providerKeyFingerprint ||
+            !/^[a-f0-9]{64}$/.test(this.#providerKeyFingerprint)) {
+          await settle("provider_error");
+          return failure("AI_UNAVAILABLE");
+        }
+        let permitted: boolean;
+        try {
+          permitted = await this.#providerCallPermits.acquire(this.#providerKeyFingerprint, capabilities.requestsPerMinute);
+        } catch {
+          await settle("provider_error");
+          return failure("AI_UNAVAILABLE");
+        }
+        if (!permitted) {
+          await settle("provider_error");
+          return failure("AI_UNAVAILABLE");
+        }
+      }
+      const llmRequest: LlmRequest = { messages: prompt.messages, maxOutputTokens: request.maxOutputTokens };
+      const perCallMaximum = call === 0 ? baseMaximum : retryMaximum;
       const started = this.#now();
       let result: LlmResult;
       try {
@@ -166,6 +257,22 @@ export class LlmGateway {
       if (validated.ok) {
         await settle("succeeded");
         return { ok: true, value: validated.value, model: result.model, redaction: prompt.redaction };
+      }
+      if (call === MAX_CALLS - 1 && validated.fallback !== undefined) {
+        await settle("succeeded");
+        return { ok: true, value: validated.fallback, model: result.model, redaction: prompt.redaction };
+      }
+      if (call === 0 && validated.correction) {
+        const emptyCorrectionPrompt = buildPrompt(request.instructions, [
+          ...request.segments, { name: "correction-feedback", content: "" },
+        ]);
+        const envelopeCharacters = promptCharacters(emptyCorrectionPrompt.messages) - baseCharacters;
+        const text = correctionText(validated.correction, Math.max(0, feedbackLimit - envelopeCharacters));
+        if (text.length <= 0 || text.length > feedbackLimit) {
+          await settle("provider_error");
+          return failure("AI_ERROR");
+        }
+        correction = text;
       }
     }
 

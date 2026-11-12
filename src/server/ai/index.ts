@@ -10,13 +10,14 @@ export type {
   LlmResult,
   LlmSuccess,
   LlmUsage,
+  ProviderCapabilities,
 } from "./llm-adapter";
 export { FakeAdapter, type FakeOutcome } from "./fake-adapter";
 export { redactSecrets, type RedactionResult } from "./redaction";
 export { SoclaasAdapter, type SoclaasAdapterOptions } from "./soclaas-adapter";
 export { AI_LIMITS, type AiEnvironment, type AiLimits } from "./limits";
 export { buildPrompt, sanitizePromptData, type PromptSegment, type RedactionSummary } from "./prompt";
-export type { OutputValidation, OutputValidator } from "./output";
+export type { OutputCorrectionIssue, OutputValidation, OutputValidator } from "./output";
 export type {
   AiFeature,
   UsageCacheHit,
@@ -24,6 +25,7 @@ export type {
   UsageReservation,
   UsageReservationResult,
   UsageSettlement,
+  ProviderCallPermitPort,
 } from "./usage-port";
 export {
   LlmGateway,

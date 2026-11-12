@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
 import { Pool } from "pg";
 import { AI_LIMITS, FakeAdapter, LlmGateway, SoclaasAdapter, type LlmAdapter } from "@/server/ai";
 import { getServerConfig, type AiConfig } from "@/server/config";
@@ -17,6 +18,7 @@ import {
   GitHubRepositoryLinkService,
 } from "@/server/github-repository-link";
 import { UsageRepository } from "@/server/repositories/usage-repository";
+import { ProviderCallRepository } from "@/server/repositories/provider-call-repository";
 import {
   CompletionAssessmentRepository,
   CompletionAssessmentService,
@@ -92,11 +94,17 @@ export function getServerComposition(): ServerComposition {
   const githubEvidenceRepository = new GitHubEvidenceRepository(pool);
   const githubEvidenceAdapter = new GitHubAppAdapter({ appId: config.githubAppId, privateKey: config.githubAppPrivateKey });
   const githubEvidenceService = new GitHubEvidenceService(githubEvidenceRepository, githubEvidenceAdapter);
+  const providerCallPermits = config.ai.provider === "soclaas" ? new ProviderCallRepository(pool) : undefined;
+  const providerKeyFingerprint = config.ai.provider === "soclaas"
+    ? createHash("sha256").update(config.ai.apiKey, "utf8").digest("hex")
+    : undefined;
   const llmGateway = new LlmGateway({
     adapter: createLlmAdapter(config.ai),
     usage: new UsageRepository(pool),
     environment: config.appEnvironment,
     limits: AI_LIMITS[config.appEnvironment],
+    providerCallPermits,
+    providerKeyFingerprint,
   });
   const taskSnapshotService = new TaskSnapshotService(new TaskSnapshotRepository(pool));
   const completionAssessmentService = new CompletionAssessmentService({
