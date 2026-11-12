@@ -33,6 +33,9 @@ import { ReviewQueueRepository, ReviewQueueService } from "@/server/review-queue
 import { ProjectDashboardRepository, ProjectDashboardService } from "@/server/project-dashboard";
 import { createProgressReportGenerationService, createProgressReportRepository, createProgressReportService, createReportCacheRepository } from "@/server/progress-report";
 import { createProjectAiUsageRepository, createProjectAiUsageService, ProjectAiUsageError } from "@/server/project-ai-usage";
+import { resolveE2EExecution } from "@/server/test-support/controls";
+import { E2ELlmAdapter } from "@/server/test-support/e2e-llm-adapter";
+import { E2EGitHubAdapter } from "@/server/test-support/e2e-github-adapter";
 
 export type ServerComposition = Readonly<{
   authService: AuthService;
@@ -60,6 +63,7 @@ let composition: ServerComposition | undefined;
 
 // E3, G10: the adapter is selected by AI_PROVIDER.
 function createLlmAdapter(ai: AiConfig): LlmAdapter {
+  if (resolveE2EExecution(process.env)) return new E2ELlmAdapter();
   return ai.provider === "soclaas" ? new SoclaasAdapter({ apiKey: ai.apiKey, model: ai.model }) : new FakeAdapter();
 }
 
@@ -73,7 +77,7 @@ export function getServerComposition(): ServerComposition {
   databaseUrl.searchParams.delete("sslmode");
   const pool = new Pool({
     connectionString: databaseUrl.toString(),
-    ssl: { ca: config.databaseCaCert, rejectUnauthorized: true },
+    ssl: resolveE2EExecution(process.env) ? false : { ca: config.databaseCaCert, rejectUnauthorized: true },
   });
   const peopleRepository = new PeopleRepository(pool);
   const projectAccessRepository = new ProjectAccessRepository(pool);
@@ -94,7 +98,9 @@ export function getServerComposition(): ServerComposition {
     config,
   );
   const githubEvidenceRepository = new GitHubEvidenceRepository(pool);
-  const githubEvidenceAdapter = new GitHubAppAdapter({ appId: config.githubAppId, privateKey: config.githubAppPrivateKey });
+  const githubEvidenceAdapter = resolveE2EExecution(process.env)
+    ? new E2EGitHubAdapter()
+    : new GitHubAppAdapter({ appId: config.githubAppId, privateKey: config.githubAppPrivateKey });
   const githubEvidenceService = new GitHubEvidenceService(githubEvidenceRepository, githubEvidenceAdapter);
   const providerCallPermits = config.ai.provider === "soclaas" ? new ProviderCallRepository(pool) : undefined;
   const providerKeyFingerprint = config.ai.provider === "soclaas"

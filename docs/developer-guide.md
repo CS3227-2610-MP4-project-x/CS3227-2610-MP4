@@ -463,3 +463,28 @@ docker stop mp4-it-pg
 Set `TEST_DATABASE_URL` in the shell that runs the tests, as shown above. The tests read it from the process environment, and Vitest does not load `.env.local` into it, so a value placed there is ignored.
 
 The container's `postgres` credential is a throwaway value, used only inside that local container. When `TEST_DATABASE_URL` is unset, the integration suites are skipped with a message. CI runs the same tests in the `db-integration` job, against a `postgres:17` service container.
+
+## Browser role journeys
+
+Task 9.2 runs six Chromium journeys against a fresh, synthetic PostgreSQL database: the developer workflow, PM create/review/report workflow, acceptance-check failure and recovery, report failure and recovery, direct authorization denial, and synthetic sign-out. The launcher creates a uniquely named database, applies the checked-in migrations, and runs Next.js in development mode as `app_runtime`. Authentication, GitHub evidence, and AI responses use guarded synthetic test adapters; project membership, authorization, request handlers, repositories, and task transitions remain real. This does not verify deployed OAuth or deployed-provider behavior; those checks remain in task 9.4.
+
+Use a dedicated local PostgreSQL cluster bound to loopback. Do not point `E2E_CLUSTER_ADMIN_URL` at Supabase, the integration-test cluster, or another shared database. For Windows, choose a new temporary directory and a port unused on your machine. The example below uses PostgreSQL 18 tools available on PATH; adjust `PG_BIN` to the installed PostgreSQL `bin` directory.
+
+```powershell
+$e2eData = Join-Path $env:TEMP "mp4-e2e-9-2"
+$PG_BIN = "C:\Program Files\PostgreSQL\18\bin"
+if (Test-Path -LiteralPath $e2eData) { throw "Choose a fresh E2E directory; this command will not overwrite or delete existing data." }
+New-Item -ItemType Directory -Path $e2eData | Out-Null
+& (Join-Path $PG_BIN "initdb.exe") -D (Join-Path $e2eData "pgdata") -U e2e_operator -A trust --no-locale
+& (Join-Path $PG_BIN "pg_ctl.exe") -D (Join-Path $e2eData "pgdata") -l (Join-Path $e2eData "postgres.log") -o "-h 127.0.0.1 -p 55492" start
+$env:E2E_CLUSTER_ADMIN_URL = "postgresql://e2e_operator@127.0.0.1:55492/postgres"
+$bytes = New-Object byte[] 32
+[System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+$env:E2E_SESSION_SECRET = [Convert]::ToHexString($bytes)
+npm.cmd run test:e2e
+& (Join-Path $PG_BIN "pg_ctl.exe") -D (Join-Path $e2eData "pgdata") stop
+```
+
+If a command fails, stop the cluster with `pg_ctl.exe ... stop` before retrying. The launcher fails if the admin URL is missing or does not use loopback. It creates a fresh database per run and keeps it inside the disposable cluster; stopping that cluster ends its availability. Playwright trace capture is disabled. CI retains only failure screenshots and `error-context.md` files under `test-results/`; trace archives are not uploaded.
+
+CI runs the same browser command in the separate `e2e-role-journeys` job against its own PostgreSQL service. It uses synthetic signing material and no production database, Supabase Auth, GitHub OAuth, or SoC LLM credentials. CI retains bounded Playwright failure artifacts for 14 days.
