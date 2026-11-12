@@ -26,9 +26,9 @@ function file(path: string, change: string) {
 }
 const diff = file("core/validate.ts", "validate(input);");
 function hash(text: string) { return createHash("sha256").update(text, "utf8").digest("hex"); }
-function versionedRules(value = rules) { return hash(JSON.stringify({ assessmentVersion: 2, pathRulesHash: hash(JSON.stringify(value)) })); }
+function versionedRules(value = rules) { return hash(JSON.stringify({ assessmentVersion: 2, evidenceReferenceVersion: 2, pathRulesHash: hash(JSON.stringify(value)) })); }
 function references(request: LlmRequest, text = "+validate(input);") {
-  return request.messages.flatMap((message) => [...message.content.matchAll(/\[\[([^\]]+)\]\] ([^\n]*)/g)])
+  return request.messages.flatMap((message) => [...message.content.matchAll(/^(L\d+) \| ([^\n]*)/gm)])
     .filter((match) => match[2] === text).map((match) => match[1]);
 }
 function modelOutput(refs: string[] = []) {
@@ -108,10 +108,14 @@ describe("version 2 check orchestration and reuse", () => {
     expect(h.repository.findReusable.mock.calls[0][0].pathRulesHash).toBe(versionedRules());
     expect(h.usage.recordCacheHit).toHaveBeenCalledOnce();
   });
-  it("does not reuse the old canonical path-rules fingerprint", async () => {
+  it.each([
+    ["unversioned", hash(JSON.stringify(rules))],
+    ["previous evidence-reference version", hash(JSON.stringify({ assessmentVersion: 2, pathRulesHash: hash(JSON.stringify(rules)) }))],
+  ])("does not reuse the %s path-rules fingerprint", async (_label, oldFingerprint) => {
     const h = harness();
-    h.repository.findReusable.mockImplementation(async (key) => key.pathRulesHash === hash(JSON.stringify(rules)) ? check() : null);
+    h.repository.findReusable.mockImplementation(async (key) => key.pathRulesHash === oldFingerprint ? check() : null);
     expect((await run(h)).reused).toBe(false); expect(h.writes).toHaveLength(1);
+    expect(h.writes[0].payload.assessmentVersion).toBe(2);
   });
   it("normalizes rules before applying the version fingerprint", async () => {
     const h = harness(); h.evidence.loadPathRules.mockResolvedValue(JSON.stringify({ ...rules, domainLogic: ["z/", "core/", "z/"] }));
@@ -147,6 +151,28 @@ describe("version 2 check orchestration and reuse", () => {
 });
 
 describe("occurrence evidence and bounded correction", () => {
+  it("accepts exact former wrappers for known IDs and stores canonical references", async () => {
+    const h = harness([(request) => success(modelOutput(references(request).map((reference) => `[[${reference}]]`)))]);
+    await run(h);
+    expect(h.complete).toHaveBeenCalledOnce();
+    expect(h.writes[0].payload.criteria[0]).toMatchObject({ status: "addressed", verification: { state: "verified", reasonCodes: [] } });
+    expect(excerpts(h.writes[0].payload)).toEqual([{ reference: "L2", text: "+validate(input);" }]);
+  });
+  it.each([
+    ["unknown ID", () => "[[L999999]]"],
+    ["partial wrapper", (reference: string) => `[[${reference}]`],
+    ["repeated wrapper", (reference: string) => `[[[[${reference}]]]]`],
+    ["leading whitespace", (reference: string) => ` [[${reference}]]`],
+    ["trailing whitespace", (reference: string) => `[[${reference}]] `],
+    ["trailing newline", (reference: string) => `[[${reference}]]\n`],
+  ] as const)("keeps a former wrapper with %s unresolved", async (_label, alterReference) => {
+    const invalid: Step = (request) => success(modelOutput(references(request).map(alterReference)));
+    const h = harness([invalid, invalid]);
+    await run(h);
+    expect(h.complete).toHaveBeenCalledTimes(2);
+    expect(h.writes[0].payload.criteria[0]).toMatchObject({ status: "unclear", modelStatus: "addressed",
+      verification: { state: "downgraded", reasonCodes: ["unknown_reference", "missing_evidence"] }, evidenceFiles: [] });
+  });
   it.each(["files", "commits", "same hunk", "other hunk"])("accepts repeated identical lines across %s", async (location) => {
     const h = harness(); h.evidence.fetchDiff.mockImplementation(async (_repository, sha) => {
       if (location === "commits") return diff;
@@ -232,9 +258,11 @@ describe("necessary data and complete serialized input budget", () => {
     const h = harness(); await run(h);
     const request = h.complete.mock.calls[0][0], user = request.messages.find((m) => m.role === "user")!.content;
     expect(user).toMatch(/<data name="file-\d+">/); expect(user).toContain(`FILE path=core/validate.ts commit=${shaA}`);
-    expect(user).toMatch(/\[\[L\d+\]\] \+validate\(input\);/);
+    expect(user).toMatch(/^L\d+ \| \+validate\(input\);/m);
+    expect(user).not.toMatch(/\[\[L\d+\]\]/);
     expect(user).not.toContain("diff --git"); expect(user).not.toContain("--- a/"); expect(user).not.toContain("+++ b/");
     const system = request.messages.find((m) => m.role === "system")!.content;
+    expect(system).toContain("bare compact IDs"); expect(system).toContain("Return only L12");
     for (const field of ["criterionId", "status", "evidenceRefs", "possibleGaps"]) expect(system).toContain(field);
     expect(h.writes[0].payload.criteria[0].evidence).toEqual([]);
   });
