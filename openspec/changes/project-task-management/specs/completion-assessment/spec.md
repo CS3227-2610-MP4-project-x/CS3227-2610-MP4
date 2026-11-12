@@ -7,10 +7,11 @@ Defines the Acceptance Criteria Check: the developer's AI feature, which assesse
 ## ADDED Requirements
 
 ### Requirement: Developer runs an acceptance criteria check
-The system SHALL allow the assigned developer to run an AI check of the task's attached commits against each acceptance criterion. The model input SHALL identify each criterion by its stable criterion ID and text. The validated result payload SHALL have exactly this shape: `{ "anchorSha": string, "criteria": [{ "criterionId": string, "criterion": string, "status": "addressed" | "not_addressed" | "unclear", "evidence": string[] }], "possibleGaps": string[], "omittedFiles": string[] }`. Each current criterion SHALL appear exactly once, associated by its ID. Each evidence entry SHALL exactly equal one line from the assessed diff. The result SHALL list possible gaps, such as missing tests or unhandled edge cases. The result SHALL NOT contain a numeric score. A check SHALL NOT approve, reject, submit, or change the task state.
+The system SHALL allow the assigned developer to run an AI check of the task's attached commits against each acceptance criterion. The model input SHALL identify each criterion by its stable criterion ID and text. The model SHALL return exactly `{ "criteria": [{ "criterionId": string, "status": "addressed" | "not_addressed" | "unclear", "evidenceRefs": string[] }], "possibleGaps": string[] }`. Each current criterion SHALL appear exactly once, associated by its ID. The model SHALL NOT echo criterion text, diff code, file paths, anchor SHA, or omitted-file metadata. The server SHALL construct those fields from its assessed input.
 
-Unknown, duplicate, or missing criterion IDs SHALL make model output invalid. The system SHALL use the LLM gateway's existing schema-validation retry. If output remains invalid after that retry, the request SHALL fail with HTTP 502 `INVALID_OUTPUT` and SHALL NOT create a check result.
+New validated results SHALL have exactly `{ "assessmentVersion": 2, "anchorSha": string, "criteria": [{ "criterionId": string, "criterion": string, "status": "addressed" | "not_addressed" | "unclear", "evidence": [], "evidenceFiles": [{ "path": string, "commitSha": string, "excerpts": [{ "hunkId": string, "lines": [{ "reference": string, "text": string }] }] }], "modelStatus": "addressed" | "not_addressed" | "unclear", "verification": { "state": "verified" | "downgraded", "reasonCodes": ("unknown_reference" | "missing_evidence")[] } }], "possibleGaps": string[], "omittedFiles": string[] }`. Evidence code SHALL be stored once, in `evidenceFiles`; the empty `evidence` array preserves compatibility with existing readers. Historical results without `assessmentVersion` SHALL remain readable using their existing flat `evidence: string[]` contract without fabricating file provenance or verification diagnostics. The result SHALL list possible gaps, such as missing tests or unhandled edge cases, SHALL NOT contain a numeric score, and SHALL NOT approve, reject, submit, or change task state.
 
+Unknown, duplicate, or missing criterion IDs SHALL make model output structurally invalid. Schema correction and evidence correction SHALL share one retry, with at most two provider calls total. If output remains structurally invalid after that retry, the request SHALL fail with HTTP 502 `INVALID_OUTPUT` and SHALL NOT create a check result.
 The commit-set hash SHALL be SHA-256 of the full commit SHAs sorted lexicographically and joined with a single line-feed (`\n`) character, with no trailing line feed. The criteria hash SHALL be SHA-256 of the UTF-8 compact JSON serialization of an array of `{ "id": string, "description": string }` objects in criterion position order, with criterion ID as the tie-breaker and property order `id`, then `description`. The task ID SHALL remain a separate cache and persistence key dimension.
 
 The assigned developer SHALL initiate a check through `POST /api/v1/projects/{projectId}/tasks/{taskId}/acceptance-criteria-check` with exactly `{}` as its JSON body. The server SHALL use the task's current attached commits and acceptance criteria. On success the route SHALL return HTTP 200 with `{ "check": <check result>, "reused": <boolean> }` and `Cache-Control: no-store`. The `check` result SHALL expose its result ID, anchor SHA, creation timestamp, redaction flag, and result payload.
@@ -58,26 +59,37 @@ The assigned developer SHALL initiate a check through `POST /api/v1/projects/{pr
 - **THEN** a new result is produced for the new set of commits and becomes the latest result
 
 ### Requirement: Evidence is verified against the diff
-The system SHALL compare evidence and assessed diff lines as whole lines after trimming surrounding whitespace, removing, when present, exactly one leading unified diff marker (`+`, `-`, or space), then trimming surrounding whitespace again. It SHALL verify an evidence entry only when this normalized whole-line comparison matches exactly one occurrence in the assessed diff. It SHALL NOT use substring matching. The system SHALL preserve the original assessed diff line as the verified evidence. Evidence that is ambiguous or cannot be mapped to a diff line SHALL remain unverified. A criterion whose evidence cannot be verified SHALL be shown as unclear.
+The system SHALL assign deterministic compact reference IDs, unique across the assembled assessed input, to diff-line occurrences. The server-side source map SHALL identify each reference's commit SHA, file path, hunk, and line occurrence. Repeated identical lines within or across files, hunks, or commits SHALL NOT invalidate otherwise valid references. The server SHALL resolve evidence references only against the actual redacted assessed input and SHALL construct excerpts preserving original diff markers and whitespace. It SHALL NOT accept model-supplied code or infer provenance from quoted text.
 
-#### Scenario: Model quotes a line that is not in the diff
-- **WHEN** the model returns evidence for a criterion that does not appear in the assessed diff
-- **THEN** that criterion is shown as unclear and the unverified evidence is not displayed as fact
+Excerpts SHALL be ordered by assessed source order and grouped by file and commit. Adjacent referenced line occurrences MAY form one excerpt only within the same file, commit, and hunk; separated occurrences SHALL remain separate excerpts. Unknown references SHALL be removed, never displayed as fact. An `addressed` model status without any verified evidence SHALL have reason `missing_evidence`; an unknown reference SHALL have reason `unknown_reference`. Valid `not_addressed` and `unclear` results MAY have no evidence.
 
-#### Scenario: Model output has invalid criterion associations
-- **WHEN** model output contains an unknown criterion ID, a duplicate criterion ID, or omits a current criterion
-- **THEN** the gateway retries once using its existing schema-validation behavior
-- **AND** if the retried output still has invalid criterion associations, the request fails with HTTP 502 `INVALID_OUTPUT` and no check result is created
+On the first structurally valid output with evidence verification failures, the system SHALL request correction using its one shared retry. Feedback SHALL contain only known criterion IDs and server-defined reason codes, SHALL be at most 1,024 characters, and SHALL NOT replay the raw model response. After the second call, structurally valid criteria with unresolved verification failures SHALL be stored as `unclear`, with `verification.state` equal to `downgraded`, their original `modelStatus`, safe reason codes, and any remaining verified excerpts. Criteria with verified references SHALL retain model status and have verification state `verified` with no reason codes. No third call SHALL occur.
 
-#### Scenario: Evidence matches a unique diff line after normalization
-- **WHEN** the model returns an evidence entry that, after trimming surrounding whitespace, removing one leading `+`, `-`, or space marker when present from both the quote and a diff line, and trimming surrounding whitespace again, exactly matches that diff line as a whole line
-- **THEN** the evidence is verified only if exactly one diff-line occurrence matches
-- **AND** the stored and displayed evidence preserves that original assessed diff line, including its marker and whitespace
-- **AND** a quote matching multiple diff-line occurrences, or matching only as a substring, remains unverified
-- **AND** a quote that cannot be mapped unambiguously remains unverified, and its criterion is shown as unclear without displaying the quote as fact
+#### Scenario: Repeated lines have distinct evidence references
+- **WHEN** identical diff lines occur in multiple files, commits, hunks, or positions within a hunk
+- **THEN** each supplied reference resolves to its own source occurrence without requiring globally unique line text
+
+#### Scenario: Evidence correction succeeds
+- **WHEN** the first response mixes valid and unknown references and the second response corrects them
+- **THEN** the system stores the corrected verified assessment with server-built excerpts
+- **AND** no more than two provider calls occur
+
+#### Scenario: Evidence correction remains incomplete
+- **WHEN** the second structurally valid response still has unknown references or an addressed criterion without verified evidence
+- **THEN** affected criteria are unclear with model status and safe downgrade reasons retained
+- **AND** valid excerpts remain visible while unknown references are removed
+
+#### Scenario: Invalid criterion associations persist
+- **WHEN** both responses contain unknown, duplicate, or missing criterion IDs
+- **THEN** the request fails with HTTP 502 `INVALID_OUTPUT` and no check result is stored
+
+#### Scenario: Legacy evidence remains readable
+- **WHEN** a historical result has only flat evidence strings
+- **THEN** the UI displays those strings with an explicit indication that file provenance is unavailable
+- **AND** does not invent filenames or verification history
 
 ### Requirement: Check input is limited to what the assessment needs
-The system SHALL send the model only the task's acceptance criteria, identified by stable criterion ID and text, and the filtered diff of the attached commits. Lockfiles, generated files, and binary files SHALL be excluded. A file SHALL be excluded as binary when GitHub's diff marks that file as binary. The input budget SHALL be 48,000 characters. Eligible files SHALL be included or omitted whole. The result SHALL list every eligible file omitted because of that budget; excluded files SHALL NOT appear in the omitted-file list.
+The system SHALL send the model only the task's acceptance criteria, identified by stable criterion ID and text, and the filtered diff of the attached commits. Lockfiles, generated files, and binary files SHALL be excluded. A file SHALL be excluded as binary when GitHub's diff marks that file as binary. The input budget SHALL be 48,000 UTF-16 code units measured over both final serialized message contents after redaction and prompt-data escaping, including fixed instructions, wrappers, criteria, file metadata, compact references, and omitted-file metadata. Selection SHALL reserve 1,024 characters for bounded correction feedback so either call fits this budget. The maximum output SHALL be 2,000 tokens. If fixed instructions, criteria, required metadata, and retry headroom cannot fit even without file content, the request SHALL fail with HTTP 503 `EVIDENCE_UNAVAILABLE` without calling the model. Each selected diff SHALL be sent once, in an explicit file/commit block with metadata once per block and compact line references; server-only mappings SHALL NOT be repeated in the prompt. Eligible files SHALL be included or omitted whole. The result SHALL list every eligible file omitted because of that budget; excluded files SHALL NOT appear in the omitted-file list.
 
 Each repository SHALL provide deterministic, source-controlled path rules in a root `.acceptance-check.json` file. The file SHALL be versioned JSON with exactly these properties: `version`, `domainLogic`, `apiHandlers`, `tests`, `ui`, `lockfileNames`, and `generatedPathPrefixes`. `version` SHALL be the integer `1`. `domainLogic`, `apiHandlers`, `tests`, `ui`, and `generatedPathPrefixes` SHALL be arrays of repository-relative directory prefixes. Prefixes SHALL use `/` separators, be relative to the repository root, and end in `/`; matching SHALL be literal and SHALL NOT use glob or regular-expression semantics. `lockfileNames` SHALL be an array of exact, case-sensitive literal basenames; a changed file SHALL be excluded as a lockfile when its basename exactly matches an entry. GitHub-binary files, configured lockfiles, and files under configured generated prefixes SHALL be excluded before eligible files are classified or considered for the input budget. If a path matches more than one category, the first matching category in priority order SHALL apply: domain logic, API handlers, tests, then UI. Unmatched eligible files SHALL be classified as other.
 
@@ -98,7 +110,7 @@ The system SHALL process groups in the priority order above and sort paths alpha
 
 #### Scenario: Diff exceeds the input budget
 - **WHEN** the filtered diff is larger than the input budget
-- **THEN** no more than 48,000 characters of eligible diff are sent to the model
+- **THEN** both final message contents, including reserved correction-feedback capacity, fit within 48,000 UTF-16 code units
 - **AND** every eligible file omitted to meet the budget is listed
 - **AND** excluded files are absent from that list
 
@@ -131,7 +143,7 @@ The system SHALL process groups in the priority order above and sort paths alpha
 - **THEN** the model receives no excluded file content and the omitted-file list contains only eligible files omitted for budget
 
 ### Requirement: Check results are reused
-The system SHALL reuse a stored result, without calling the LLM, only when the check is requested again with the same set of commits, the same acceptance criteria, and the same normalized repository path rules. The system SHALL identify those inputs using commit-set, criteria, and normalized path-rules hashes. A reused result SHALL return HTTP 200 with `reused: true`, create no duplicate result row or history entry, and tell the assigned developer that the existing result is being shown. A change to normalized repository path rules SHALL allow a new result for the same commits and criteria.
+The system SHALL reuse a stored result, without calling the LLM, only when the check is requested again with the same assessment contract version, the same set of commits, the same acceptance criteria, and the same normalized repository path rules. The system SHALL identify those inputs using commit-set and criteria hashes and an effective versioned path-rules fingerprint. The canonical normalized path-rules hash calculation SHALL remain unchanged. For assessment version 2, the persisted/cache `pathRulesHash` SHALL be SHA-256 of UTF-8 compact JSON with property order `{ "assessmentVersion": 2, "pathRulesHash": "<canonical normalized path-rules hash>" }`. A different assessment contract version SHALL use its own fingerprint; legacy results SHALL remain readable but SHALL NOT be reused by version 2. A reused result SHALL return HTTP 200 with `reused: true`, create no duplicate result row or history entry, and tell the assigned developer that the existing result is being shown. A change to normalized repository path rules SHALL allow a new result for the same commits and criteria.
 
 #### Scenario: Same commits, criteria, and path rules
 - **WHEN** a check is requested for a commit set, criteria, and path rules that already have a stored result
@@ -212,3 +224,11 @@ The system SHALL NOT use a check result to approve, reject, submit, or change th
 #### Scenario: Check is generated
 - **WHEN** the system generates a check result
 - **THEN** the task state is unchanged
+
+### Requirement: Evidence excerpts fit the interface
+The acceptance-check UI SHALL display version 2 evidence as separate file/commit groups and contiguous excerpts. Filenames, evidence lines, and long unbroken strings SHALL wrap within the available width while preserving meaningful whitespace and diff markers. Opening evidence SHALL NOT widen the card or page at mobile or desktop widths. The UI SHALL distinguish a verification downgrade from the model's proposed status using safe reasons, without exposing raw provider output.
+
+#### Scenario: Long multi-file evidence
+- **WHEN** a criterion has source and test evidence including a line wider than the available card width
+- **THEN** each file's excerpts appear separately with its path and commit
+- **AND** the long line wraps without enlarging the card or causing page overflow, including at a 320-pixel viewport
