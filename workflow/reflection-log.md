@@ -106,3 +106,9 @@
 
 - Human closeout decision: "Tick as implementation complete; revise the spec/decision to keep CI verification explicitly pending." D7 clarified in design/specs,9.2checked for implementation only; original gate7/0/0 retained separately. CI remains required before claiming verification/release readiness. Product commit3b68867a22e710c24771ba4bd43cc8786efe29f3; records/speccloseoutcommit pending. Original checkbox conflict escalated once and resolved by human; no reviewer disputes. PR drafted locally only. Single interaction summary remains pending human verification.
 - Closeout resource issue: orchestrator usage-limit interruption left partial handoff writes; same agent resumed after human continuation and finalized. No token/tool/duration estimates; commit and CI verification kept distinct.
+
+### 9.2 — secret-scan follow-up
+
+- Actual CI reported3historical generic-api-key findings: fixed synthetic signing key and2nonfunctional placeholders. Earlier local checks did not include full-history secret scanning; add that before future integration commits.
+- Fix uses existing approvedCID4:exact3fingerprints only; randommasked per-runCIkey and obviousfakeplaceholders. No scan-scope weakening/historyrewrite. Local233-commit scan nowpasses, newfilespass, unrelated synthetic negativecontrol stillfailscorrectly; exactBashgeneration testedtwice. Independent review0/0/0; scoped commit uses existing branch authorization, actualCIrerunpending.
+- Reused orchestrator/implementer/reviewer; metricsnotavailable. No newproductrequirements/dependencies/UI/migrations or broad application reruns. Full details in existinghandoff; no claimedcontrolledcomparison.

@@ -149,8 +149,6 @@ jobs:
           --health-retries 20
     env:
       E2E_CLUSTER_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/postgres
-      # Synthetic test-only signing material. No production credentials are available.
-      E2E_SESSION_SECRET: 8f90afedc41b79a46de3e6b6b8848c0396c244c0350f6888a0537f12e39c7601
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -165,6 +163,14 @@ jobs:
         run: npm ci
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
+      - name: Generate per-run synthetic E2E signing key
+        shell: bash
+        run: |
+          set -euo pipefail
+          secret="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("hex"))')"
+          printf '::add-mask::%s\n' "$secret"
+          printf 'E2E_SESSION_SECRET=%s\n' "$secret" >> "$GITHUB_ENV"
+          unset secret
       - name: Run isolated Chromium role journeys
         run: npm run test:e2e
       - name: Retain sanitized Playwright failure evidence

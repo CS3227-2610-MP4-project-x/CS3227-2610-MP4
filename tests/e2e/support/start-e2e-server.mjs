@@ -58,12 +58,12 @@ const env = {
   DATABASE_URL: runtimeUrl.toString(),
   DATABASE_CA_CERT: "-----BEGIN CERTIFICATE-----\nsynthetic-e2e-only\n-----END CERTIFICATE-----",
   SUPABASE_URL: "https://e2e.invalid",
-  SUPABASE_PUBLISHABLE_KEY: "synthetic-e2e-publishable-placeholder",
+  SUPABASE_PUBLISHABLE_KEY: "test",
   GITHUB_APP_CLIENT_ID: "synthetic-e2e-client",
   GITHUB_APP_CLIENT_SECRET: "synthetic-e2e-client-placeholder",
   GITHUB_APP_ID: "1",
   GITHUB_APP_SLUG: "synthetic-e2e",
-  GITHUB_APP_PRIVATE_KEY: "synthetic-e2e-private-key-placeholder",
+  GITHUB_APP_PRIVATE_KEY: "test",
   AI_PROVIDER: "fake",
 };
 const next = spawn(process.execPath, [path.join(root, "node_modules", "next", "dist", "bin", "next"), "dev", "--hostname", "localhost", "--port", "3000"], { cwd: root, env, stdio: "inherit" });
