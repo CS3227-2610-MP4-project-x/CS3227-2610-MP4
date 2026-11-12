@@ -628,9 +628,16 @@ Approved by the human in this chat on 9 November 2026: the task 4.5 spec delta a
 
 On 9 November 2026 the human requested a back button from the developer project workspace to the main Project Space page, then explicitly chose "Both developer and product-manager project pages" when asked about visibility. Add a "Back to Project Space" link above the shared project tabs, pointing directly to `/` rather than browser history. Implement it in the existing project-navigation component; preserve project-name placement, tab ordering, role visibility, active states and server authorization. This is an approved task 4.5 scope extension. It remains uncommitted because the single authorized spec-only commit has already been made.
 
+## Tester Accounts and E2E Authentication Decision
+
+Approved by the human on 12 November 2026: option 1, synthetic local authentication with manual deployed sign-in checks.
+
+- **Task 9.2 local E2E.** Use disposable synthetic data and distinct synthetic product-manager and developer identities through a test-only server-side authentication/session boundary. Use controlled GitHub and AI provider responses for deterministic success and failure journeys. Seeded application people alone do not establish authenticated sessions. The test-only authentication boundary is restricted to local/test execution and must not be available in deployed environments; deployed authentication remains GitHub through Supabase Auth.
+- **Task 9.4 deployed verification.** Use two distinct real GitHub identities for the product-manager and developer roles. Humans perform fresh real GitHub sign-in and the required real SoC call in each deployed environment and record release evidence, including callback destinations. Automated deployed OAuth and saved browser-session maintenance are not required by this choice.
+- **Account provisioning.** Specific GitHub accounts, existing human accounts versus designated tester accounts, their custodians, test repository ownership, and synthetic-data reset scope are not selected by this decision and must be supplied before dependent setup. Separate GitHub accounts per environment are not required.
+
 ## Open Questions
 
-- Tester accounts for the deployed environments.
 - Resolved 6 November 2026 (task 4.1): who may create a project and how its initial product manager is selected. See "Project and Membership Decisions".
 
 ## Migration Plan
