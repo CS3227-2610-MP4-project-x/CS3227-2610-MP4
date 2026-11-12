@@ -316,7 +316,8 @@ describe("source-aware compact file input", () => {
   it("references triple-marker code inside a hunk and preserves source whitespace", () => {
     const result = render([{ commitSha: "a".repeat(40), diff: diff("core/a.ts", "+++code;  \n---removed;\n context;\n") }]);
     expect([...result.sourceMap.values()].map((line) => line.text)).toEqual(["+++code;  ", "---removed;", " context;"]);
-    expect(result.segments[0].content).toMatch(/\[\[L\d+\]\] \+\+\+code;  /);
+    expect(result.segments[0].content).toMatch(/^L\d+ \| \+\+\+code;  /m);
+    expect(result.segments[0].content).not.toMatch(/\[\[L\d+\]\]/);
   });
   it("retains assessable mode-only changes and rename provenance without redundant headers", () => {
     const mode = "diff --git a/core/tool.sh b/core/tool.sh\nold mode 100644\nnew mode 100755\n";

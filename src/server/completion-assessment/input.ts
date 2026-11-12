@@ -319,7 +319,7 @@ export function renderAcceptanceCheckFiles(files: readonly AcceptanceDiffFile[])
       sourceMap.set(reference, { reference, commitSha: file.commitSha, path: file.path,
         hunkId: inHunk ? `H${hunkNumber}` : "META", lineOccurrence: occurrence, text: content, order: order++ });
       const ending = line.endsWith("\n") ? "\n" : "";
-      return [`[[${reference}]] ${content}${ending}`];
+      return [`${reference} | ${content}${ending}`];
     });
     const safePath = redactSecrets(file.path);
     pathRedactions += safePath.redactionCount;

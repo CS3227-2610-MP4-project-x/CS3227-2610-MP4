@@ -1,6 +1,6 @@
 # Acceptance criteria check evidence investigation and fixes
 
-Human verification: pending review. One summary for this chat session in this repository.
+Human verification: the user approved the reference-format and cache-version decisions recorded below and requested implementation. One summary for this chat session in this repository.
 
 The user first requested discount validation/rounding and later tests in a sibling test repository. Those changes have a summary in that repository; no sibling changes form part of this implementation.
 
@@ -13,3 +13,5 @@ Analyst and planning recorder updated specifications first. Independent test-wri
 Final checks:2,469 unit tests and382 local PostgreSQL integration tests passed; TypeScript, application/test ESLint, scoped whitespace and webpack production build passed. Default Turbopack build remained blocked by local port-binding permissions. Full lint retained4 pre-existing generated website errors; unrelated guide whitespace/edits were preserved. OpenSpec validation exit0 with long-requirement warnings. Independent reviewer reported no remaining product findings after fixes.
 
 No dependencies, hosted migrations, inference smoke calls, deployments, commits, pushes or PRs. Build regenerated next-env.d.ts. Visual diff artifacts and complete changed-file/evidence/resource records are in workflow/handoffs/acceptance-check-evidence.md. Provider resource metrics not surfaced are recorded as not available. Human cross-review, this summary's verification, and controlled migration/release remain pending.
+
+Follow-up in this same session: the user approved showing bare `L<number>` references, asking the model for bare IDs, normalizing only an exact `[[L<number>]]` wrapper when its inner ID is known, and bumping an independent evidence-reference cache version while keeping DTO v2. The implementer changed the prompt renderer and validator/cache key, and the reviewer caught and confirmed a strict end-of-input fix so trailing newlines are rejected. After the user reported unit failures, the test-writer updated service/input fixtures to use bare IDs and the new cache fingerprint, and added exact/invalid wrapper coverage. Both affected test files passed (198/198). The full unit suite had 28 unrelated sandbox failures in guard-write-scope/environment-configuration due child `git` process `EPERM`; 2,449 other tests passed. TypeScript and scoped ESLint passed. No provider call was made. See `workflow/handoffs/acceptance-reference-format-fix.md`.
