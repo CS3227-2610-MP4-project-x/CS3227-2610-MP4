@@ -1,0 +1,33 @@
+@startuml
+!pragma layout smetana
+!include style.puml
+title Request path through the server layers
+
+package "src/app (transport)" {
+  component "Route Handler\nroute.ts" as rh
+  component "Server Component\npage.tsx" as page
+}
+package "src/server (domain)" {
+  component "Module handler\n(e.g. projects/handlers.ts)\nOrigin, Content-Type, body,\npath-ID validation" as h
+  component "auth module\nrequest-access.ts / page-access.ts\nsession -> person -> membership" as auth
+  component "Domain service\n(e.g. TaskLifecycleService)\nrole + invariant checks,\ntransactions" as svc
+  component "Repository\n(parameterised SQL,\nunnamed statements)" as repo
+  component "Adapter port\n(GitHub, LLM, Auth)" as port
+  component "composition.ts\ncomposition root:\npool + service graph" as comp
+}
+database "PostgreSQL\napp schema" as db
+cloud "External provider" as ext
+
+rh --> h : delegates
+page --> auth : page outcome\n(redirect / notFound / unavailable)
+page --> svc : read services
+h --> auth : 401 / 404 / 403
+h --> svc
+svc --> repo
+svc --> port
+repo --> db
+port --> ext
+comp ..> svc : builds once\nper instance
+comp ..> repo
+comp ..> port
+@enduml

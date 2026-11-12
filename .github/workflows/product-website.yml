@@ -9,6 +9,7 @@ on:
       - "docs/reflections.md"
       - "docs/Lim-ZY_Reflection.md"
       - "docs/thegrimbee_Reflection.md"
+      - "docs/images/**"
       - ".github/workflows/product-website.yml"
   push:
     branches:
@@ -20,6 +21,7 @@ on:
       - "docs/reflections.md"
       - "docs/Lim-ZY_Reflection.md"
       - "docs/thegrimbee_Reflection.md"
+      - "docs/images/**"
       - ".github/workflows/product-website.yml"
 
 permissions:

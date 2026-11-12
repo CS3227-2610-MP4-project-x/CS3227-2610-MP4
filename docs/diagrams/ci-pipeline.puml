@@ -1,0 +1,45 @@
+@startuml
+!include style.puml
+title GitHub Actions checks (.github/workflows/ci.yml)
+
+start
+:Trigger: pull request (any branch), push to master / dev,
+weekly schedule (audit), manual dispatch;
+note right
+  permissions: contents: read
+  no repository secrets
+  actions pinned to full commit SHAs
+  Node.js from .nvmrc
+end note
+fork
+  :lint
+  npm run lint;
+fork again
+  :typecheck
+  npm run typecheck;
+fork again
+  :unit-tests
+  npm test (Vitest);
+fork again
+  :db-integration
+  postgres:17 service container
+  npm run test:integration;
+fork again
+  :e2e-role-journeys
+  disposable PostgreSQL + Chromium
+  npm run test:e2e;
+fork again
+  :build
+  npm run build (no env vars);
+fork again
+  :secret-scan
+  gitleaks (checksum-verified)
+  over full history;
+fork again
+  :dependency-audit
+  npm audit --audit-level=high;
+end fork
+:Branch protection (set by a human) requires the checks
+and a reviewed pull request before merging;
+stop
+@enduml

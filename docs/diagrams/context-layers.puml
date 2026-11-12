@@ -1,0 +1,34 @@
+@startuml
+!pragma layout smetana
+!include style.puml
+title Where agent context comes from
+
+rectangle "Always loaded (up front)" as up {
+  component "AGENTS.md\nhow to work: stack, boundaries,\ncoding conventions, git rules" as agents
+  component "Role contract\nworkflow/agents/<role>.md\n+ thin .claude/agents adapter" as role
+  component "Task handoff\nworkflow/handoffs/<task>.md\nscope, paths, decisions, exclusions" as handoff
+}
+rectangle "Retrieved when needed" as later {
+  component "OpenSpec delta specs\nopenspec/changes/.../specs/*/spec.md" as spec
+  component "Recorded decisions\ndesign.md sections" as design
+  component "UI guidance\nspecs/ui-spec.md" as ui
+  component "Source and tests\nsrc/, tests/" as code
+  component "Prior evidence and logs\nworkflow/evidence/, logs/" as evidence
+}
+rectangle "Enforced, not just stated" as enforce {
+  component ".claude/settings.json\ndeny secret files,\nask before push / PR,\nspawn depth 1" as settings
+  component "guard-write-scope.mjs\nper-role write paths" as hook
+}
+actor "Worker agent" as w
+
+agents --> w
+role --> w
+handoff --> w
+w ..> spec : read by path
+w ..> design
+w ..> ui
+w ..> code
+w ..> evidence
+settings --> w
+hook --> w
+@enduml

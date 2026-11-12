@@ -1,0 +1,57 @@
+@startuml
+!pragma layout smetana
+!include style.puml
+title src/server modules and their public-entry dependencies\n(composition.ts wires all of them; omitted for clarity)
+
+package "Identity and access" {
+  component "auth" as auth
+  component "config" as config
+}
+package "Task management (Developer B)" {
+  component "projects" as projects
+  component "tasks" as tasks
+  component "task-board" as board
+  component "review-queue" as review
+  component "project-dashboard" as dash
+}
+package "GitHub evidence (Developer A)" {
+  component "github-repository-link" as link
+  component "github-evidence" as evidence
+  component "github\n(GitHubAppAdapter)" as github
+}
+package "AI features" {
+  component "completion-assessment\n(Acceptance Criteria Check)" as ca
+  component "task-detail" as detail
+  component "progress-report" as report
+  component "project-ai-usage\n(read-only aggregates)" as usage
+  component "ai\n(LLM gateway, adapters,\nredaction, limits)" as ai
+}
+package "Persistence" {
+  component "repositories\n(people, access,\nusage, provider-call permits)" as repos
+}
+
+projects --> auth
+projects --> repos
+tasks --> auth
+tasks --> projects
+tasks --> repos
+board --> tasks
+board --> repos
+review --> ca
+review --> repos
+dash --> repos
+detail --> ca
+detail --> auth
+detail --> repos
+link --> auth
+link --> config
+link --> repos
+evidence --> github
+evidence --> link
+ca --> ai
+ca --> link
+report --> ai
+report --> projects
+repos --> ai : implements\nUsagePort
+auth --> config
+@enduml
