@@ -113,9 +113,9 @@ Depends on: all groups above.
 
 - [x] 9.1 **[P]** Run the AI security evaluation: prompt-injection and secret-redaction fixtures for both AI features against the live SoC LLM in development; record outcomes without asserting exact model wording. Completed 12 November 2026; see `workflow/handoffs/task-9-1-ai-security-evaluation.md` and `workflow/evidence/task-9-1-ai-security-evaluation.md`. Human verification of the interaction summary remains pending.
 - [x] 9.2 **[P]** Write end-to-end tests for one complete developer journey and one complete product-manager journey, including fake-provider success and failure paths. Follow the approved `end-to-end-verification` contract and "End-to-End Verification Decisions (9.2)" in `design.md`; add the separate Playwright CI check and record local/CI execution evidence and any unavailable checks. Implementation complete with human approval: local journeys pass 6/6 and final independent code review has no findings. CI execution remains explicitly pending; this checkbox does not claim CI verification or release readiness (D7 closeout clarification).
-- [ ] 9.3 **[P]** Run accessibility checks on the main pages and record results.
-- [ ] 9.4 Deploy to production, run the release checks (including one real SoC LLM call from each environment, after confirming with `GET /v1/models` that each key can use the pinned model, and a GitHub sign-in on each environment that returns to that environment's own URL), and record commands, revision, environment, results, and evidence paths.
-- [ ] 9.5 Run OpenSpec validation and all lint, type-check, test, and build checks; resolve findings and record the final results.
+- [x] 9.3 **[P]** Run accessibility checks on the main pages and record results.
+- [x] 9.4 Deploy to production, run the release checks (including one real SoC LLM call from each environment, after confirming with `GET /v1/models` that each key can use the pinned model, and a GitHub sign-in on each environment that returns to that environment's own URL), and record commands, revision, environment, results, and evidence paths.
+- [x] 9.5 Run OpenSpec validation and all lint, type-check, test, and build checks; resolve findings and record the final results.
 
 ## 10. Shared Interaction Feedback
 

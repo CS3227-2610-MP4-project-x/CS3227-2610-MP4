@@ -300,7 +300,7 @@ Then:
 - [x] The `master` and `dev` deployments both succeed after the redeploy (step 10).
 - [x] The two environments share no database password, OAuth client secret, SoC LLM key, or encryption key. Compare them in your password manager, not in a file.
 - [x] The Hobby checks (steps 5 and 10) and the Deployment Protection and sign-in-provider decisions (steps 6 and 8) are recorded.
-- [ ] After task 3.1: the Redirect URLs are added (step 8), and task 9.4 signs in on each deployed environment and records the result. CI cannot check this.
+- [x] After task 3.1: the Redirect URLs are added (step 8), and task 9.4 signs in on each deployed environment and records the result. CI cannot check this.
 - [ ] After the first deployment with the real SoC LLM adapter, each environment makes one real call, recorded with the release checks.
 
 ## Database migrations
