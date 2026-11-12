@@ -111,7 +111,7 @@ Implemented on 10 November 2026: structured-input replacement counts before esca
 
 Depends on: all groups above.
 
-- [ ] 9.1 **[P]** Run the AI security evaluation: prompt-injection and secret-redaction fixtures for both AI features against the live SoC LLM in development; record outcomes without asserting exact model wording.
+- [x] 9.1 **[P]** Run the AI security evaluation: prompt-injection and secret-redaction fixtures for both AI features against the live SoC LLM in development; record outcomes without asserting exact model wording. Completed 12 November 2026; see `workflow/handoffs/task-9-1-ai-security-evaluation.md` and `workflow/evidence/task-9-1-ai-security-evaluation.md`. Human verification of the interaction summary remains pending.
 - [ ] 9.2 **[P]** Write end-to-end tests for one complete developer journey and one complete product-manager journey, including fake-provider success and failure paths.
 - [ ] 9.3 **[P]** Run accessibility checks on the main pages and record results.
 - [ ] 9.4 Deploy to production, run the release checks (including one real SoC LLM call from each environment, after confirming with `GET /v1/models` that each key can use the pinned model, and a GitHub sign-in on each environment that returns to that environment's own URL), and record commands, revision, environment, results, and evidence paths.
