@@ -1,0 +1,165 @@
+@startuml
+!pragma layout smetana
+!include style.puml
+hide circle
+hide methods
+title Database schema "app" (after all migrations)
+
+entity people {
+  * id : uuid <<PK>>
+  --
+  auth_user_id : uuid <<unique>>
+  github_user_id : bigint <<unique>>
+  github_username : text
+  version : integer
+}
+entity projects {
+  * id : uuid <<PK>>
+  --
+  key : text <<unique>> ^[A-Z][A-Z0-9]{1,9}$
+  name : text
+  last_task_number : integer
+  github_installation_id : bigint
+  github_repository_id : bigint
+  github_repository_owner / _name : text
+  version : integer
+}
+entity memberships {
+  * id : uuid <<PK>>
+  --
+  project_id : uuid <<FK>>
+  person_id : uuid <<FK>>
+  role : product_manager | developer
+  .. one product_manager per project (partial unique index)
+}
+entity tasks {
+  * id : uuid <<PK>>
+  --
+  project_id : uuid <<FK>>
+  number : integer (unique per project)
+  title, description : text
+  assignee_id : uuid <<FK>>
+  due_date : date
+  status : to_do | in_progress | in_review | done
+  branch_name : text
+  deleted_at : timestamptz (soft delete)
+  version : integer
+}
+entity acceptance_criteria {
+  * id : uuid <<PK>>
+  --
+  task_id : uuid <<FK>>
+  position : integer
+  description : text
+}
+entity task_events {
+  * id : uuid <<PK>>
+  --
+  task_id, actor_id : uuid <<FK>>
+  event_type : state_change | submission |
+     assignment_change | review_feedback
+  from_status, to_status : text
+  check_result_id : uuid <<FK same task>>
+  feedback : text
+  .. append-only (SELECT, INSERT only)
+}
+entity progress_updates {
+  * id : uuid <<PK>>
+  --
+  task_id, author_id : uuid <<FK>>
+  body : text
+}
+entity attached_commits {
+  * id : uuid <<PK>>
+  --
+  task_id, attached_by : uuid <<FK>>
+  commit_sha : text (unique per task)
+  source_branch : text
+}
+entity check_results {
+  * id : uuid <<PK>>
+  --
+  task_id : uuid <<FK>>
+  commit_set_hash, criteria_hash,
+  path_rules_hash : text (cache key)
+  model : text
+  redacted : boolean
+  result : jsonb
+}
+entity reports {
+  * id : uuid <<PK>>
+  --
+  project_id : uuid <<FK>>
+  range_start, range_end : date (unique per project)
+  statements : jsonb
+  input_fingerprint, generation_contract_version,
+  provider_model : text
+  redaction_replacement_count : integer
+  github_evidence_unavailable : boolean
+  version : integer
+}
+entity usage_records {
+  * id : uuid <<PK>>
+  --
+  feature : acceptance_check | progress_report
+  project_id, person_id : uuid <<FK>>
+  environment : development | production
+  reserved_tokens, charged_tokens,
+  input_tokens, output_tokens, latency_ms
+  outcome : pending | succeeded | invalid_output |
+     provider_error | cached
+}
+entity usage_quota_days {
+  * id : uuid <<PK>>
+  --
+  person_id : uuid <<FK>>
+  sgt_date : date (lock row)
+}
+entity provider_call_permits {
+  * id : uuid <<PK>>
+  --
+  key_fingerprint : char(64) SHA-256
+  acquired_at : timestamptz
+}
+entity github_repository_setup_attempts {
+  * id : uuid <<PK>>
+  --
+  project_id, person_id : uuid <<FK>>
+  expected_github_user_id, installation_id : bigint
+  status : setup_pending | oauth_pending |
+     verified | expired
+  expires_at : timestamptz (10 min)
+}
+entity github_repository_snapshots {
+  * id : uuid <<PK>>
+  --
+  attempt_id : uuid <<FK unique>>
+  installation_id : bigint
+  expires_at : timestamptz (10 min)
+}
+entity github_repository_snapshot_repositories {
+  * id : uuid <<PK>>
+  --
+  snapshot_id : uuid <<FK>>
+  repository_id : bigint
+  owner, name, default_branch : text
+}
+
+people ||--o{ memberships
+projects ||--o{ memberships
+projects ||--o{ tasks
+people ||--o{ tasks : assignee
+tasks ||--|{ acceptance_criteria
+tasks ||--o{ task_events
+tasks ||--o{ progress_updates
+tasks ||--o{ attached_commits
+tasks ||--o{ check_results
+check_results |o--o{ task_events : submission reference
+projects ||--o{ reports
+projects ||--o{ usage_records
+people ||--o{ usage_records
+people ||--o{ usage_quota_days
+projects ||--o{ github_repository_setup_attempts
+github_repository_setup_attempts ||--o| github_repository_snapshots
+github_repository_snapshots ||--o{ github_repository_snapshot_repositories
+@enduml

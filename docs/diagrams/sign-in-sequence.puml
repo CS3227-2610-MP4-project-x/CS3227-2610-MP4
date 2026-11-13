@@ -1,0 +1,40 @@
+@startuml
+!include style.puml
+title GitHub sign-in through Supabase Auth (PKCE)
+autonumber
+actor User
+participant "Browser" as B
+participant "GET /api/v1/auth/sign-in" as SI
+participant "AuthService" as AS
+participant "Supabase Auth" as SA
+participant "GitHub OAuth app" as GH
+participant "GET /api/v1/auth/callback" as CB
+participant "PeopleRepository" as PR
+database "app.people" as DB
+
+User -> B : click "Sign in with GitHub"
+B -> SI
+SI -> AS : startGitHubSignIn()
+AS -> SA : signInWithOAuth(github, redirectTo =\nAPP_ORIGIN + /api/v1/auth/callback)
+SA --> AS : provider URL (+ PKCE verifier cookie)
+SI --> B : 302 to GitHub
+B -> GH : authorize
+GH --> B : 302 to Supabase provider callback
+B -> SA : /auth/v1/callback
+SA --> B : 302 to app callback ?code=...
+B -> CB
+CB -> AS : completeGitHubSignIn(code)
+AS -> SA : exchangeCodeForSession(code)
+SA --> AS : session + verified user
+AS -> AS : pick provider = github identity;\nprovider_id -> github_user_id,\nidentity_data.user_name -> username
+AS -> PR : upsert person by auth_user_id
+PR -> DB : INSERT ... ON CONFLICT\n(refresh username)
+CB --> B : 303 to /  (HttpOnly, SameSite=Lax cookies)
+
+note over CB, AS
+  On any failure the callback calls
+  signOut({scope: 'local'}) and redirects to
+  /sign-in with a generic error. Redirect URLs
+  are built from APP_ORIGIN, never Host headers.
+end note
+@enduml

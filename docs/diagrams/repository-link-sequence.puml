@@ -1,0 +1,38 @@
+@startuml
+!include style.puml
+title Linking a project to a GitHub repository (product manager only)
+autonumber
+actor "Product manager" as PM
+participant "Settings page\n(repository panel)" as UI
+participant "github-repository\nRoute Handlers" as API
+participant "GitHubRepositoryLinkService" as S
+database "setup attempts /\nsnapshots" as DB
+participant "GitHub" as GH
+
+PM -> UI : Install / configure
+UI -> API : GET .../github-repository/setup-url
+API -> S : startSetup(project, verified PM)
+S -> DB : insert attempt (single-use state,\nexpires in 10 min)
+API --> UI : {setupUrl}
+UI -> GH : github.com/apps/<slug>/installations/new?state
+GH --> PM : choose account and repositories
+GH -> API : GET /api/v1/auth/github-app/setup-callback\n?installation_id&state
+API -> S : beginOAuthFromSetup(state, installation_id)
+S -> DB : consume state; installation_id stays untrusted
+API --> GH : redirect to GitHub user authorisation
+GH -> API : GET /api/v1/auth/github-app/callback?code&state
+API -> S : completeSetupAuthorization(...)
+S -> GH : exchange code (client secret, server only)
+S -> GH : verify user == expected GitHub user,\nlist installation repositories
+S -> DB : store repository-list snapshot (10 min);\nuser token is discarded, never stored
+API --> UI : 303 to settings ?githubSnapshot=<id>
+UI -> API : GET .../github-repository/snapshots/{id}
+API --> UI : repositories from the snapshot
+PM -> UI : choose repository
+UI -> API : POST .../github-repository {snapshotId, repositoryId}
+API -> S : linkSnapshotRepository(...)
+S -> GH : recheck current App access\n(installation token)
+S -> DB : update project binding\n(installation id, repository id, owner, name)
+API --> UI : linked repository
+note over S, DB : Any failure leaves the existing binding unchanged.
+@enduml

@@ -1,0 +1,42 @@
+@startuml
+!include style.puml
+title Progress Report generation (product manager)
+autonumber
+actor "Product manager" as PM
+participant "Reports page" as UI
+participant "POST .../progress-report" as R
+participant "Generation service" as G
+participant "Assembly service\n(8.1)" as A
+participant "Report cache\nrepository" as C
+participant "LlmGateway" as GW
+
+PM -> UI : choose range (<= 7 SGT days)
+UI -> R : {} or {startDate, endDate}
+R -> R : Origin -> body -> session ->\nmembership -> PM role
+R -> G : generate(request)
+G -> A : assemble(project, range)
+A -> A : one read-only DB snapshot:\nstate changes, submissions, progress,\nfeedback, check summaries, task context
+A -> A : commit metadata via GitHub module\n(never diffs); redact + escape;\nmeasure against 72,000 chars
+alt empty range
+  G --> R : {kind: empty} (no LLM call, nothing stored)
+else over budget / range too long
+  G --> R : 400 REPORT_INPUT_BUDGET_EXCEEDED /\nREPORT_RANGE_TOO_LONG
+else ready
+  G -> C : read(project, range)
+  alt same input fingerprint, contract version,\nmodel and redaction count (and GitHub available)
+    G -> GW : recordCacheHit()
+    G --> R : {report, reused: true}
+  else regenerate
+    G -> GW : run(report instructions, input,\nvalidator = citation check)
+    note right
+      Each statement must cite task UUIDs
+      from the same assignee group; any bad
+      citation rejects the whole output.
+    end note
+    G -> A : reassemble; fingerprint unchanged?
+    G -> C : publish with optimistic version guard
+    G --> R : {report, reused: false}\nor 409 REPORT_INPUT_CHANGED
+  end
+end
+R --> UI : 200 no-store
+@enduml

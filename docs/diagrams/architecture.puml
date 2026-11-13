@@ -1,0 +1,47 @@
+@startuml
+!pragma layout smetana
+!include style.puml
+title High-level architecture
+
+actor "Developer" as dev
+actor "Product manager" as pm
+
+node "Browser" as browser {
+  component "Client Components\n(src/components)" as cc
+}
+
+cloud "Vercel (Node.js runtime)" as vercel {
+  component "Proxy\n(src/proxy.ts)\nsession refresh only" as proxy
+  component "Pages / Server Components\n(src/app/**/page.tsx)" as pages
+  component "Route Handlers\n(src/app/api/v1/**)" as routes
+  component "Server modules\n(src/server)\nservices, repositories,\nadapters, LLM gateway" as server
+}
+
+cloud "Supabase (Singapore)" as supa {
+  component "Supabase Auth\n(GitHub provider)" as sauth
+  database "PostgreSQL 17\nschema app" as db
+}
+
+cloud "GitHub" as gh {
+  component "GitHub App\n(installation tokens,\nREST API 2026-03-10)" as ghapp
+  component "OAuth\n(sign-in and\nrepository-link verification)" as ghoauth
+}
+
+cloud "SoC LLM (SoCLaaS)" as soc {
+  component "POST /v1/chat/completions\nqwen3.6:35b" as llm
+}
+
+dev --> cc
+pm --> cc
+cc --> proxy : HTTPS
+proxy --> pages
+cc --> routes : JSON /api/v1\n(same origin)
+pages --> server : direct call\n(authorised)
+routes --> server
+server --> db : app_runtime role\ntransaction pooler, TLS
+server --> sauth : PKCE sign-in,\nsession checks
+sauth --> ghoauth
+server --> ghapp : read-only\nContents + Metadata
+server --> ghoauth : link verification
+server --> llm : via LLM gateway only
+@enduml
