@@ -19,6 +19,7 @@ Small software teams lose time to status reporting: product managers chase devel
 
 ### New Capabilities
 
+- `end-to-end-verification`: Complete synthetic local developer and product-manager browser journeys, guarded test controls and reproducible CI evidence for task 9.2.
 - `task-management`: Project membership and roles, task management, the task lifecycle, progress updates, and the review and approval flow.
 - `identity-and-access`: GitHub sign-in, verified GitHub identity, and server-side enforcement of project roles.
 - `github-evidence`: Repository linking, the developer commit picker, attaching commits to tasks, and reporting unavailable evidence.

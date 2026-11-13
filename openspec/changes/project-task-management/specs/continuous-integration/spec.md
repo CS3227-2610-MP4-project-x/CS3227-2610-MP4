@@ -41,11 +41,15 @@ The workflow SHALL audit installed dependencies for known vulnerabilities and re
 - **AND** the severity at which it fails is as recorded in `design.md` (CI decision D6)
 
 ### Requirement: CI uses no production credentials
-The workflow SHALL run without production credentials, database access, or SoC LLM access, and tests it runs SHALL use isolated synthetic fixtures.
+The workflow SHALL run without production credentials, production database access, or live SoC LLM access, and tests it runs SHALL use isolated synthetic fixtures. Disposable synthetic database services are permitted for integration and end-to-end checks.
 
 #### Scenario: Workflow environment
 - **WHEN** the workflow runs
 - **THEN** no production database, GitHub OAuth, or SoC LLM secret is available to any step
+
+#### Scenario: Disposable browser verification
+- **WHEN** the end-to-end check runs
+- **THEN** Chromium role journeys execute as a separate reported check with disposable local services and no live external provider calls
 
 ### Requirement: CI results gate merging to master
 Changes SHALL reach `master` only through a reviewed pull request whose CI checks have passed.

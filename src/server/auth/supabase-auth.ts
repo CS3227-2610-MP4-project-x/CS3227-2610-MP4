@@ -4,6 +4,8 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { ServerConfig } from "@/server/config";
 import type { AuthIdentity, AuthPort, AuthUser } from "./auth-port";
+import { resolveE2EExecution } from "@/server/test-support/controls";
+import { createSyntheticAuthPort, E2E_SESSION_COOKIE } from "@/server/test-support/synthetic-session";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -41,6 +43,12 @@ export async function createRequestSupabaseClient(
   config: Pick<ServerConfig, "appOrigin" | "supabasePublishableKey" | "supabaseUrl">,
 ): Promise<AuthPort> {
   const cookieStore = await cookies();
+  if (resolveE2EExecution(process.env)) {
+    return createSyntheticAuthPort(
+      cookieStore.get(E2E_SESSION_COOKIE)?.value,
+      async () => { cookieStore.delete(E2E_SESSION_COOKIE); },
+    );
+  }
   const secure = config.appOrigin.startsWith("https://");
   const supabase = createServerClient(config.supabaseUrl, config.supabasePublishableKey, {
     cookies: {
