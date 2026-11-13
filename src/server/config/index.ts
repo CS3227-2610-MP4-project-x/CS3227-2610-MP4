@@ -1,4 +1,5 @@
 import "server-only";
+import { assertDisposableE2EDatabaseUrl, resolveE2EExecution } from "@/server/test-support/controls";
 
 export type AppEnvironment = "development" | "production";
 
@@ -70,13 +71,15 @@ function parseDatabaseUrl(value: string): string {
   const sslParameters = [...parsed.searchParams.keys()].map((name) => name.toLowerCase());
   const hasSslOverride = sslParameters.some((name) => name.startsWith("ssl") && name !== "sslmode") ||
     sslParameters.includes("uselibpqcompat");
+  const e2e = resolveE2EExecution(process.env);
+  if (e2e) assertDisposableE2EDatabaseUrl(value);
   if (
     (parsed.protocol !== "postgres:" && parsed.protocol !== "postgresql:") ||
     !parsed.hostname ||
     !parsed.username ||
     !parsed.password ||
-    parsed.searchParams.getAll("sslmode").length !== 1 ||
-    parsed.searchParams.get("sslmode") !== "verify-full" ||
+    (e2e ? parsed.searchParams.getAll("sslmode").length > 1 || (parsed.searchParams.has("sslmode") && parsed.searchParams.get("sslmode") !== "disable") :
+      parsed.searchParams.getAll("sslmode").length !== 1 || parsed.searchParams.get("sslmode") !== "verify-full") ||
     hasSslOverride
   ) {
     throw new Error("Missing or invalid environment variable: DATABASE_URL");

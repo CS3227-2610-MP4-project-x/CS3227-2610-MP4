@@ -1,8 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getServerConfig } from "@/server/config";
+import { resolveE2EExecution } from "@/server/test-support/controls";
 
 export async function proxy(request: NextRequest) {
+  if (resolveE2EExecution(process.env)) return NextResponse.next({ request });
   let config: ReturnType<typeof getServerConfig>;
   try {
     config = getServerConfig();

@@ -23,3 +23,6 @@ _site/
 .vscode/
 .idea/*
 *.iml
+
+# Images
+images/

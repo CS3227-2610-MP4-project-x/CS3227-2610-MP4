@@ -130,6 +130,60 @@ jobs:
       - name: Database integration tests
         run: npm run test:integration
 
+  e2e-role-journeys:
+    name: e2e-role-journeys
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      E2E_CLUSTER_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/postgres
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js from .nvmrc
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies from lockfile
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Generate per-run synthetic E2E signing key
+        shell: bash
+        run: |
+          set -euo pipefail
+          secret="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("hex"))')"
+          printf '::add-mask::%s\n' "$secret"
+          printf 'E2E_SESSION_SECRET=%s\n' "$secret" >> "$GITHUB_ENV"
+          unset secret
+      - name: Run isolated Chromium role journeys
+        run: npm run test:e2e
+      - name: Retain sanitized Playwright failure evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: e2e-role-journeys-${{ github.run_id }}
+          path: |
+            test-results/**/*.png
+            test-results/**/error-context.md
+          if-no-files-found: ignore
+          retention-days: 14
+
   build:
     name: build
     if: github.event_name != 'schedule'

@@ -628,9 +628,16 @@ Approved by the human in this chat on 9 November 2026: the task 4.5 spec delta a
 
 On 9 November 2026 the human requested a back button from the developer project workspace to the main Project Space page, then explicitly chose "Both developer and product-manager project pages" when asked about visibility. Add a "Back to Project Space" link above the shared project tabs, pointing directly to `/` rather than browser history. Implement it in the existing project-navigation component; preserve project-name placement, tab ordering, role visibility, active states and server authorization. This is an approved task 4.5 scope extension. It remains uncommitted because the single authorized spec-only commit has already been made.
 
+## Tester Accounts and E2E Authentication Decision
+
+Approved by the human on 12 November 2026: option 1, synthetic local authentication with manual deployed sign-in checks.
+
+- **Task 9.2 local E2E.** Use disposable synthetic data and distinct synthetic product-manager and developer identities through a test-only server-side authentication/session boundary. Use controlled GitHub and AI provider responses for deterministic success and failure journeys. Seeded application people alone do not establish authenticated sessions. The test-only authentication boundary is restricted to local/test execution and must not be available in deployed environments; deployed authentication remains GitHub through Supabase Auth.
+- **Task 9.4 deployed verification.** Use two distinct real GitHub identities for the product-manager and developer roles. Humans perform fresh real GitHub sign-in and the required real SoC call in each deployed environment and record release evidence, including callback destinations. Automated deployed OAuth and saved browser-session maintenance are not required by this choice.
+- **Account provisioning.** Specific GitHub accounts, existing human accounts versus designated tester accounts, their custodians, test repository ownership, and synthetic-data reset scope are not selected by this decision and must be supplied before dependent setup. Separate GitHub accounts per environment are not required.
+
 ## Open Questions
 
-- Tester accounts for the deployed environments.
 - Resolved 6 November 2026 (task 4.1): who may create a project and how its initial product manager is selected. See "Project and Membership Decisions".
 
 ## Migration Plan
@@ -702,3 +709,22 @@ Gate: D1-D8 accepted: 8; modified: 0; rejected: 0. All recommendations below are
 - **D8 (accept) — Fake-provider scope:** use existing scripted `FakeAdapter` outcomes for valid, invalid/retry, provider-failure and missing-usage generation tests; keep its existing default behavior unchanged. Explicitly defer an application-wide valid canned report mode to the end-to-end/fake-journey work. Record this limitation rather than implying an unscripted fake deployment can generate valid reports.
 
 Verification: scripted fake success/retry/failure/no-usage tests; PM-only handler and direct-service tests; real PostgreSQL cache round-trip, project isolation, timestamp ties, deletion, backdated attachment, version/concurrent publication and unchanged-cache tests. Developer A retains ownership of adversarial AI security fixtures. No shipped migration is edited. No task mutation is permitted.
+
+## End-to-End Verification Decisions (9.2)
+
+Human approval on 12 November 2026: "I approve your spec delta and recommendations for each decisions."
+Gate: D1-D7 accepted: 7; modified: 0; rejected: 0. Owner: Developer B. Developer A cross-review is required for authentication, API, GitHub and acceptance-check boundaries. AI adversarial evaluation fixtures remain Developer A's responsibility.
+
+- **D1 (accept) - What constitutes each complete journey?** Approve the concrete developer and PM sequences in `specs/end-to-end-verification/spec.md`, including one request-changes/resubmit cycle. Keep exhaustive CRUD, live OAuth, accessibility and live-model security evaluation outside this task.
+- **D2 (accept) - Data isolation/reset scope.** Use a dedicated disposable PostgreSQL cluster/database owned by the E2E run, apply existing migrations during setup, run the app as `app_runtime`, and isolate each scenario's data. Never reset a shared or hosted database. This resolves the explicitly unselected local synthetic-data reset scope in the Tester Accounts decision; real account provisioning remains under 9.4.
+- **D3 (accept) - Synthetic session protection.** Use a server-only synthetic AuthPort/session adapter with harness-issued signed cookies and fixed synthetic identities. Require explicit E2E mode, loopback origin and absence of deployment markers; reject production/deployed activation. Keep membership, role authorization, CSRF and repositories real.
+- **D4 (accept) - Fake AI scenario selection.** Add a separately guarded E2E adapter with named per-scenario outcomes for both feature schemas and provider failures. Build valid responses from controlled synthetic inputs; scope outcomes to each scenario so parallelism/retries cannot consume another test's script. Preserve FakeAdapter defaults.
+- **D5 (accept) - GitHub setup coverage.** Seed a synthetic verified repository binding and exercise branch listing, commit selection/save and evidence reads through the real application using a controlled GitHub adapter. Leave external installation/OAuth to existing lower-level coverage and deployed manual verification.
+- **D6 (accept) - Local runtime and CI conflict resolution.** Use http://localhost consistently; explicitly allow plain PostgreSQL only inside the guarded disposable E2E mode, preserving normal runtime TLS requirements. Clarify the CI spec to permit disposable databases and add the already-planned separate Playwright job. This approval resolves the literal CI database-access conflict and the loopback/TLS harness conflicts.
+- **D7 (accept; closeout meaning clarified by human) - Evidence and completion threshold.** Require all success/failure journey scenarios to execute and pass on a fresh database in Chromium locally and in CI before reporting task 9.2 verified. The implementation checkbox may be checked after implementation, passing local fresh-database journeys and independent review with no unresolved code findings, while CI execution is explicitly pending. Checking it does not claim CI verification or release readiness. Retain sanitized failure traces/screenshots plus a command/revision/environment manifest; disclose synthetic authentication limits and retain manual deployed checks under 9.4.
+
+Implementation may proceed against these approved decisions. Missing CI execution evidence must remain explicitly unverified, not treated as a local pass. No shipped migrations are changed or hosted migrations applied. At the initial gate the human authorized exactly one spec-only commit on the current branch; later commit authorization is recorded in the closeout clarification below. Push, PR creation and deployment remain unauthorized.
+
+### Task 9.2 human closeout clarification
+
+On 12 November 2026 the human approved the implementation and authorized scoped commits on `chore/e2e-product-manager-journey`, with no push or PR creation. To resolve the checkbox/CI-threshold conflict, the human explicitly chose: "Tick as implementation complete; revise the spec/decision to keep CI verification explicitly pending." This clarifies D7's completion label without waiving CI verification. The original requirements gate remains 7 accepted / 0 modified / 0 rejected; this later D7 clarification is recorded separately. Local Chromium journeys pass 6/6 and final independent code review has no unresolved findings. CI execution, human cross-review, interaction-summary verification and release readiness remain pending.
