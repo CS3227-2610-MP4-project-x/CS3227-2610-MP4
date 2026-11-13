@@ -23,7 +23,9 @@ export class E2EGitHubAdapter implements GitHubEvidenceAdapter {
   async listCommits(_repository: GitHubRepository, query: CommitQuery): Promise<GitHubResult<readonly GitHubCommit[]>> {
     if (query.author.id !== USER.id || query.author.login !== USER.login || query.branch !== "main") return { ok: true, value: [] };
     const claims = await readSyntheticSessionClaims();
-    return claims ? { ok: true, value: [{ ...COMMIT, message: `${claims.taskKey} synthetic implementation` }] } : { ok: false, category: "unauthorized" };
+    // Date the synthetic commit inside the requested window: the picker defaults to the current SGT day,
+    // so a fixed authoredAt would fall outside it on any later run and the commit list would be empty.
+    return claims ? { ok: true, value: [{ ...COMMIT, date: query.since, message: `${claims.taskKey} synthetic implementation` }] } : { ok: false, category: "unauthorized" };
   }
   async fetchDiff(_repository: GitHubRepository, sha: string): Promise<GitHubResult<string>> {
     return sha === SHA ? { ok: true, value: DIFF } : { ok: false, category: "not_found" };
