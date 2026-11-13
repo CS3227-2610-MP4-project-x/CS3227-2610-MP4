@@ -10,7 +10,6 @@
     <li><a href="{{baseUrl}}user-guide.html" class="nav-link nav-link-text">User Guide</a></li>
     <li><a href="{{baseUrl}}developer-guide.html" class="nav-link nav-link-text">Developer Guide</a></li>
     <li><a href="{{baseUrl}}reflections.html" class="nav-link nav-link-text">Reflections</a></li>
-    <li><a href="{{baseUrl}}releases.html" class="nav-link nav-link-text">Releases</a></li>
     <li><a href="https://github.com/CS3227-2610-MP4-project-x/CS3227-2610-MP4" class="nav-link"><md>:fab-github:</md></a></li>
   </navbar>
 </header>
@@ -33,7 +32,6 @@
   * [Overview]({{baseUrl}}reflections.html)
   * [Lim-ZY Reflection]({{baseUrl}}Lim-ZY_Reflection.html)
   * [thegrimbee Reflection]({{baseUrl}}thegrimbee_Reflection.html)
-* [Releases]({{baseUrl}}releases.html)
       </site-nav>
     </div>
   </nav>
