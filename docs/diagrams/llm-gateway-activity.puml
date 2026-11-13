@@ -1,0 +1,47 @@
+@startuml
+!include style.puml
+title LlmGateway.run(): one gateway request
+
+start
+:Feature service passes instructions, named segments,
+maxOutputTokens and a hand-written validator;
+:Build prompt
+- system message: fixed instructions + untrusted-data preamble
+- user message: one <data name="..."> section per segment
+- each segment redacted, "<data" / "</data" neutralised;
+:Reserve usage (one DB transaction, database time)
+- lock usage_quota_days row for person + SGT date
+- per-person rate: 5 non-cached requests / 60 s
+- daily quota: charged + pending tokens + this reservation
+  (reservation covers both possible calls);
+if (allowed?) then (no)
+  :return RATE_LIMITED or QUOTA_EXCEEDED
+  (no record written);
+  stop
+endif
+:insert usage_records row (outcome = pending);
+repeat :attempt (at most 2 calls);
+  :Preflight: fetch provider capabilities
+  (context window, key request limit; cached <= 60 s);
+  if (prompt + output + 1,024 tokens fits context\nand provider-key permit acquired?) then (no)
+    :settle provider_error -> AI_UNAVAILABLE;
+    stop
+  endif
+  :adapter.complete(messages, maxOutputTokens)
+  (60 s timeout, no adapter retry);
+  if (adapter failure?) then (yes)
+    :settle provider_error, return
+    AI_UNAVAILABLE or AI_ERROR;
+    stop
+  endif
+  :strip code fence, JSON.parse, validator;
+  if (valid?) then (yes)
+    :settle succeeded (charge reported usage
+    or the call's reserved maximum);
+    :return value + model + redaction summary;
+    stop
+  endif
+repeat while (first call and correction allowed?) is (yes: add safe\ncorrection feedback)
+:settle invalid_output -> INVALID_OUTPUT;
+stop
+@enduml

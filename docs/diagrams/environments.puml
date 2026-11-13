@@ -1,0 +1,53 @@
+@startuml
+!pragma layout smetana
+!include style.puml
+title Environments and deployment
+
+node "Developer laptop" as local {
+  component "next dev\nlocalhost:3000\nAI_PROVIDER=fake" as ldev
+}
+node "GitHub repository" as repo {
+  component "feature branches" as fb
+  component "dev" as devb
+  component "master" as master
+  component "GitHub Actions\nCI + product website" as gha
+}
+node "Vercel project (Hobby)" as vercel {
+  component "Preview scope\n(dev branch only)\nAPP_ENV=development" as vprev
+  component "Production scope\n(master)\nAPP_ENV=production" as vprod
+}
+node "Development stack" as devstack {
+  database "Supabase dev\n(PostgreSQL 17)" as sdev
+  component "GitHub App (dev)\n+ OAuth app (dev)" as ghdev
+  component "SoC key (thegrimbee)" as kdev
+}
+node "Production stack" as prodstack {
+  database "Supabase prod\n(PostgreSQL 17)" as sprod
+  component "GitHub App (prod)\n+ OAuth app (prod)" as ghprod
+  component "SoC key (Lim-ZY)" as kprod
+}
+node "GitHub Pages" as pages {
+  component "MarkBind product website" as site
+}
+
+fb --> devb : reviewed PR
+devb --> master : reviewed PR
+fb ..> gha
+devb ..> gha
+master ..> gha
+devb --> vprev : Vercel Git integration
+master --> vprod
+master --> site : deploy job
+ldev --> sdev
+vprev --> sdev
+vprev --> ghdev
+vprev --> kdev
+vprod --> sprod
+vprod --> ghprod
+vprod --> kprod
+note bottom of vercel
+  No credential is shared between
+  environments. Previews of other
+  branches get no variables.
+end note
+@enduml

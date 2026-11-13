@@ -1,0 +1,41 @@
+@startuml
+!include style.puml
+title Acceptance Criteria Check (assigned developer)
+autonumber
+actor Developer
+participant "Check panel\n(Client Component)" as UI
+participant "POST .../acceptance-criteria-check" as R
+participant "CompletionAssessmentService" as S
+participant "TaskSnapshotService" as SN
+participant "GitHubEvidenceService" as GE
+participant "CompletionAssessmentRepository" as CR
+participant "LlmGateway" as GW
+
+Developer -> UI : Run check
+UI -> R : {} (same-origin JSON)
+R -> R : validate Origin, Content-Type,\nUUIDs, body == {}; session -> 401
+R -> S : runCheck(project, task, verified identity)
+S -> SN : getAssignedSnapshot()\n(one SQL statement: criteria, SHAs, repo)
+SN --> S : snapshot (or 403 / 404)
+S -> GE : loadPathRules() at default-branch tip
+S -> GE : isAncestor() -> unique anchor SHA
+S -> CR : findReusable(task, commit-set hash,\ncriteria hash, path-rules hash)
+alt cache hit
+  S -> GW : recordCacheHit()  (no quota, no rate)
+  S --> R : {check, reused: true}
+else cache miss
+  S -> GE : fetchDiff() for each SHA
+  S -> S : redact secrets; drop lockfiles, generated,\nbinary files; whole-file selection by priority\nwithin 48,000 chars; list omitted files
+  S -> GW : run(instructions, segments,\nmaxOutputTokens 2000, validator)
+  GW --> S : validated per-criterion statuses + references
+  S -> S : resolve L<n> references to\nverified excerpts; downgrade\nunverifiable "addressed" to unclear
+  S -> CR : save(result, model, redacted)
+  S --> R : {check, reused: false}
+end
+R --> UI : 200 (Cache-Control: no-store)
+note over S, GW
+  No database transaction is open during
+  GitHub or LLM calls. The check never
+  changes task state.
+end note
+@enduml

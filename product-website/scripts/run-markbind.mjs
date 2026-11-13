@@ -1,4 +1,4 @@
-import { mkdir, copyFile, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, copyFile, cp, readFile, rm, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,6 +29,26 @@ for (const sourceName of ['Lim-ZY_Reflection.md', 'thegrimbee_Reflection.md']) {
   reflections = reflections.replaceAll(`](${sourceName})`, `](${siteRoute})`);
 }
 await writeFile(reflectionsPath, reflections);
+
+// The docs pages use links that work on GitHub. Relative links inside an included file
+// would resolve against generated-pages, so rewrite them for the site:
+// - images/...        -> the copy of ../docs/images in the site root (ignored by git);
+// - another docs page -> its site route;
+// - anything else     -> the file on GitHub (repository files are not published).
+const repositoryBlobUrl = 'https://github.com/CS3227-2610-MP4-project-x/CS3227-2610-MP4/blob/master/';
+const siteImagesDirectory = resolve(siteRoot, 'images');
+await rm(siteImagesDirectory, { recursive: true, force: true });
+await cp(resolve(repositoryRoot, 'docs/images'), siteImagesDirectory, { recursive: true });
+for (const name of sourcePages) {
+  const pagePath = resolve(generatedPagesDirectory, name);
+  let page = (await readFile(pagePath, 'utf8')).replaceAll('](images/', `](${baseUrl}images/`);
+  for (const target of sourcePages) {
+    page = page.replaceAll(`](${target}`, `](${baseUrl}${target.replace(/\.md$/, '.html')}`);
+  }
+  page = page.replace(/\]\(\.\.\/([^)\s]+)\)/g, `](${repositoryBlobUrl}$1)`);
+  page = page.replace(/\]\((?!https?:|#|\/|mailto:)([^)\s]+)\)/g, `](${repositoryBlobUrl}docs/$1)`);
+  await writeFile(pagePath, page);
+}
 
 if (process.argv[2] === 'serve') {
   console.info('Preview note: guide sources are copied at startup; restart the preview after editing files in ../docs.');

@@ -1,0 +1,60 @@
+@startuml
+!include style.puml
+title Multi-agent workflow for one tasks.md item
+
+|Human owner|
+start
+:Pick a tasks.md item in own ownership lane
+(Developer A: Lim-ZY, Developer B: thegrimbee);
+|Orchestrator|
+:Record goal, owner, source revision and
+worktree in workflow/plans/;
+|Analyst|
+:Explore task-relevant code, specs and prior decisions;
+:Write source-linked context brief + candidate edit paths;
+:Draft OpenSpec delta (requirements, scenarios)
+and list decisions needing a human;
+|Human owner|
+if (Approve requirements and decisions?) then (no)
+  :Revise or stop;
+  stop
+endif
+:Record decisions in design.md;
+|Orchestrator|
+:Confirm disjoint write paths, dependencies
+and parallel worktrees; write handoff;
+fork
+  |Test-writer|
+  :Write tests under tests/ only;
+fork again
+  |Implementer|
+  :Change only assigned source paths;
+end fork
+|Frontend|
+if (Visible UI changed?) then (yes)
+  :Read-only rendered-UI inspection
+  with current -> desired findings;
+else (no)
+endif
+|Reviewer|
+:Read-only review of every acceptance
+criterion, quality, security, tests;
+if (Findings?) then (yes, at most 2 fix rounds)
+  |Implementer|
+  :Fix and re-verify;
+  |Reviewer|
+  :Re-review;
+endif
+|Orchestrator|
+:Consolidate session reports and resource
+metrics into workflow/handoffs/<task>.md;
+|Human owner|
+:Resolve findings; authorise commits on a named branch;
+|Commit/PR agent|
+:Group authorised changes into scoped
+Conventional Commits; draft PR text;
+|Human owner|
+:Review commits; push and open PR;
+:Cross-review by the other developer; merge;
+stop
+@enduml

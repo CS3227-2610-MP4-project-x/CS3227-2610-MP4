@@ -1,0 +1,29 @@
+@startuml
+!include style.puml
+title Task lifecycle and who may move a task
+
+hide empty description
+[*] --> ToDo : PM creates task\n(>=1 acceptance criterion,\nassignee is a developer)
+state "To Do" as ToDo
+state "In Progress" as InProgress
+state "In Review" as InReview
+state "Done" as Done
+
+ToDo --> InProgress : assigned developer\nstart (state_change)
+InProgress --> InReview : assigned developer\nsubmit (submission event,\nreferences matching check result)
+InReview --> Done : product manager\napprove (state_change)
+InReview --> InProgress : product manager\nrequest changes\n(review_feedback, 1-5,000 chars)
+Done --> [*]
+
+note right of InProgress
+  Only while In Progress may the developer
+  attach / replace commits.
+  Progress updates and AI checks never
+  change state.
+end note
+note bottom of Done
+  Every write sends {state, version}.
+  A stale version returns 409 VERSION_CONFLICT;
+  a disallowed move returns 403 FORBIDDEN.
+end note
+@enduml

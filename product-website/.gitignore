@@ -23,3 +23,6 @@ _site/
 .vscode/
 .idea/*
 *.iml
+
+# Copied from ../docs/images by scripts/run-markbind.mjs
+images/
